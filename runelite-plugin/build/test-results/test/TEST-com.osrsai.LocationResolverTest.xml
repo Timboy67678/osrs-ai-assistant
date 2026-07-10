@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.osrsai.LocationResolverTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-07-10T12:40:57" hostname="TIMOTHY-PC" time="0.007">
+  <properties/>
+  <testcase name="describeForAiIncludesCanonicalNameWhenDifferent" classname="com.osrsai.LocationResolverTest" time="0.0"/>
+  <testcase name="describesAreasUsingRegionBasedFallback" classname="com.osrsai.LocationResolverTest" time="0.001"/>
+  <testcase name="describesUnknownAndNullAreas" classname="com.osrsai.LocationResolverTest" time="0.002"/>
+  <testcase name="describesKnownSurfaceAreas" classname="com.osrsai.LocationResolverTest" time="0.001"/>
+  <testcase name="describesStarterRegionAliasesFromResource" classname="com.osrsai.LocationResolverTest" time="0.0"/>
+  <testcase name="describeForAiReturnsPlainNameWhenNoDifference" classname="com.osrsai.LocationResolverTest" time="0.0"/>
+  <testcase name="describesKnownInstances" classname="com.osrsai.LocationResolverTest" time="0.001"/>
+  <testcase name="parsesStructuredRegionAliasValues" classname="com.osrsai.LocationResolverTest" time="0.001"/>
+  <testcase name="describesUndergroundAreasFromSurfaceOffset" classname="com.osrsai.LocationResolverTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

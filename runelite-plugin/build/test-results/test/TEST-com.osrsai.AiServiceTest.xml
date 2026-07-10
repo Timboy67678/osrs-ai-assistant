@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.osrsai.AiServiceTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-07-10T12:40:56" hostname="TIMOTHY-PC" time="0.243">
+  <properties/>
+  <testcase name="describeAccountTypeIncludesIronmanVariants" classname="com.osrsai.AiServiceTest" time="0.237"/>
+  <testcase name="trimToPromptBudgetNormalizesEmptyText" classname="com.osrsai.AiServiceTest" time="0.0"/>
+  <testcase name="describeAccountGuidanceIncludesIronmanRestrictions" classname="com.osrsai.AiServiceTest" time="0.001"/>
+  <testcase name="buildSystemPromptIncludesGroundingRules" classname="com.osrsai.AiServiceTest" time="0.004"/>
+  <testcase name="trimToPromptBudgetCapsLongText" classname="com.osrsai.AiServiceTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

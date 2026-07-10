@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.osrsai.OsrsAiPanelTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-07-10T12:40:57" hostname="TIMOTHY-PC" time="0.119">
+  <properties/>
+  <testcase name="formatsHeadingsListsAndEscaping" classname="com.osrsai.OsrsAiPanelTest" time="0.119"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
