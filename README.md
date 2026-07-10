@@ -104,24 +104,11 @@ To set up the plugin, navigate to the **RuneLite Settings (wrench icon)**, searc
 
 ## 🎨 UI Preview
 
-Below is a schematic overview of the plugin interface:
+Below is a preview of the plugin interface in action inside RuneLite:
 
-```
-+---------------------------------------+
-|  + New      Delete           [Attach] |  <-- Chat Session Controls
-|  [ Chat Session #1                v ] |  <-- Session Selector
-+---------------------------------------+
-|                                       |
-|  You: How do I beat Jad?              |
-|                                       |
-|  Assistant: Based on your current     |
-|  Ranged level of 75 and equipped      |
-|  Toxic Blowpipe, you should...       |
-|                                       |
-+---------------------------------------+
-|  [ Enter your question...     ] [Ask] |  <-- Chat input
-+---------------------------------------+
-```
+<p align="center">
+  <img src="assets/ui_preview.png" alt="OSRS AI Assistant UI Preview" width="300" />
+</p>
 
 ---
 
