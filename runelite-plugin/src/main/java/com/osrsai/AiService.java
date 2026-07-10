@@ -91,9 +91,8 @@ public class AiService {
         panel.setThinking(true);
         try {
             // Retrieve recent conversation context on the EDT (current thread) to avoid
-            // thread-safety violations
-            // when copying/iterating over panel.recentMessages (ArrayDeque) on the client
-            // thread.
+            // thread-safety violations when copying/iterating over panel.recentMessages on
+            // the client thread.
             String recentConversation = panel.getRecentConversationContext(question);
 
             clientThread.invokeLater(() -> {
@@ -102,44 +101,25 @@ public class AiService {
                     AiProvider provider = config.aiProvider();
                     String clientId = config.clientId();
 
-                    // Fetch wiki context in background, then build and send AI request.
-                    CompletableFuture.supplyAsync(() -> buildWikiContext(question, promptContext))
-                            .whenComplete((wikiContext, ex) -> {
-                                try {
-                                    if (ex != null) {
-                                        log.warn("Wiki fetch failed, proceeding without wiki context", ex);
-                                    }
-                                    String finalContext = appendWikiToContext(promptContext,
-                                            wikiContext != null ? wikiContext : "");
+                    JsonObject requestBody;
+                    switch (provider) {
+                        case OPENAI:
+                            requestBody = buildOpenAiBody("gpt-4o", promptContext, recentConversation, question);
+                            break;
+                        case GROK:
+                            requestBody = buildOpenAiBody(provider.getModelId(), promptContext, recentConversation,
+                                    question);
+                            break;
+                        case CLAUDE:
+                            requestBody = buildClaudeBody(promptContext, recentConversation, question);
+                            break;
+                        case GEMINI:
+                        default:
+                            requestBody = buildGeminiBody(promptContext, recentConversation, question);
+                            break;
+                    }
 
-                                    JsonObject requestBody;
-                                    switch (provider) {
-                                        case OPENAI:
-                                            requestBody = buildOpenAiBody("gpt-4o", finalContext, recentConversation,
-                                                    question);
-                                            break;
-                                        case GROK:
-                                            requestBody = buildOpenAiBody(provider.getModelId(), finalContext,
-                                                    recentConversation, question);
-                                            break;
-                                        case CLAUDE:
-                                            requestBody = buildClaudeBody(finalContext, recentConversation, question);
-                                            break;
-                                        case GEMINI:
-                                        default:
-                                            requestBody = buildGeminiBody(finalContext, recentConversation, question);
-                                            break;
-                                    }
-
-                                    executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
-                                } catch (Throwable t) {
-                                    log.error("Error preparing request", t);
-                                    SwingUtilities.invokeLater(() -> {
-                                        panel.setThinking(false);
-                                        panel.addMessage("System", "Error preparing request: " + t.getMessage());
-                                    });
-                                }
-                            });
+                    executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
                 } catch (Throwable t) {
                     log.error("Error executing client thread prompt preparation", t);
                     SwingUtilities.invokeLater(() -> {
@@ -242,11 +222,15 @@ public class AiService {
         declarations.add(
                 createGeminiFunction("get_player_equipment", "Retrieve the items currently equipped by the player."));
         declarations.add(createGeminiFunction("get_player_slayer_task",
-                "Retrieve the player's current Slayer task and remaining quantity."));
+                "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
         declarations.add(createGeminiFunction("get_player_quests",
                 "Retrieve the player's quest points and list of in-progress quests."));
         declarations.add(createGeminiFunction("get_player_bank",
                 "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
+        declarations.add(createGeminiFunctionWithParams("search_osrs_wiki",
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
+                createGeminiStringParam("query",
+                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
 
         JsonObject tool = new JsonObject();
         tool.add("functionDeclarations", declarations);
@@ -267,6 +251,34 @@ public class AiService {
         return decl;
     }
 
+    private JsonObject createGeminiFunctionWithParams(String name, String description, JsonObject properties) {
+        JsonObject decl = new JsonObject();
+        decl.addProperty("name", name);
+        decl.addProperty("description", description);
+
+        JsonObject params = new JsonObject();
+        params.addProperty("type", "OBJECT");
+        params.add("properties", properties);
+
+        JsonArray required = new JsonArray();
+        for (String key : properties.keySet()) {
+            required.add(key);
+        }
+        params.add("required", required);
+
+        decl.add("parameters", params);
+        return decl;
+    }
+
+    private JsonObject createGeminiStringParam(String name, String description) {
+        JsonObject prop = new JsonObject();
+        JsonObject val = new JsonObject();
+        val.addProperty("type", "STRING");
+        val.addProperty("description", description);
+        prop.add(name, val);
+        return prop;
+    }
+
     private JsonArray buildOpenAiTools() {
         JsonArray tools = new JsonArray();
         tools.add(createOpenAiFunction("get_player_skills",
@@ -275,11 +287,15 @@ public class AiService {
                 "Retrieve the items currently in the player's inventory."));
         tools.add(createOpenAiFunction("get_player_equipment", "Retrieve the items currently equipped by the player."));
         tools.add(createOpenAiFunction("get_player_slayer_task",
-                "Retrieve the player's current Slayer task and remaining quantity."));
+                "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
         tools.add(createOpenAiFunction("get_player_quests",
                 "Retrieve the player's quest points and list of in-progress quests."));
         tools.add(createOpenAiFunction("get_player_bank",
                 "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
+        tools.add(createOpenAiFunctionWithParams("search_osrs_wiki",
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
+                createOpenAiStringParam("query",
+                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
         return tools;
     }
 
@@ -298,6 +314,38 @@ public class AiService {
         return tool;
     }
 
+    private JsonObject createOpenAiFunctionWithParams(String name, String description, JsonObject properties) {
+        JsonObject func = new JsonObject();
+        func.addProperty("name", name);
+        func.addProperty("description", description);
+
+        JsonObject params = new JsonObject();
+        params.addProperty("type", "object");
+        params.add("properties", properties);
+
+        JsonArray required = new JsonArray();
+        for (String key : properties.keySet()) {
+            required.add(key);
+        }
+        params.add("required", required);
+
+        func.add("parameters", params);
+
+        JsonObject tool = new JsonObject();
+        tool.addProperty("type", "function");
+        tool.add("function", func);
+        return tool;
+    }
+
+    private JsonObject createOpenAiStringParam(String name, String description) {
+        JsonObject prop = new JsonObject();
+        JsonObject val = new JsonObject();
+        val.addProperty("type", "string");
+        val.addProperty("description", description);
+        prop.add(name, val);
+        return prop;
+    }
+
     private JsonArray buildClaudeTools() {
         JsonArray tools = new JsonArray();
         tools.add(createClaudeFunction("get_player_skills",
@@ -306,11 +354,15 @@ public class AiService {
                 "Retrieve the items currently in the player's inventory."));
         tools.add(createClaudeFunction("get_player_equipment", "Retrieve the items currently equipped by the player."));
         tools.add(createClaudeFunction("get_player_slayer_task",
-                "Retrieve the player's current Slayer task and remaining quantity."));
+                "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
         tools.add(createClaudeFunction("get_player_quests",
                 "Retrieve the player's quest points and list of in-progress quests."));
         tools.add(createClaudeFunction("get_player_bank",
                 "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
+        tools.add(createClaudeFunctionWithParams("search_osrs_wiki",
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
+                createClaudeStringParam("query",
+                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
         return tools;
     }
 
@@ -323,6 +375,34 @@ public class AiService {
         schema.add("properties", new JsonObject());
         tool.add("input_schema", schema);
         return tool;
+    }
+
+    private JsonObject createClaudeFunctionWithParams(String name, String description, JsonObject properties) {
+        JsonObject tool = new JsonObject();
+        tool.addProperty("name", name);
+        tool.addProperty("description", description);
+
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "object");
+        schema.add("properties", properties);
+
+        JsonArray required = new JsonArray();
+        for (String key : properties.keySet()) {
+            required.add(key);
+        }
+        schema.add("required", required);
+
+        tool.add("input_schema", schema);
+        return tool;
+    }
+
+    private JsonObject createClaudeStringParam(String name, String description) {
+        JsonObject prop = new JsonObject();
+        JsonObject val = new JsonObject();
+        val.addProperty("type", "string");
+        val.addProperty("description", description);
+        prop.add(name, val);
+        return prop;
     }
 
     private Request buildHttpRequest(AiProvider provider, String apiKey, String clientId, JsonObject requestBody) {
@@ -515,15 +595,55 @@ public class AiService {
         });
     }
 
+    private String executeWikiSearch(String query) {
+        String title = searchWikiTopResult(query);
+        if (title != null) {
+            String extract = fetchWikiExtract(title);
+            if (extract != null && !extract.isEmpty()) {
+                JsonObject res = new JsonObject();
+                res.addProperty("title", title);
+                res.addProperty("extract", extract);
+                return gson.toJson(res);
+            }
+        }
+        JsonObject err = new JsonObject();
+        err.addProperty("status", "error");
+        err.addProperty("message", "No wiki article found for search query: " + query);
+        return gson.toJson(err);
+    }
+
     private CompletableFuture<List<ToolResult>> executeToolsAsync(List<ToolCall> toolCalls) {
         CompletableFuture<List<ToolResult>> future = new CompletableFuture<>();
-        clientThread.invokeLater(() -> {
+        CompletableFuture.runAsync(() -> {
             List<ToolResult> results = new ArrayList<>();
             for (ToolCall tc : toolCalls) {
                 try {
                     log.info("Executing tool: {}", tc.name);
-                    String output = executeToolOnClientThread(tc.name);
-                    log.info("Tool {} returned result: {}", tc.name, output);
+                    String output;
+                    if ("search_osrs_wiki".equals(tc.name)) {
+                        String query = tc.args.has("query") ? tc.args.get("query").getAsString() : "";
+                        output = executeWikiSearch(query);
+                    } else {
+                        // Client-thread bound tools
+                        final String[] clientThreadResult = new String[1];
+                        final Throwable[] clientThreadError = new Throwable[1];
+                        CompletableFuture<Void> clientFuture = new CompletableFuture<>();
+                        clientThread.invokeLater(() -> {
+                            try {
+                                clientThreadResult[0] = executeToolOnClientThread(tc.name);
+                                clientFuture.complete(null);
+                            } catch (Throwable t) {
+                                clientThreadError[0] = t;
+                                clientFuture.completeExceptionally(t);
+                            }
+                        });
+                        clientFuture.join(); // wait for client thread to finish
+                        if (clientThreadError[0] != null) {
+                            throw new Exception(clientThreadError[0]);
+                        }
+                        output = clientThreadResult[0];
+                    }
+                    log.info("Tool {} returned result length: {}", tc.name, output.length());
                     results.add(new ToolResult(tc, output));
                 } catch (Exception ex) {
                     log.error("Error executing tool: " + tc.name, ex);
@@ -582,6 +702,20 @@ public class AiService {
                 String amount = configManager.getRSProfileConfiguration("slayer", "amount");
                 if (amount == null || amount.isEmpty()) {
                     amount = configManager.getConfiguration("slayer", "amount");
+                }
+                String pointsStr = configManager.getRSProfileConfiguration("slayer", "points");
+                if (pointsStr == null || pointsStr.isEmpty()) {
+                    pointsStr = configManager.getConfiguration("slayer", "points");
+                }
+                int pointsVal = 0;
+                if (pointsStr != null && !pointsStr.isEmpty()) {
+                    try {
+                        pointsVal = Integer.parseInt(pointsStr);
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                if (pointsVal != 0) {
+                    result.addProperty("points", pointsVal);
                 }
                 if (taskName != null && !taskName.isEmpty() && amount != null) {
                     result.addProperty("task", taskName);
@@ -892,9 +1026,10 @@ public class AiService {
     }
 
     private boolean isSlayerRelated(String question, String monster) {
-        if (question == null) return false;
+        if (question == null)
+            return false;
         String q = question.toLowerCase();
-        return q.contains("slayer") || q.contains("task") || q.contains("monster") || q.contains("kill") 
+        return q.contains("slayer") || q.contains("task") || q.contains("monster") || q.contains("kill")
                 || q.contains("fight") || q.contains("weakness") || q.contains("combat") || q.contains("gear")
                 || (monster != null && q.contains(monster.toLowerCase()));
     }
@@ -914,7 +1049,8 @@ public class AiService {
             }
         }
 
-        // Include the slayer task monster only if active and the question is slayer/combat related.
+        // Include the slayer task monster only if active and the question is
+        // slayer/combat related.
         String slayerMonster = extractSlayerMonster(gameContext);
         if (slayerMonster != null && !slayerMonster.isEmpty() && isSlayerRelated(question, slayerMonster)) {
             boolean alreadyCovered = fetchedTitles.stream()
@@ -1128,8 +1264,6 @@ public class AiService {
                 return "Normal";
         }
     }
-
-
 
     private static String truncateForNotification(String text) {
         if (text.length() <= 80) {
