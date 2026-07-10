@@ -44,3 +44,9 @@ next-env.d.ts
 runelite-plugin/.gradle/
 runelite-plugin/build/
 
+# IDEs and Editors
+.idea/
+*.iml
+*.iws
+*.ipr
+bin/
