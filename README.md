@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="OSRS AI Assistant Logo" width="220" />
+  <img src="assets/logo.png" alt="OSRS AI Assistant Logo" width="350" />
 </p>
 
 <h1 align="center">OSRS AI Assistant</h1>
