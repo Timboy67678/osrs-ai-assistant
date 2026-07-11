@@ -4,6 +4,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Range;
 
 @ConfigGroup("osrsai")
 public interface OsrsAiConfig extends Config {
@@ -26,6 +27,12 @@ public interface OsrsAiConfig extends Config {
         @ConfigItem(keyName = "clientId", name = "Org ID", description = "Optional client ID (Required if provider specifies it).", position = 3, secret = true, section = apiSection)
         default String clientId() {
                 return "";
+        }
+
+        @Range(min = 1, max = 10)
+        @ConfigItem(keyName = "maxSearchDepth", name = "Max Search Depth", description = "The maximum number of recursive tool calls/wiki searches the AI can perform for a single question.", position = 4, section = apiSection)
+        default int maxSearchDepth() {
+                return 5;
         }
 
         @ConfigItem(keyName = "shareCharacterInfo", name = "Share Character Info", description = "Allow the AI assistant to query your in-game status, stats, inventory, equipment, quests, slayer task, and bank when open.", position = 11, section = sharingSection)

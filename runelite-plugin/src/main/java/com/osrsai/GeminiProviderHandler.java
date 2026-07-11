@@ -52,9 +52,11 @@ public class GeminiProviderHandler implements ProviderHandler {
             declarations.add(createGeminiFunction("get_player_equipment",
                     "Retrieve the items currently equipped by the player."));
             declarations.add(createGeminiFunction("get_player_slayer_task",
-                    "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
+                    "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak."));
             declarations.add(createGeminiFunction("get_player_quests",
                     "Retrieve the player's quest points and list of in-progress quests."));
+            declarations.add(createGeminiFunction("get_player_achievement_diaries",
+                    "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
             declarations.add(createGeminiFunction("get_player_bank",
                     "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
         }

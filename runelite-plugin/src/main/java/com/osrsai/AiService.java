@@ -94,34 +94,26 @@ public class AiService {
                     final AiProvider provider = config.aiProvider();
                     final String clientId = config.clientId();
 
-                    CompletableFuture.supplyAsync(() -> {
-                        try {
-                            String wikiContext = buildWikiContext(question, gameContext);
-                            return appendWikiToContext(gameContext, wikiContext);
-                        } catch (Exception e) {
-                            log.error("Error building wiki context", e);
-                            return gameContext;
-                        }
-                    }).thenAccept(promptContext -> {
+                    CompletableFuture.runAsync(() -> {
                         try {
                             ProviderHandler handler = provider.getHandler();
                             JsonObject requestBody = handler.buildRequestBody(
                                     provider.getModelId(),
-                                    promptContext,
+                                    gameContext,
                                     recentConversation,
                                     question,
                                     config.shareCharacterInfo());
 
                             executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
                         } catch (Throwable t) {
-                            log.error("Error executing API request in supplyAsync callback", t);
+                            log.error("Error executing API request", t);
                             SwingUtilities.invokeLater(() -> {
                                 panel.setThinking(false);
                                 panel.addMessage("System", "Error preparing request: " + t.getMessage());
                             });
                         }
                     }).exceptionally(ex -> {
-                        log.error("Error in supplyAsync pipeline", ex);
+                        log.error("Error in async pipeline", ex);
                         SwingUtilities.invokeLater(() -> {
                             panel.setThinking(false);
                             panel.addMessage("System", "Error in pipeline: " + ex.getMessage());
@@ -147,6 +139,7 @@ public class AiService {
 
     private void executeRequestLoop(AiProvider provider, String apiKey, String clientId, JsonObject requestBody,
             int depth, OsrsAiPanel panel) {
+        int maxDepth = Math.max(1, Math.min(10, config.maxSearchDepth()));
         ProviderHandler handler = provider.getHandler();
         log.info("Sending request to AI provider {}. Depth: {}. Has tools: {}", provider, depth,
                 requestBody.has("tools"));
@@ -198,7 +191,7 @@ public class AiService {
                     boolean hasToolCalls = false;
                     List<ToolCall> toolCalls = new ArrayList<>();
 
-                    if (depth < 3 && handler.hasToolCalls(root)) {
+                    if (depth < maxDepth && handler.hasToolCalls(root)) {
                         hasToolCalls = true;
                         toolCalls = handler.extractToolCalls(root);
                     }
@@ -217,6 +210,11 @@ public class AiService {
 
                             // Update request body with tool calls and results
                             handler.updateRequestWithToolResults(requestBody, root, results);
+
+                            // If the next request will be the final depth, remove the tools object so the model must return text
+                            if (depth + 1 >= maxDepth) {
+                                requestBody.remove("tools");
+                            }
 
                             // Send updated request recursively
                             executeRequestLoop(provider, apiKey, clientId, requestBody, depth + 1, panel);
@@ -364,6 +362,10 @@ public class AiService {
                 if (pointsStr == null || pointsStr.isEmpty()) {
                     pointsStr = configManager.getConfiguration("slayer", "points");
                 }
+                String streakStr = configManager.getRSProfileConfiguration("slayer", "streak");
+                if (streakStr == null || streakStr.isEmpty()) {
+                    streakStr = configManager.getConfiguration("slayer", "streak");
+                }
                 int pointsVal = 0;
                 if (pointsStr != null && !pointsStr.isEmpty()) {
                     try {
@@ -373,6 +375,12 @@ public class AiService {
                 }
                 if (pointsVal != 0) {
                     result.addProperty("points", pointsVal);
+                }
+                if (streakStr != null && !streakStr.isEmpty()) {
+                    try {
+                        result.addProperty("streak", Integer.parseInt(streakStr));
+                    } catch (NumberFormatException ignored) {
+                    }
                 }
                 if (taskName != null && !taskName.isEmpty() && amount != null) {
                     result.addProperty("task", taskName);
@@ -393,6 +401,23 @@ public class AiService {
                     }
                 }
                 result.add("inProgressQuests", inProgress);
+                break;
+
+            case "get_player_achievement_diaries":
+                JsonObject diaries = new JsonObject();
+                diaries.add("Ardougne", createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM, Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE));
+                diaries.add("Desert", createDiaryProgress(Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM, Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE));
+                diaries.add("Falador", createDiaryProgress(Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM, Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE));
+                diaries.add("Fremennik", createDiaryProgress(Varbits.DIARY_FREMENNIK_EASY, Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE));
+                diaries.add("Kandarin", createDiaryProgress(Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM, Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE));
+                diaries.add("Karamja", createDiaryProgress(Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM, Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE));
+                diaries.add("Kourend", createDiaryProgress(Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM, Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE));
+                diaries.add("Lumbridge", createDiaryProgress(Varbits.DIARY_LUMBRIDGE_EASY, Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE));
+                diaries.add("Morytania", createDiaryProgress(Varbits.DIARY_MORYTANIA_EASY, Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE));
+                diaries.add("Varrock", createDiaryProgress(Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM, Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE));
+                diaries.add("Western", createDiaryProgress(Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM, Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE));
+                diaries.add("Wilderness", createDiaryProgress(Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM, Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
+                result.add("diaries", diaries);
                 break;
 
             case "get_player_bank":
@@ -524,6 +549,10 @@ public class AiService {
     }
 
     static String trimToPromptBudget(String text, int maxChars, String truncationLabel) {
+        return trimToPromptBudget(text, maxChars, truncationLabel, false);
+    }
+
+    static String trimToPromptBudget(String text, int maxChars, String truncationLabel, boolean keepEnd) {
         if (maxChars <= 0) {
             return "";
         }
@@ -546,7 +575,11 @@ public class AiService {
         }
 
         int keepLength = maxChars - safeLabel.length() - 1;
-        return normalized.substring(0, keepLength) + "\n" + safeLabel;
+        if (keepEnd) {
+            return safeLabel + "\n" + normalized.substring(normalized.length() - keepLength);
+        } else {
+            return normalized.substring(0, keepLength) + "\n" + safeLabel;
+        }
     }
 
     private boolean isSlayerRelated(String question, String monster) {
@@ -781,13 +814,13 @@ public class AiService {
 
     static String buildSystemPrompt(String context, String recentConversation) {
         String compactConversation = trimToPromptBudget(recentConversation, MAX_RECENT_CONVERSATION_CHARS,
-                "...[recent conversation truncated]");
+                "...[recent conversation truncated]", true);
 
         return "You are an OSRS RuneLite assistant. Use OSRS knowledge, and treat the GAME CONTEXT and tools as truth for the player.\n"
                 + "\n"
                 + "INTEGRATION TOOLS:\n"
-                + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, and bank (when open).\n"
-                + "- Call them when the player asks about stats, items, progress, or general goals/progression advice (query skills/quests first for tailored advice).\n"
+                + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, and bank (when open).\n"
+                + "- Call them when the player asks about stats, items, progress, or general goals/progression advice (query skills/quests/diaries first for tailored advice).\n"
                 + "- Do not guess player details; call the relevant tools to check.\n"
                 + "\n"
                 + "GROUNDING RULES:\n"
@@ -798,6 +831,7 @@ public class AiService {
                 + "5. For Ironman/UIM/GIM accounts, do not recommend invalid trading, Grand Exchange, or banking options.\n"
                 + "6. Respect disabled tools/errors and keep answers practical and concise. Avoid markdown headings.\n"
                 + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, and requirements.\n"
+                + "8. Use tool result data to answer the user's original question. Do not change the conversation topic to unrelated tool outputs if they do not address the user's query.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation
@@ -875,5 +909,28 @@ public class AiService {
             return text;
         }
         return text.substring(0, 77) + "...";
+    }
+
+    private String getDiaryStatus(int varbitId) {
+        int val = client.getVarbitValue(varbitId);
+        switch (val) {
+            case 0:
+                return "Not Started";
+            case 1:
+                return "In Progress";
+            case 2:
+                return "Completed";
+            default:
+                return "Unknown (" + val + ")";
+        }
+    }
+
+    private JsonObject createDiaryProgress(int easy, int med, int hard, int elite) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("Easy", getDiaryStatus(easy));
+        obj.addProperty("Medium", getDiaryStatus(med));
+        obj.addProperty("Hard", getDiaryStatus(hard));
+        obj.addProperty("Elite", getDiaryStatus(elite));
+        return obj;
     }
 }

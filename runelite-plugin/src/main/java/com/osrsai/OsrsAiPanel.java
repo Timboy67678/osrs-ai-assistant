@@ -130,10 +130,11 @@ public class OsrsAiPanel extends PluginPanel {
         // Add action listener
         java.awt.event.ActionListener sendAction = e -> {
             String question = inputField.getText();
-            if (!question.isBlank() && this.plugin != null) {
-                addMessage("You", question);
+            if (question != null && !question.isBlank() && this.plugin != null) {
+                String trimmed = question.trim();
+                addMessage("You", trimmed);
                 inputField.setText("");
-                this.plugin.askQuestion(question);
+                this.plugin.askQuestion(trimmed);
             }
         };
 
