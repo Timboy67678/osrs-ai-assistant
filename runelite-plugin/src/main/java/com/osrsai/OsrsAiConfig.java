@@ -29,10 +29,10 @@ public interface OsrsAiConfig extends Config {
                 return "";
         }
 
-        @Range(min = 1, max = 10)
+        @Range(min = 1, max = AiService.MAX_DEPTH_COUNT)
         @ConfigItem(keyName = "maxSearchDepth", name = "Max Search Depth", description = "The maximum number of recursive tool calls/wiki searches the AI can perform for a single question.", position = 4, section = apiSection)
         default int maxSearchDepth() {
-                return 5;
+                return AiService.MAX_DEPTH_COUNT / 2;
         }
 
         @ConfigItem(keyName = "shareCharacterInfo", name = "Share Character Info", description = "Allow the AI assistant to query your in-game status, stats, inventory, equipment, quests, slayer task, and bank when open.", position = 11, section = sharingSection)

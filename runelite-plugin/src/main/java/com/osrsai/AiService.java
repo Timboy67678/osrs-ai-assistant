@@ -39,9 +39,15 @@ import org.jetbrains.annotations.NotNull;
 
 @Slf4j
 public class AiService {
+    // Global Constants
+    static final int MAX_DEPTH_COUNT = 10;
+
+    // Token Constants
     private static final int MAX_CONTEXT_CHARACTERS = 8000;
     private static final int MAX_RECENT_CONVERSATION_CHARS = 1200;
     private static final int WIKI_EXTRACT_CHARS = 2500;
+
+    // URI Constants
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
 
     @Inject
@@ -135,7 +141,7 @@ public class AiService {
 
     private void executeRequestLoop(AiProvider provider, String apiKey, String clientId, JsonObject requestBody,
             int depth, OsrsAiPanel panel) {
-        int maxDepth = Math.max(1, Math.min(10, config.maxSearchDepth()));
+        int maxDepth = Math.max(1, Math.min(MAX_DEPTH_COUNT, config.maxSearchDepth()));
         ProviderHandler handler = provider.getHandler();
         log.info("Sending request to AI provider {}. Depth: {}. Has tools: {}", provider, depth,
                 requestBody.has("tools"));
