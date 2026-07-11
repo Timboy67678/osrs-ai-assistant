@@ -34,23 +34,19 @@ import javax.swing.SwingUtilities;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
-import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 
 @Slf4j
 public class AiService {
-    private static final double LOW_TEMPERATURE = 0.2d;
     private static final int MAX_CONTEXT_CHARACTERS = 8000;
     private static final int MAX_RECENT_CONVERSATION_CHARS = 1200;
-    private static final int MAX_WIKI_CHARS = 1400;
-    private static final int WIKI_EXTRACT_CHARS = 650;
+    private static final int MAX_WIKI_CHARS = 3000;
+    private static final int WIKI_EXTRACT_CHARS = 2500;
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
     private static final Pattern SLAYER_TASK_PATTERN = Pattern.compile("Slayer Task: \\d+ (.+)", Pattern.MULTILINE);
-
 
     @Inject
     private Client client;
@@ -114,8 +110,7 @@ public class AiService {
                                     promptContext,
                                     recentConversation,
                                     question,
-                                    config.shareCharacterInfo()
-                            );
+                                    config.shareCharacterInfo());
 
                             executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
                         } catch (Throwable t) {
@@ -149,8 +144,6 @@ public class AiService {
             });
         }
     }
-
-
 
     private void executeRequestLoop(AiProvider provider, String apiKey, String clientId, JsonObject requestBody,
             int depth, OsrsAiPanel panel) {
@@ -233,11 +226,16 @@ public class AiService {
                         String aiResponseText = handler.extractResponseText(root);
                         String cleanResponse = aiResponseText.trim();
 
+                        if (cleanResponse.isEmpty() && handler.hasToolCalls(root)) {
+                            cleanResponse = "I reached my search limit while trying to gather details. Please try rephrasing your question or checking that the required game screen is open.";
+                        }
+
+                        final String finalResponse = cleanResponse;
                         SwingUtilities.invokeLater(() -> {
                             panel.setThinking(false);
-                            panel.addMessage("AI", cleanResponse);
-                            if (config.notifyOnResponse()) {
-                                notifier.notify("AI Assistant: " + truncateForNotification(cleanResponse));
+                            panel.addMessage("AI", finalResponse);
+                            if (config.notifyOnResponse() && !finalResponse.isEmpty()) {
+                                notifier.notify("AI Assistant: " + truncateForNotification(finalResponse));
                                 clientThread.invokeLater(
                                         () -> client.playSoundEffect(SoundEffectID.GE_ADD_OFFER_DINGALING));
                             }
@@ -432,8 +430,6 @@ public class AiService {
         }
         return aggregatedItems;
     }
-
-
 
     static class ToolCall {
         final String id;
@@ -708,10 +704,9 @@ public class AiService {
             HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
                     .addQueryParameter("action", "query")
                     .addQueryParameter("titles", title)
-                    .addQueryParameter("prop", "extracts")
-                    .addQueryParameter("exintro", "true")
-                    .addQueryParameter("exchars", String.valueOf(WIKI_EXTRACT_CHARS))
-                    .addQueryParameter("explaintext", "true")
+                    .addQueryParameter("prop", "revisions")
+                    .addQueryParameter("rvprop", "content")
+                    .addQueryParameter("rvlimit", "1")
                     .addQueryParameter("redirects", "1")
                     .addQueryParameter("format", "json")
                     .build();
@@ -736,10 +731,18 @@ public class AiService {
                     if ("-1".equals(entry.getKey()))
                         continue;
                     JsonObject page = entry.getValue().getAsJsonObject();
-                    if (page.has("extract")) {
-                        String extract = page.get("extract").getAsString().trim();
-                        if (!extract.isEmpty())
-                            return extract;
+                    if (page.has("revisions")) {
+                        JsonArray revisions = page.getAsJsonArray("revisions");
+                        if (revisions != null && revisions.size() > 0) {
+                            JsonObject rev = revisions.get(0).getAsJsonObject();
+                            if (rev.has("*")) {
+                                String wikitext = rev.get("*").getAsString();
+                                if (wikitext.length() > WIKI_EXTRACT_CHARS) {
+                                    wikitext = wikitext.substring(0, WIKI_EXTRACT_CHARS) + "\n...[truncated]";
+                                }
+                                return wikitext;
+                            }
+                        }
                     }
                 }
             }

@@ -4,7 +4,7 @@ public enum AiProvider {
     GEMINI("Gemini 2.5 Flash", "gemini-2.5-flash"),
     OPENAI("OpenAI GPT-4o", "gpt-4o"),
     CLAUDE("Anthropic Claude", "claude-3-5-sonnet-20240620"),
-    GROK("xAI Grok", "grok-4-1-fast-non-reasoning");
+    GROK("Grok Build 0.1 Chat", "grok-build-0.1");
 
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
     private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler("https://api.openai.com/v1/chat/completions");
