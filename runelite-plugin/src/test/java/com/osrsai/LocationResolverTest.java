@@ -72,6 +72,23 @@ public class LocationResolverTest
     }
 
     @Test
+    public void describesNewRegionAliasesFromResource()
+    {
+        Assert.assertEquals("Stronghold of Security (Vault of War)",
+                locationResolver.describe(new WorldPoint(1866, 5194, 0), false, null));
+        Assert.assertEquals("Catacombs of Kourend",
+                locationResolver.describe(new WorldPoint(1610, 9994, 0), false, null));
+        Assert.assertEquals("Prifddinas",
+                locationResolver.describe(new WorldPoint(2186, 3402, 0), false, null));
+        Assert.assertEquals("Duke Sucellus Arena (Ghorrock Dungeon)",
+                locationResolver.describe(new WorldPoint(3018, 6410, 0), false, null));
+        Assert.assertEquals("Taverley Dungeon",
+                locationResolver.describe(new WorldPoint(2868, 9817, 0), false, null));
+        Assert.assertEquals("Entrana Dungeon",
+                locationResolver.describe(new WorldPoint(2834, 9835, 0), false, null));
+    }
+
+    @Test
     public void describesKnownInstances()
     {
         Assert.assertEquals("Chambers of Xeric - Lobby",

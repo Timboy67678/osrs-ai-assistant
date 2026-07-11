@@ -50,10 +50,7 @@ public class AiService {
     private static final int WIKI_EXTRACT_CHARS = 650;
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
     private static final Pattern SLAYER_TASK_PATTERN = Pattern.compile("Slayer Task: \\d+ (.+)", Pattern.MULTILINE);
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
-    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
-    private static final String GROK_API_URL = "https://api.x.ai/v1/chat/completions";
+
 
     @Inject
     private Client client;
@@ -97,29 +94,45 @@ public class AiService {
 
             clientThread.invokeLater(() -> {
                 try {
-                    String promptContext = buildContext();
-                    AiProvider provider = config.aiProvider();
-                    String clientId = config.clientId();
+                    final String gameContext = buildContext();
+                    final AiProvider provider = config.aiProvider();
+                    final String clientId = config.clientId();
 
-                    JsonObject requestBody;
-                    switch (provider) {
-                        case OPENAI:
-                            requestBody = buildOpenAiBody("gpt-4o", promptContext, recentConversation, question);
-                            break;
-                        case GROK:
-                            requestBody = buildOpenAiBody(provider.getModelId(), promptContext, recentConversation,
-                                    question);
-                            break;
-                        case CLAUDE:
-                            requestBody = buildClaudeBody(promptContext, recentConversation, question);
-                            break;
-                        case GEMINI:
-                        default:
-                            requestBody = buildGeminiBody(promptContext, recentConversation, question);
-                            break;
-                    }
+                    CompletableFuture.supplyAsync(() -> {
+                        try {
+                            String wikiContext = buildWikiContext(question, gameContext);
+                            return appendWikiToContext(gameContext, wikiContext);
+                        } catch (Exception e) {
+                            log.error("Error building wiki context", e);
+                            return gameContext;
+                        }
+                    }).thenAccept(promptContext -> {
+                        try {
+                            ProviderHandler handler = provider.getHandler();
+                            JsonObject requestBody = handler.buildRequestBody(
+                                    provider.getModelId(),
+                                    promptContext,
+                                    recentConversation,
+                                    question,
+                                    config.shareCharacterInfo()
+                            );
 
-                    executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
+                            executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
+                        } catch (Throwable t) {
+                            log.error("Error executing API request in supplyAsync callback", t);
+                            SwingUtilities.invokeLater(() -> {
+                                panel.setThinking(false);
+                                panel.addMessage("System", "Error preparing request: " + t.getMessage());
+                            });
+                        }
+                    }).exceptionally(ex -> {
+                        log.error("Error in supplyAsync pipeline", ex);
+                        SwingUtilities.invokeLater(() -> {
+                            panel.setThinking(false);
+                            panel.addMessage("System", "Error in pipeline: " + ex.getMessage());
+                        });
+                        return null;
+                    });
                 } catch (Throwable t) {
                     log.error("Error executing client thread prompt preparation", t);
                     SwingUtilities.invokeLater(() -> {
@@ -137,316 +150,17 @@ public class AiService {
         }
     }
 
-    private JsonObject buildGeminiBody(String context, String recentConversation, String question) {
-        String fullPrompt = buildSystemPrompt(context, recentConversation)
-                + "\n\nCURRENT USER QUESTION:\n"
-                + question;
 
-        JsonObject messageObj = new JsonObject();
-        JsonArray partsArray = new JsonArray();
-        JsonObject textObj = new JsonObject();
-        textObj.addProperty("text", fullPrompt);
-        partsArray.add(textObj);
-        messageObj.add("parts", partsArray);
-
-        JsonArray contentsArray = new JsonArray();
-        contentsArray.add(messageObj);
-
-        JsonObject bodyObj = new JsonObject();
-        bodyObj.add("contents", contentsArray);
-
-        JsonObject generationConfig = new JsonObject();
-        generationConfig.addProperty("temperature", LOW_TEMPERATURE);
-        bodyObj.add("generationConfig", generationConfig);
-
-        if (config.shareCharacterInfo()) {
-            bodyObj.add("tools", buildGeminiTools());
-        }
-
-        return bodyObj;
-    }
-
-    private JsonObject buildOpenAiBody(String modelName, String context, String recentConversation, String question) {
-        JsonObject bodyObj = new JsonObject();
-        bodyObj.addProperty("model", modelName);
-        bodyObj.addProperty("temperature", LOW_TEMPERATURE);
-
-        JsonArray messages = new JsonArray();
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", buildSystemPrompt(context, recentConversation));
-
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", question);
-
-        messages.add(systemMessage);
-        messages.add(userMessage);
-        bodyObj.add("messages", messages);
-
-        if (config.shareCharacterInfo()) {
-            bodyObj.add("tools", buildOpenAiTools());
-        }
-
-        return bodyObj;
-    }
-
-    private JsonObject buildClaudeBody(String context, String recentConversation, String question) {
-        JsonObject bodyObj = new JsonObject();
-        bodyObj.addProperty("model", "claude-3-5-sonnet-20240620");
-        bodyObj.addProperty("system", buildSystemPrompt(context, recentConversation));
-        bodyObj.addProperty("max_tokens", 1024);
-        bodyObj.addProperty("temperature", LOW_TEMPERATURE);
-
-        JsonArray messages = new JsonArray();
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", question);
-
-        messages.add(userMessage);
-        bodyObj.add("messages", messages);
-
-        if (config.shareCharacterInfo()) {
-            bodyObj.add("tools", buildClaudeTools());
-        }
-
-        return bodyObj;
-    }
-
-    private JsonArray buildGeminiTools() {
-        JsonArray declarations = new JsonArray();
-        declarations.add(createGeminiFunction("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted) for all skills."));
-        declarations.add(createGeminiFunction("get_player_inventory",
-                "Retrieve the items currently in the player's inventory."));
-        declarations.add(
-                createGeminiFunction("get_player_equipment", "Retrieve the items currently equipped by the player."));
-        declarations.add(createGeminiFunction("get_player_slayer_task",
-                "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
-        declarations.add(createGeminiFunction("get_player_quests",
-                "Retrieve the player's quest points and list of in-progress quests."));
-        declarations.add(createGeminiFunction("get_player_bank",
-                "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
-        declarations.add(createGeminiFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
-                createGeminiStringParam("query",
-                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
-
-        JsonObject tool = new JsonObject();
-        tool.add("functionDeclarations", declarations);
-
-        JsonArray tools = new JsonArray();
-        tools.add(tool);
-        return tools;
-    }
-
-    private JsonObject createGeminiFunction(String name, String description) {
-        JsonObject decl = new JsonObject();
-        decl.addProperty("name", name);
-        decl.addProperty("description", description);
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "OBJECT");
-        params.add("properties", new JsonObject());
-        decl.add("parameters", params);
-        return decl;
-    }
-
-    private JsonObject createGeminiFunctionWithParams(String name, String description, JsonObject properties) {
-        JsonObject decl = new JsonObject();
-        decl.addProperty("name", name);
-        decl.addProperty("description", description);
-
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "OBJECT");
-        params.add("properties", properties);
-
-        JsonArray required = new JsonArray();
-        for (String key : properties.keySet()) {
-            required.add(key);
-        }
-        params.add("required", required);
-
-        decl.add("parameters", params);
-        return decl;
-    }
-
-    private JsonObject createGeminiStringParam(String name, String description) {
-        JsonObject prop = new JsonObject();
-        JsonObject val = new JsonObject();
-        val.addProperty("type", "STRING");
-        val.addProperty("description", description);
-        prop.add(name, val);
-        return prop;
-    }
-
-    private JsonArray buildOpenAiTools() {
-        JsonArray tools = new JsonArray();
-        tools.add(createOpenAiFunction("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted) for all skills."));
-        tools.add(createOpenAiFunction("get_player_inventory",
-                "Retrieve the items currently in the player's inventory."));
-        tools.add(createOpenAiFunction("get_player_equipment", "Retrieve the items currently equipped by the player."));
-        tools.add(createOpenAiFunction("get_player_slayer_task",
-                "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
-        tools.add(createOpenAiFunction("get_player_quests",
-                "Retrieve the player's quest points and list of in-progress quests."));
-        tools.add(createOpenAiFunction("get_player_bank",
-                "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
-        tools.add(createOpenAiFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
-                createOpenAiStringParam("query",
-                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
-        return tools;
-    }
-
-    private JsonObject createOpenAiFunction(String name, String description) {
-        JsonObject func = new JsonObject();
-        func.addProperty("name", name);
-        func.addProperty("description", description);
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "object");
-        params.add("properties", new JsonObject());
-        func.add("parameters", params);
-
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-        tool.add("function", func);
-        return tool;
-    }
-
-    private JsonObject createOpenAiFunctionWithParams(String name, String description, JsonObject properties) {
-        JsonObject func = new JsonObject();
-        func.addProperty("name", name);
-        func.addProperty("description", description);
-
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "object");
-        params.add("properties", properties);
-
-        JsonArray required = new JsonArray();
-        for (String key : properties.keySet()) {
-            required.add(key);
-        }
-        params.add("required", required);
-
-        func.add("parameters", params);
-
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-        tool.add("function", func);
-        return tool;
-    }
-
-    private JsonObject createOpenAiStringParam(String name, String description) {
-        JsonObject prop = new JsonObject();
-        JsonObject val = new JsonObject();
-        val.addProperty("type", "string");
-        val.addProperty("description", description);
-        prop.add(name, val);
-        return prop;
-    }
-
-    private JsonArray buildClaudeTools() {
-        JsonArray tools = new JsonArray();
-        tools.add(createClaudeFunction("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted) for all skills."));
-        tools.add(createClaudeFunction("get_player_inventory",
-                "Retrieve the items currently in the player's inventory."));
-        tools.add(createClaudeFunction("get_player_equipment", "Retrieve the items currently equipped by the player."));
-        tools.add(createClaudeFunction("get_player_slayer_task",
-                "Retrieve the player's current Slayer task, remaining quantity, and current Slayer points."));
-        tools.add(createClaudeFunction("get_player_quests",
-                "Retrieve the player's quest points and list of in-progress quests."));
-        tools.add(createClaudeFunction("get_player_bank",
-                "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
-        tools.add(createClaudeFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
-                createClaudeStringParam("query",
-                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
-        return tools;
-    }
-
-    private JsonObject createClaudeFunction(String name, String description) {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", name);
-        tool.addProperty("description", description);
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "object");
-        schema.add("properties", new JsonObject());
-        tool.add("input_schema", schema);
-        return tool;
-    }
-
-    private JsonObject createClaudeFunctionWithParams(String name, String description, JsonObject properties) {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", name);
-        tool.addProperty("description", description);
-
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "object");
-        schema.add("properties", properties);
-
-        JsonArray required = new JsonArray();
-        for (String key : properties.keySet()) {
-            required.add(key);
-        }
-        schema.add("required", required);
-
-        tool.add("input_schema", schema);
-        return tool;
-    }
-
-    private JsonObject createClaudeStringParam(String name, String description) {
-        JsonObject prop = new JsonObject();
-        JsonObject val = new JsonObject();
-        val.addProperty("type", "string");
-        val.addProperty("description", description);
-        prop.add(name, val);
-        return prop;
-    }
-
-    private Request buildHttpRequest(AiProvider provider, String apiKey, String clientId, JsonObject requestBody) {
-        String jsonBody = gson.toJson(requestBody);
-        RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
-        Request.Builder builder = new Request.Builder();
-
-        switch (provider) {
-            case OPENAI:
-                builder.url(OPENAI_API_URL)
-                        .header("Authorization", "Bearer " + apiKey)
-                        .post(body);
-                if (clientId != null && !clientId.trim().isEmpty()) {
-                    builder.header("OpenAI-Organization", clientId);
-                }
-                break;
-            case GROK:
-                builder.url(GROK_API_URL)
-                        .header("Authorization", "Bearer " + apiKey)
-                        .post(body);
-                break;
-            case CLAUDE:
-                builder.url(CLAUDE_API_URL)
-                        .header("x-api-key", apiKey)
-                        .header("anthropic-version", "2023-06-01")
-                        .header("content-type", "application/json")
-                        .post(body);
-                break;
-            case GEMINI:
-            default:
-                builder.url(GEMINI_API_URL + apiKey)
-                        .post(body);
-                break;
-        }
-        return builder.build();
-    }
 
     private void executeRequestLoop(AiProvider provider, String apiKey, String clientId, JsonObject requestBody,
             int depth, OsrsAiPanel panel) {
+        ProviderHandler handler = provider.getHandler();
         log.info("Sending request to AI provider {}. Depth: {}. Has tools: {}", provider, depth,
                 requestBody.has("tools"));
         log.debug("Request body: {}", gson.toJson(requestBody));
 
-        Request request = buildHttpRequest(provider, apiKey, clientId, requestBody);
+        String jsonBody = gson.toJson(requestBody);
+        Request request = handler.buildHttpRequest(provider.getModelId(), apiKey, clientId, jsonBody);
 
         OkHttpClient aiClient = okHttpClient.newBuilder()
                 .connectTimeout(60, TimeUnit.SECONDS)
@@ -491,53 +205,9 @@ public class AiService {
                     boolean hasToolCalls = false;
                     List<ToolCall> toolCalls = new ArrayList<>();
 
-                    if (config.shareCharacterInfo() && depth < 3) {
-                        if (provider == AiProvider.GEMINI) {
-                            if (hasGeminiToolCalls(root)) {
-                                hasToolCalls = true;
-                                JsonArray assistantParts = root.getAsJsonArray("candidates").get(0)
-                                        .getAsJsonObject().getAsJsonObject("content").getAsJsonArray("parts");
-                                for (int i = 0; i < assistantParts.size(); i++) {
-                                    JsonObject part = assistantParts.get(i).getAsJsonObject();
-                                    if (part.has("functionCall")) {
-                                        JsonObject fc = part.getAsJsonObject("functionCall");
-                                        String name = fc.get("name").getAsString();
-                                        JsonObject args = fc.getAsJsonObject("args");
-                                        toolCalls.add(new ToolCall(null, name, args));
-                                    }
-                                }
-                            }
-                        } else if (provider == AiProvider.OPENAI || provider == AiProvider.GROK) {
-                            if (hasOpenAiToolCalls(root)) {
-                                hasToolCalls = true;
-                                JsonObject assistantMessage = root.getAsJsonArray("choices").get(0)
-                                        .getAsJsonObject().getAsJsonObject("message");
-                                JsonArray tcArray = assistantMessage.getAsJsonArray("tool_calls");
-                                for (int i = 0; i < tcArray.size(); i++) {
-                                    JsonObject tc = tcArray.get(i).getAsJsonObject();
-                                    String id = tc.get("id").getAsString();
-                                    JsonObject func = tc.getAsJsonObject("function");
-                                    String name = func.get("name").getAsString();
-                                    JsonObject args = gson.fromJson(func.get("arguments").getAsString(),
-                                            JsonObject.class);
-                                    toolCalls.add(new ToolCall(id, name, args));
-                                }
-                            }
-                        } else if (provider == AiProvider.CLAUDE) {
-                            if (hasClaudeToolCalls(root)) {
-                                hasToolCalls = true;
-                                JsonArray assistantContent = root.getAsJsonArray("content");
-                                for (int i = 0; i < assistantContent.size(); i++) {
-                                    JsonObject item = assistantContent.get(i).getAsJsonObject();
-                                    if (item.has("type") && "tool_use".equals(item.get("type").getAsString())) {
-                                        String id = item.get("id").getAsString();
-                                        String name = item.get("name").getAsString();
-                                        JsonObject input = item.getAsJsonObject("input");
-                                        toolCalls.add(new ToolCall(id, name, input));
-                                    }
-                                }
-                            }
-                        }
+                    if (depth < 3 && handler.hasToolCalls(root)) {
+                        hasToolCalls = true;
+                        toolCalls = handler.extractToolCalls(root);
                     }
 
                     if (hasToolCalls && !toolCalls.isEmpty()) {
@@ -553,25 +223,14 @@ public class AiService {
                             }
 
                             // Update request body with tool calls and results
-                            if (provider == AiProvider.GEMINI) {
-                                JsonArray assistantParts = root.getAsJsonArray("candidates").get(0)
-                                        .getAsJsonObject().getAsJsonObject("content").getAsJsonArray("parts");
-                                updateGeminiRequest(requestBody, assistantParts, results);
-                            } else if (provider == AiProvider.OPENAI || provider == AiProvider.GROK) {
-                                JsonObject assistantMessage = root.getAsJsonArray("choices").get(0)
-                                        .getAsJsonObject().getAsJsonObject("message");
-                                updateOpenAiRequest(requestBody, assistantMessage, results);
-                            } else if (provider == AiProvider.CLAUDE) {
-                                JsonArray assistantContent = root.getAsJsonArray("content");
-                                updateClaudeRequest(requestBody, assistantContent, results);
-                            }
+                            handler.updateRequestWithToolResults(requestBody, root, results);
 
                             // Send updated request recursively
                             executeRequestLoop(provider, apiKey, clientId, requestBody, depth + 1, panel);
                         });
                     } else {
                         // Normal text response
-                        String aiResponseText = extractResponseText(provider, root);
+                        String aiResponseText = handler.extractResponseText(root);
                         String cleanResponse = aiResponseText.trim();
 
                         SwingUtilities.invokeLater(() -> {
@@ -774,140 +433,9 @@ public class AiService {
         return aggregatedItems;
     }
 
-    private void updateOpenAiRequest(JsonObject requestBody, JsonObject assistantMessage, List<ToolResult> results) {
-        JsonArray messages = requestBody.getAsJsonArray("messages");
 
-        // Add assistant message (which contains the tool calls)
-        JsonObject msg = new JsonObject();
-        msg.addProperty("role", "assistant");
-        msg.add("tool_calls", assistantMessage.getAsJsonArray("tool_calls"));
-        messages.add(msg);
 
-        // Add a message for each tool result
-        for (ToolResult res : results) {
-            JsonObject toolMsg = new JsonObject();
-            toolMsg.addProperty("role", "tool");
-            toolMsg.addProperty("tool_call_id", res.call.id);
-            toolMsg.addProperty("content", res.resultJson);
-            messages.add(toolMsg);
-        }
-    }
-
-    private void updateClaudeRequest(JsonObject requestBody, JsonArray assistantContent, List<ToolResult> results) {
-        JsonArray messages = requestBody.getAsJsonArray("messages");
-
-        // Add assistant message with tool use block(s)
-        JsonObject assistantMsg = new JsonObject();
-        assistantMsg.addProperty("role", "assistant");
-        assistantMsg.add("content", assistantContent);
-        messages.add(assistantMsg);
-
-        // Add user message containing all tool results
-        JsonObject userMsg = new JsonObject();
-        userMsg.addProperty("role", "user");
-        JsonArray contentArray = new JsonArray();
-        for (ToolResult res : results) {
-            JsonObject resultObj = new JsonObject();
-            resultObj.addProperty("type", "tool_result");
-            resultObj.addProperty("tool_use_id", res.call.id);
-            resultObj.addProperty("content", res.resultJson);
-            contentArray.add(resultObj);
-        }
-        userMsg.add("content", contentArray);
-        messages.add(userMsg);
-    }
-
-    private void updateGeminiRequest(JsonObject requestBody, JsonArray assistantParts, List<ToolResult> results) {
-        JsonArray contents = requestBody.getAsJsonArray("contents");
-
-        // Add model message containing the function calls
-        JsonObject modelMsg = new JsonObject();
-        modelMsg.addProperty("role", "model");
-        modelMsg.add("parts", assistantParts);
-        contents.add(modelMsg);
-
-        // Add function message containing the function responses
-        JsonObject functionMsg = new JsonObject();
-        functionMsg.addProperty("role", "function");
-        JsonArray partsArray = new JsonArray();
-        for (ToolResult res : results) {
-            JsonObject part = new JsonObject();
-            JsonObject funcRes = new JsonObject();
-            funcRes.addProperty("name", res.call.name);
-            funcRes.add("response", gson.fromJson(res.resultJson, JsonObject.class));
-            part.add("functionResponse", funcRes);
-            partsArray.add(part);
-        }
-        functionMsg.add("parts", partsArray);
-        contents.add(functionMsg);
-    }
-
-    private boolean hasOpenAiToolCalls(JsonObject root) {
-        if (!root.has("choices"))
-            return false;
-        JsonArray choices = root.getAsJsonArray("choices");
-        if (choices.size() == 0)
-            return false;
-        JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
-        return message != null && message.has("tool_calls") && message.getAsJsonArray("tool_calls").size() > 0;
-    }
-
-    private boolean hasClaudeToolCalls(JsonObject root) {
-        if (!root.has("content"))
-            return false;
-        JsonArray content = root.getAsJsonArray("content");
-        for (int i = 0; i < content.size(); i++) {
-            JsonObject item = content.get(i).getAsJsonObject();
-            if (item.has("type") && "tool_use".equals(item.get("type").getAsString())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean hasGeminiToolCalls(JsonObject root) {
-        if (!root.has("candidates"))
-            return false;
-        JsonArray candidates = root.getAsJsonArray("candidates");
-        if (candidates.size() == 0)
-            return false;
-        JsonObject content = candidates.get(0).getAsJsonObject().getAsJsonObject("content");
-        if (content == null || !content.has("parts"))
-            return false;
-        JsonArray parts = content.getAsJsonArray("parts");
-        for (int i = 0; i < parts.size(); i++) {
-            JsonObject part = parts.get(i).getAsJsonObject();
-            if (part.has("functionCall")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String extractResponseText(AiProvider provider, JsonObject root) {
-        switch (provider) {
-            case OPENAI:
-            case GROK:
-                return root.getAsJsonArray("choices")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonObject("message")
-                        .get("content").getAsString();
-            case CLAUDE:
-                return root.getAsJsonArray("content")
-                        .get(0).getAsJsonObject()
-                        .get("text").getAsString();
-            case GEMINI:
-            default:
-                return root.getAsJsonArray("candidates")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonObject("content")
-                        .getAsJsonArray("parts")
-                        .get(0).getAsJsonObject()
-                        .get("text").getAsString();
-        }
-    }
-
-    private static class ToolCall {
+    static class ToolCall {
         final String id;
         final String name;
         final JsonObject args;
@@ -919,7 +447,7 @@ public class AiService {
         }
     }
 
-    private static class ToolResult {
+    static class ToolResult {
         final ToolCall call;
         final String resultJson;
 
@@ -1034,18 +562,92 @@ public class AiService {
                 || (monster != null && q.contains(monster.toLowerCase()));
     }
 
+    private static final Set<String> GREETINGS = new HashSet<>(Arrays.asList(
+            "hi", "hello", "hey", "yo", "sup", "thanks", "thank you", "bye", "goodbye"));
+
+    private static boolean isGreeting(String query) {
+        if (query == null) {
+            return false;
+        }
+        return GREETINGS.contains(query.toLowerCase().trim());
+    }
+
+    static String extractSearchQuery(String question) {
+        if (question == null) {
+            return "";
+        }
+        String q = question.trim().toLowerCase();
+
+        if (q.endsWith("?")) {
+            q = q.substring(0, q.length() - 1).trim();
+        }
+
+        String[] prefixes = {
+                "what are the ingredients for",
+                "what is the recipe for",
+                "what is the drop rate of",
+                "what is the drop rate for",
+                "where can i find",
+                "where do i find",
+                "how do i make",
+                "how to make",
+                "how do i get",
+                "how to get",
+                "how do i craft",
+                "how to craft",
+                "how do i brew",
+                "how to brew",
+                "what are the stats for",
+                "what are the stats of",
+                "what is the stats of",
+                "what is the stats for",
+                "can you search for",
+                "can you look up",
+                "tell me about",
+                "information on",
+                "ingredients for",
+                "recipe for",
+                "search for",
+                "lookup",
+                "look up",
+                "where is",
+                "where are",
+                "what is",
+                "what are",
+                "how to",
+                "how do i",
+                "info on"
+        };
+
+        for (String prefix : prefixes) {
+            if (q.startsWith(prefix)) {
+                q = q.substring(prefix.length()).trim();
+                break;
+            }
+        }
+
+        if (q.startsWith("the ")) {
+            q = q.substring(4).trim();
+        }
+
+        return q.isEmpty() ? question : q;
+    }
+
     private String buildWikiContext(String question, String gameContext) {
         List<String> sections = new ArrayList<>();
         List<String> fetchedTitles = new ArrayList<>();
 
         // Search wiki based on the user's question — handles "what spell for X", "how
         // to unlock Y", etc.
-        String questionTitle = searchWikiTopResult(question);
-        if (questionTitle != null) {
-            String extract = fetchWikiExtract(questionTitle);
-            if (extract != null && !extract.isEmpty()) {
-                sections.add(questionTitle + ":\n" + extract);
-                fetchedTitles.add(questionTitle.toLowerCase());
+        String cleanQuery = extractSearchQuery(question);
+        if (!cleanQuery.isEmpty() && !isGreeting(cleanQuery)) {
+            String questionTitle = searchWikiTopResult(cleanQuery);
+            if (questionTitle != null) {
+                String extract = fetchWikiExtract(questionTitle);
+                if (extract != null && !extract.isEmpty()) {
+                    sections.add(questionTitle + ":\n" + extract);
+                    fetchedTitles.add(questionTitle.toLowerCase());
+                }
             }
         }
 

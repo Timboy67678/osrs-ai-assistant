@@ -30,11 +30,10 @@ public class AiServiceTest
         String prompt = AiService.buildSystemPrompt("Location Name: Grand Exchange", "You: Where am I?");
 
         Assert.assertTrue(prompt.contains("GROUNDING RULES"));
-        Assert.assertTrue(prompt.contains("do not know"));
         Assert.assertTrue(prompt.contains("GAME CONTEXT"));
         Assert.assertTrue(prompt.contains("RECENT CONVERSATION"));
-        Assert.assertTrue(prompt.contains("Account Type and Account Guidance"));
-        Assert.assertTrue(prompt.contains("Not shared"));
+        Assert.assertTrue(prompt.contains("OSRS RuneLite assistant"));
+        Assert.assertTrue(prompt.contains("Never invent stats"));
     }
 
     @Test
@@ -55,15 +54,13 @@ public class AiServiceTest
     }
 
     @Test
-    public void describeAccountGuidanceIncludesIronmanRestrictions() throws Exception
+    public void extractSearchQueryCleansConversationalPrefixes()
     {
-        AiService aiService = new AiService();
-        Method describeAccountGuidance = AiService.class.getDeclaredMethod("describeAccountGuidance", Integer.class);
-        describeAccountGuidance.setAccessible(true);
-
-        Assert.assertTrue(((String) describeAccountGuidance.invoke(aiService, 1)).contains("No trading"));
-        Assert.assertTrue(((String) describeAccountGuidance.invoke(aiService, 2)).contains("no bank storage"));
-        Assert.assertTrue(((String) describeAccountGuidance.invoke(aiService, 4)).contains("within the group"));
-        Assert.assertTrue(((String) describeAccountGuidance.invoke(aiService, 5)).contains("hardcore status"));
+        Assert.assertEquals("super antipoison", AiService.extractSearchQuery("what are the ingredients for super antipoison?"));
+        Assert.assertEquals("super antipoison", AiService.extractSearchQuery("how to make super antipoison"));
+        Assert.assertEquals("grand exchange", AiService.extractSearchQuery("where is the grand exchange?"));
+        Assert.assertEquals("king roald", AiService.extractSearchQuery("tell me about king roald"));
+        Assert.assertEquals("guthix rest", AiService.extractSearchQuery("recipe for guthix rest"));
+        Assert.assertEquals("hello", AiService.extractSearchQuery("hello"));
     }
 }
