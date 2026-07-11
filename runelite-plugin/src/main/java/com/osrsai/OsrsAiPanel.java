@@ -130,7 +130,7 @@ public class OsrsAiPanel extends PluginPanel {
         // Add action listener
         java.awt.event.ActionListener sendAction = e -> {
             String question = inputField.getText();
-            if (!question.isEmpty() && this.plugin != null) {
+            if (!question.isBlank() && this.plugin != null) {
                 addMessage("You", question);
                 inputField.setText("");
                 this.plugin.askQuestion(question);
@@ -535,7 +535,8 @@ public class OsrsAiPanel extends PluginPanel {
         String json = configManager.getConfiguration(CONFIG_GROUP, "chat_sessions_v1");
 
         try {
-            Type listType = new TypeToken<ArrayList<ChatSession>>(){}.getType();
+            Type listType = new TypeToken<ArrayList<ChatSession>>() {
+            }.getType();
             List<ChatSession> loaded = gson.fromJson(json, listType);
 
             sessions.clear();
@@ -631,8 +632,7 @@ public class OsrsAiPanel extends PluginPanel {
                 "Are you sure you want to delete this chat history?",
                 "Delete Chat",
                 JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE
-        );
+                JOptionPane.WARNING_MESSAGE);
 
         if (confirm != JOptionPane.YES_OPTION) {
             return;
