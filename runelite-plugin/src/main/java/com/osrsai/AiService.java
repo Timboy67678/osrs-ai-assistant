@@ -7,8 +7,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -43,10 +41,8 @@ import org.jetbrains.annotations.NotNull;
 public class AiService {
     private static final int MAX_CONTEXT_CHARACTERS = 8000;
     private static final int MAX_RECENT_CONVERSATION_CHARS = 1200;
-    private static final int MAX_WIKI_CHARS = 3000;
     private static final int WIKI_EXTRACT_CHARS = 2500;
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
-    private static final Pattern SLAYER_TASK_PATTERN = Pattern.compile("Slayer Task: \\d+ (.+)", Pattern.MULTILINE);
 
     @Inject
     private Client client;
@@ -211,7 +207,8 @@ public class AiService {
                             // Update request body with tool calls and results
                             handler.updateRequestWithToolResults(requestBody, root, results);
 
-                            // If the next request will be the final depth, remove the tools object so the model must return text
+                            // If the next request will be the final depth, remove the tools object so the
+                            // model must return text
                             if (depth + 1 >= maxDepth) {
                                 requestBody.remove("tools");
                             }
@@ -313,6 +310,7 @@ public class AiService {
         return future;
     }
 
+    @SuppressWarnings("deprecation")
     private String executeToolOnClientThread(String name) {
         JsonObject result = new JsonObject();
         switch (name) {
@@ -405,18 +403,31 @@ public class AiService {
 
             case "get_player_achievement_diaries":
                 JsonObject diaries = new JsonObject();
-                diaries.add("Ardougne", createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM, Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE));
-                diaries.add("Desert", createDiaryProgress(Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM, Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE));
-                diaries.add("Falador", createDiaryProgress(Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM, Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE));
-                diaries.add("Fremennik", createDiaryProgress(Varbits.DIARY_FREMENNIK_EASY, Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE));
-                diaries.add("Kandarin", createDiaryProgress(Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM, Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE));
-                diaries.add("Karamja", createDiaryProgress(Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM, Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE));
-                diaries.add("Kourend", createDiaryProgress(Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM, Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE));
-                diaries.add("Lumbridge", createDiaryProgress(Varbits.DIARY_LUMBRIDGE_EASY, Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE));
-                diaries.add("Morytania", createDiaryProgress(Varbits.DIARY_MORYTANIA_EASY, Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE));
-                diaries.add("Varrock", createDiaryProgress(Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM, Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE));
-                diaries.add("Western", createDiaryProgress(Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM, Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE));
-                diaries.add("Wilderness", createDiaryProgress(Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM, Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
+                diaries.add("Ardougne", createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM,
+                        Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE));
+                diaries.add("Desert", createDiaryProgress(Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM,
+                        Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE));
+                diaries.add("Falador", createDiaryProgress(Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM,
+                        Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE));
+                diaries.add("Fremennik", createDiaryProgress(Varbits.DIARY_FREMENNIK_EASY,
+                        Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE));
+                diaries.add("Kandarin", createDiaryProgress(Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM,
+                        Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE));
+                diaries.add("Karamja", createDiaryProgress(Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM,
+                        Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE));
+                diaries.add("Kourend", createDiaryProgress(Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM,
+                        Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE));
+                diaries.add("Lumbridge", createDiaryProgress(Varbits.DIARY_LUMBRIDGE_EASY,
+                        Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE));
+                diaries.add("Morytania", createDiaryProgress(Varbits.DIARY_MORYTANIA_EASY,
+                        Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE));
+                diaries.add("Varrock", createDiaryProgress(Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM,
+                        Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE));
+                diaries.add("Western", createDiaryProgress(Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM,
+                        Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE));
+                diaries.add("Wilderness",
+                        createDiaryProgress(Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM,
+                                Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
                 result.add("diaries", diaries);
                 break;
 
@@ -582,25 +593,6 @@ public class AiService {
         }
     }
 
-    private boolean isSlayerRelated(String question, String monster) {
-        if (question == null)
-            return false;
-        String q = question.toLowerCase();
-        return q.contains("slayer") || q.contains("task") || q.contains("monster") || q.contains("kill")
-                || q.contains("fight") || q.contains("weakness") || q.contains("combat") || q.contains("gear")
-                || (monster != null && q.contains(monster.toLowerCase()));
-    }
-
-    private static final Set<String> GREETINGS = new HashSet<>(Arrays.asList(
-            "hi", "hello", "hey", "yo", "sup", "thanks", "thank you", "bye", "goodbye"));
-
-    private static boolean isGreeting(String query) {
-        if (query == null) {
-            return false;
-        }
-        return GREETINGS.contains(query.toLowerCase().trim());
-    }
-
     static String extractSearchQuery(String question) {
         if (question == null) {
             return "";
@@ -660,41 +652,6 @@ public class AiService {
         }
 
         return q.isEmpty() ? question : q;
-    }
-
-    private String buildWikiContext(String question, String gameContext) {
-        List<String> sections = new ArrayList<>();
-        List<String> fetchedTitles = new ArrayList<>();
-
-        // Search wiki based on the user's question — handles "what spell for X", "how
-        // to unlock Y", etc.
-        String cleanQuery = extractSearchQuery(question);
-        if (!cleanQuery.isEmpty() && !isGreeting(cleanQuery)) {
-            String questionTitle = searchWikiTopResult(cleanQuery);
-            if (questionTitle != null) {
-                String extract = fetchWikiExtract(questionTitle);
-                if (extract != null && !extract.isEmpty()) {
-                    sections.add(questionTitle + ":\n" + extract);
-                    fetchedTitles.add(questionTitle.toLowerCase());
-                }
-            }
-        }
-
-        // Include the slayer task monster only if active and the question is
-        // slayer/combat related.
-        String slayerMonster = extractSlayerMonster(gameContext);
-        if (slayerMonster != null && !slayerMonster.isEmpty() && isSlayerRelated(question, slayerMonster)) {
-            boolean alreadyCovered = fetchedTitles.stream()
-                    .anyMatch(t -> t.contains(slayerMonster.toLowerCase()) || slayerMonster.toLowerCase().contains(t));
-            if (!alreadyCovered) {
-                String extract = fetchWikiExtract(slayerMonster);
-                if (extract != null && !extract.isEmpty()) {
-                    sections.add(slayerMonster + ":\n" + extract);
-                }
-            }
-        }
-
-        return String.join("\n\n", sections);
     }
 
     private String searchWikiTopResult(String query) {
@@ -790,26 +747,6 @@ public class AiService {
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-    }
-
-    private static String appendWikiToContext(String gameContext, String wikiContext) {
-        if (wikiContext == null || wikiContext.isEmpty()) {
-            return gameContext;
-        }
-        return gameContext
-                + "\n\n--- OSRS WIKI REFERENCE (authoritative for mechanics, weaknesses, requirements) ---\n"
-                + trimToPromptBudget(wikiContext, MAX_WIKI_CHARS, "...[wiki truncated]");
-    }
-
-    private static String extractSlayerMonster(String context) {
-        if (context == null)
-            return null;
-        Matcher matcher = SLAYER_TASK_PATTERN.matcher(context);
-        if (matcher.find()) {
-            String monster = matcher.group(1).trim();
-            return monster.equalsIgnoreCase("none") ? null : monster;
-        }
-        return null;
     }
 
     static String buildSystemPrompt(String context, String recentConversation) {
