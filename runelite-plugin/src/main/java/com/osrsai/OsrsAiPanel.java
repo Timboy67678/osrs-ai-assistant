@@ -105,6 +105,16 @@ public class OsrsAiPanel extends PluginPanel {
         c.weightx = 1.0;
         topBar.add(chatSessionComboBox, c);
 
+        // Row 2: Warning Label
+        JLabel warningLabel = new JLabel("⚠️ Sends query & game context to external AI APIs");
+        warningLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 10));
+        warningLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        warningLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        c.gridy = 2;
+        c.gridx = 0;
+        c.gridwidth = 3;
+        topBar.add(warningLabel, c);
+
         contentPanel.add(topBar, BorderLayout.NORTH);
 
         chatArea = new JEditorPane();

@@ -8,7 +8,7 @@ import net.runelite.client.config.Range;
 
 @ConfigGroup("osrsai")
 public interface OsrsAiConfig extends Config {
-        @ConfigSection(name = "API Settings", description = "Configure your AI provider and API keys", position = 0)
+        @ConfigSection(name = "API Settings", description = "Configure your AI provider and API keys. Note: Chat queries and selected game details are sent to external AI servers.", position = 0)
         String apiSection = "api";
 
         @ConfigSection(name = "Data Sharing", description = "Configure what game context is sent to the AI", position = 10)
@@ -19,7 +19,7 @@ public interface OsrsAiConfig extends Config {
                 return AiProvider.OPENAI;
         }
 
-        @ConfigItem(keyName = "apiKey", name = "API Key", description = "The API key for your selected provider.", position = 2, secret = true, section = apiSection)
+        @ConfigItem(keyName = "apiKey", name = "API Key", description = "The API key for your selected provider. Kept secret, but used for external AI API communication.", position = 2, secret = true, section = apiSection)
         default String apiKey() {
                 return "";
         }
@@ -35,7 +35,7 @@ public interface OsrsAiConfig extends Config {
                 return AiService.MAX_DEPTH_COUNT / 2;
         }
 
-        @ConfigItem(keyName = "shareCharacterInfo", name = "Share Character Info", description = "Allow the AI assistant to query your in-game status, stats, inventory, equipment, quests, slayer task, and bank when open.", position = 11, section = sharingSection)
+        @ConfigItem(keyName = "shareCharacterInfo", name = "Share Character Info", description = "WARNING: When enabled, this option will send your in-game stats, location, active task, inventory, equipment, quests, achievement diaries, and bank contents to the external AI provider whenever you submit a query.", position = 11, section = sharingSection)
         default boolean shareCharacterInfo() {
                 return true;
         }
