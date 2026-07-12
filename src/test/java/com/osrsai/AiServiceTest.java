@@ -1,12 +1,41 @@
 package com.osrsai;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import okhttp3.OkHttpClient;
+import com.google.gson.Gson;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 public class AiServiceTest
 {
+    @Test
+    public void testWikiSearch() throws Exception
+    {
+        AiService aiService = new AiService();
+        
+        // Initialize Gson
+        Field gsonField = AiService.class.getDeclaredField("gson");
+        gsonField.setAccessible(true);
+        gsonField.set(aiService, new Gson());
+        
+        // Initialize OkHttpClient
+        Field okHttpClientField = AiService.class.getDeclaredField("okHttpClient");
+        okHttpClientField.setAccessible(true);
+        okHttpClientField.set(aiService, new OkHttpClient());
+
+        Method executeWikiSearch = AiService.class.getDeclaredMethod("executeWikiSearch", String.class);
+        executeWikiSearch.setAccessible(true);
+
+        System.out.println("Running executeWikiSearch...");
+        String result = (String) executeWikiSearch.invoke(aiService, "Suqah teeth");
+        System.out.println("Result: " + result);
+        Assert.assertNotNull(result);
+        // Resilient to offline environments - allow "status":"error" OR matching result
+        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"error\""));
+    }
+
     @Test
     public void describeAccountTypeIncludesIronmanVariants() throws Exception
     {

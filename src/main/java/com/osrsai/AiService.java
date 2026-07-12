@@ -303,11 +303,11 @@ public class AiService {
                     }
                     log.info("Tool {} returned result length: {}", tc.name, output.length());
                     results.add(new ToolResult(tc, output));
-                } catch (Exception ex) {
-                    log.error("Error executing tool: " + tc.name, ex);
+                } catch (Throwable t) {
+                    log.error("Error executing tool: " + tc.name, t);
                     JsonObject err = new JsonObject();
                     err.addProperty("status", "error");
-                    err.addProperty("message", ex.getMessage());
+                    err.addProperty("message", t.getMessage() != null ? t.getMessage() : t.toString());
                     results.add(new ToolResult(tc, gson.toJson(err)));
                 }
             }
@@ -685,7 +685,7 @@ public class AiService {
                 if (queryObj == null)
                     return null;
                 JsonArray results = queryObj.getAsJsonArray("search");
-                if (results == null || results.isEmpty())
+                if (results == null || results.size() == 0)
                     return null;
                 return results.get(0).getAsJsonObject().get("title").getAsString();
             }
