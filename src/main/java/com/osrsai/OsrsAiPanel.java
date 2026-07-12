@@ -35,6 +35,7 @@ public class OsrsAiPanel extends PluginPanel {
     private final JButton newChatButton;
     private final JButton deleteChatButton;
     private final JComboBox<ChatSession> chatSessionComboBox;
+    private final JLabel warningLabel;
     private final StringBuilder chatHistory = new StringBuilder();
     private final Deque<ChatTurn> recentMessages = new ArrayDeque<>();
     private JFrame detachedFrame;
@@ -106,10 +107,11 @@ public class OsrsAiPanel extends PluginPanel {
         topBar.add(chatSessionComboBox, c);
 
         // Row 2: Warning Label
-        JLabel warningLabel = new JLabel("<html><div style='text-align: center;'>⚠️ Sends query & game context to external AI APIs</div></html>");
+        this.warningLabel = new JLabel();
         warningLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
         warningLabel.setForeground(ColorScheme.BRAND_ORANGE);
         warningLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        updateWarningLabel();
         c.gridy = 2;
         c.gridx = 0;
         c.gridwidth = 3;
@@ -330,6 +332,25 @@ public class OsrsAiPanel extends PluginPanel {
         }
 
         SwingUtilities.invokeLater(runnable);
+    }
+
+    public void updateWarningLabel() {
+        runOnEdt(() -> {
+            if (warningLabel == null) {
+                return;
+            }
+            boolean share = false;
+            if (plugin != null && plugin.getConfig() != null) {
+                share = plugin.getConfig().shareCharacterInfo();
+            }
+            if (share) {
+                warningLabel.setText("<html><div style='text-align: center;'>⚠️ Sends query & game context to external AI APIs</div></html>");
+            } else {
+                warningLabel.setText("<html><div style='text-align: center;'>⚠️ Sends query text to external AI APIs</div></html>");
+            }
+            warningLabel.revalidate();
+            warningLabel.repaint();
+        });
     }
 
     private String formatMarkdownToHtml(String text) {

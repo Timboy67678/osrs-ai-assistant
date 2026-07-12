@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -79,6 +80,21 @@ public class OsrsAiPlugin extends Plugin {
     public void askQuestion(String question) {
         log.debug("Question asked: {}", question);
         aiService.sendQuestion(question, panel);
+    }
+
+    public OsrsAiConfig getConfig() {
+        return config;
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if ("osrsai".equals(event.getGroup())) {
+            if ("shareCharacterInfo".equals(event.getKey())) {
+                if (panel != null) {
+                    panel.updateWarningLabel();
+                }
+            }
+        }
     }
 
     @Subscribe
