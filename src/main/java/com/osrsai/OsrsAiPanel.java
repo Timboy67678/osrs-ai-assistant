@@ -106,9 +106,9 @@ public class OsrsAiPanel extends PluginPanel {
         topBar.add(chatSessionComboBox, c);
 
         // Row 2: Warning Label
-        JLabel warningLabel = new JLabel("⚠️ Sends query & game context to external AI APIs");
-        warningLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 10));
-        warningLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        JLabel warningLabel = new JLabel("<html><div style='text-align: center;'>⚠️ Sends query & game context to external AI APIs</div></html>");
+        warningLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
+        warningLabel.setForeground(ColorScheme.BRAND_ORANGE);
         warningLabel.setHorizontalAlignment(SwingConstants.CENTER);
         c.gridy = 2;
         c.gridx = 0;
