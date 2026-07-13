@@ -4,7 +4,8 @@ public enum AiProvider {
     GEMINI("Gemini 2.5 Flash", "gemini-2.5-flash"),
     OPENAI("OpenAI GPT-4o", "gpt-4o"),
     CLAUDE("Anthropic Claude", "claude-3-5-sonnet-20240620"),
-    GROK("Grok 4.3", "grok-4.3");
+    GROK("Grok 4.3", "grok-4.3"),
+    CUSTOM("Custom (OpenAI Compatible)", "custom");
 
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
     private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler(
@@ -29,7 +30,7 @@ public enum AiProvider {
         return modelId;
     }
 
-    public ProviderHandler getHandler() {
+    public ProviderHandler getHandler(String customEndpoint) {
         switch (this) {
             case GEMINI:
                 return GEMINI_HANDLER;
@@ -39,6 +40,8 @@ public enum AiProvider {
                 return CLAUDE_HANDLER;
             case GROK:
                 return GROK_HANDLER;
+            case CUSTOM:
+                return new OpenAiProviderHandler(customEndpoint);
             default:
                 throw new IllegalStateException("Unexpected provider: " + this);
         }

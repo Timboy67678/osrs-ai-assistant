@@ -101,8 +101,9 @@ public class AiService {
     }
 
     public void sendQuestion(String question, OsrsAiPanel panel) {
-        String apiKey = config.apiKey();
-        if (apiKey == null || apiKey.isEmpty()) {
+        final String apiKey = config.apiKey();
+        final AiProvider provider = config.aiProvider();
+        if (provider != AiProvider.CUSTOM && (apiKey == null || apiKey.isEmpty())) {
             panel.addMessage("System", "Please set an API key in the plugin config.");
             return;
         }
@@ -117,20 +118,27 @@ public class AiService {
             clientThread.invokeLater(() -> {
                 try {
                     final String gameContext = buildContext();
-                    final AiProvider provider = config.aiProvider();
                     final String clientId = config.clientId();
+                    final String customModel = config.customModel();
+                    final String modelId = (customModel != null && !customModel.trim().isEmpty())
+                            ? customModel.trim()
+                            : provider.getModelId();
+                    final String customEndpoint = config.customEndpoint();
+                    final String endpoint = (customEndpoint != null && !customEndpoint.trim().isEmpty())
+                            ? customEndpoint.trim()
+                            : "http://localhost:11434/v1/chat/completions";
 
                     CompletableFuture.runAsync(() -> {
                         try {
-                            ProviderHandler handler = provider.getHandler();
+                            ProviderHandler handler = provider.getHandler(endpoint);
                             JsonObject requestBody = handler.buildRequestBody(
-                                    provider.getModelId(),
+                                    modelId,
                                     gameContext,
                                     recentConversation,
                                     question,
                                     config.shareCharacterInfo());
 
-                            executeRequestLoop(provider, apiKey, clientId, requestBody, 0, panel);
+                            executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, 0, panel);
                         } catch (Throwable t) {
                             log.error("Error executing API request", t);
                             SwingUtilities.invokeLater(() -> {
@@ -163,16 +171,16 @@ public class AiService {
         }
     }
 
-    private void executeRequestLoop(AiProvider provider, String apiKey, String clientId, JsonObject requestBody,
+    private void executeRequestLoop(AiProvider provider, String modelId, String endpoint, String apiKey, String clientId, JsonObject requestBody,
             int depth, OsrsAiPanel panel) {
         int maxDepth = Math.max(1, Math.min(MAX_DEPTH_COUNT, config.maxSearchDepth()));
-        ProviderHandler handler = provider.getHandler();
-        log.info("Sending request to AI provider {}. Depth: {}. Has tools: {}", provider, depth,
+        ProviderHandler handler = provider.getHandler(endpoint);
+        log.info("Sending request to AI provider {}. Model: {}. Depth: {}. Has tools: {}", provider, modelId, depth,
                 requestBody.has("tools"));
         log.debug("Request body: {}", gson.toJson(requestBody));
 
         String jsonBody = gson.toJson(requestBody);
-        Request request = handler.buildHttpRequest(provider.getModelId(), apiKey, clientId, jsonBody);
+        Request request = handler.buildHttpRequest(modelId, apiKey, clientId, jsonBody);
 
         OkHttpClient aiClient = getAiClient();
 
@@ -240,7 +248,7 @@ public class AiService {
                             }
 
                             // Send updated request recursively
-                            executeRequestLoop(provider, apiKey, clientId, requestBody, depth + 1, panel);
+                            executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, depth + 1, panel);
                         });
                     } else {
                         // Normal text response

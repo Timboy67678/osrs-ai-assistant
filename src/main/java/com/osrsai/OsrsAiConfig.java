@@ -29,8 +29,18 @@ public interface OsrsAiConfig extends Config {
                 return "";
         }
 
+        @ConfigItem(keyName = "customEndpoint", name = "Custom Endpoint", description = "The endpoint URL for a custom or local OpenAI-compatible API (e.g. http://localhost:11434/v1/chat/completions). Only used when Provider is Custom.", position = 4, section = apiSection)
+        default String customEndpoint() {
+                return "";
+        }
+
+        @ConfigItem(keyName = "customModel", name = "Custom Model ID", description = "Override the AI model name/ID (e.g., gpt-4-turbo, gemini-1.5-pro, or your local model name). Leave blank to use default.", position = 5, section = apiSection)
+        default String customModel() {
+                return "";
+        }
+
         @Range(min = 1, max = AiService.MAX_DEPTH_COUNT)
-        @ConfigItem(keyName = "maxSearchDepth", name = "Max Search Depth", description = "The maximum number of recursive tool calls/wiki searches the AI can perform for a single question.", position = 4, section = apiSection)
+        @ConfigItem(keyName = "maxSearchDepth", name = "Max Search Depth", description = "The maximum number of recursive tool calls/wiki searches the AI can perform for a single question.", position = 6, section = apiSection)
         default int maxSearchDepth() {
                 return AiService.MAX_DEPTH_COUNT / 2;
         }
