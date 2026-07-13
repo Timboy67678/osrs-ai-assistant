@@ -59,6 +59,10 @@ public class AiServiceTest {
         Assert.assertTrue(prompt.contains("RECENT CONVERSATION"));
         Assert.assertTrue(prompt.contains("OSRS RuneLite assistant"));
         Assert.assertTrue(prompt.contains("Never invent stats"));
+        Assert.assertTrue(prompt.contains("farming patch"));
+        Assert.assertTrue(prompt.contains("Never assume or state that a skilling/farming patch"));
+        Assert.assertTrue(prompt.contains("Never guess, assume, or invent item prices"));
+        Assert.assertTrue(prompt.contains("High Alchemy values"));
     }
 
     @Test

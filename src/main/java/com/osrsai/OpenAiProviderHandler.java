@@ -49,9 +49,9 @@ public class OpenAiProviderHandler implements ProviderHandler {
             tools.add(createOpenAiFunction("get_player_skills",
                     "Retrieve the player's current levels (both real and boosted) for all skills."));
             tools.add(createOpenAiFunction("get_player_inventory",
-                    "Retrieve the items currently in the player's inventory."));
+                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory."));
             tools.add(createOpenAiFunction("get_player_equipment",
-                    "Retrieve the items currently equipped by the player."));
+                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player."));
             tools.add(createOpenAiFunction("get_player_slayer_task",
                     "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak."));
             tools.add(createOpenAiFunction("get_player_quests",
@@ -59,12 +59,12 @@ public class OpenAiProviderHandler implements ProviderHandler {
             tools.add(createOpenAiFunction("get_player_achievement_diaries",
                     "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
             tools.add(createOpenAiFunction("get_player_bank",
-                    "Retrieve the items currently in the player's bank. Only works if the bank interface is open."));
+                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open."));
         }
         tools.add(createOpenAiFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, and information on items, monsters, spells, quests, or activities.",
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information on items, monsters, spells, quests, or activities.",
                 createOpenAiStringParam("query",
-                        "The exact entity or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows').")));
+                        "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').")));
         return tools;
     }
 

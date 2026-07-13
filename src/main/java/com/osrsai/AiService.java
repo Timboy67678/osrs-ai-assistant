@@ -363,10 +363,7 @@ public class AiService {
                 JsonObject invItems = new JsonObject();
                 ItemContainer invContainer = client.getItemContainer(InventoryID.INVENTORY);
                 if (invContainer != null) {
-                    Map<String, Long> aggregated = aggregateItems(invContainer);
-                    for (Map.Entry<String, Long> entry : aggregated.entrySet()) {
-                        invItems.addProperty(entry.getKey(), entry.getValue());
-                    }
+                    invItems = aggregateItemsWithPrices(invContainer);
                 }
                 result.add("items", invItems);
                 break;
@@ -375,10 +372,7 @@ public class AiService {
                 JsonObject eqItems = new JsonObject();
                 ItemContainer eqContainer = client.getItemContainer(InventoryID.EQUIPMENT);
                 if (eqContainer != null) {
-                    Map<String, Long> aggregated = aggregateItems(eqContainer);
-                    for (Map.Entry<String, Long> entry : aggregated.entrySet()) {
-                        eqItems.addProperty(entry.getKey(), entry.getValue());
-                    }
+                    eqItems = aggregateItemsWithPrices(eqContainer);
                 }
                 result.add("items", eqItems);
                 break;
@@ -479,12 +473,7 @@ public class AiService {
                     result.addProperty("message",
                             "The bank is not currently open. Ask the player to open their bank if they want you to check bank items.");
                 } else {
-                    JsonObject bankItems = new JsonObject();
-                    Map<String, Long> aggregated = aggregateItems(bankContainer);
-                    for (Map.Entry<String, Long> entry : aggregated.entrySet()) {
-                        bankItems.addProperty(entry.getKey(), entry.getValue());
-                    }
-                    result.add("items", bankItems);
+                    result.add("items", aggregateItemsWithPrices(bankContainer));
                 }
                 break;
 
@@ -496,16 +485,48 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private Map<String, Long> aggregateItems(ItemContainer container) {
-        Map<String, Long> aggregatedItems = new LinkedHashMap<>();
+    private JsonObject aggregateItemsWithPrices(ItemContainer container) {
+        JsonObject result = new JsonObject();
+        Map<String, Long> quantities = new LinkedHashMap<>();
+        Map<String, Integer> itemIds = new HashMap<>();
+
         for (Item item : container.getItems()) {
             if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
                 continue;
             }
             String itemName = safeItemName(item.getId());
-            aggregatedItems.put(itemName, aggregatedItems.getOrDefault(itemName, 0L) + item.getQuantity());
+            quantities.put(itemName, quantities.getOrDefault(itemName, 0L) + item.getQuantity());
+            itemIds.putIfAbsent(itemName, item.getId());
         }
-        return aggregatedItems;
+
+        for (Map.Entry<String, Long> entry : quantities.entrySet()) {
+            String name = entry.getKey();
+            long qty = entry.getValue();
+            int itemId = itemIds.get(name);
+            int price = itemManager.getItemPrice(itemId);
+            int haPrice = safeHighAlchPrice(itemId);
+
+            JsonObject detail = new JsonObject();
+            detail.addProperty("qty", qty);
+            if (price > 0) {
+                detail.addProperty("gePrice", price);
+            } else if ("Coins".equals(name)) {
+                detail.addProperty("gePrice", 1);
+            } else {
+                detail.addProperty("gePrice", 0);
+            }
+            detail.addProperty("haPrice", haPrice);
+            result.add(name, detail);
+        }
+        return result;
+    }
+
+    private int safeHighAlchPrice(int itemId) {
+        try {
+            return itemManager.getItemComposition(itemId).getHaPrice();
+        } catch (Exception ex) {
+            return 0;
+        }
     }
 
     static class ToolCall {
@@ -793,7 +814,7 @@ public class AiService {
                 + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, and bank (when open).\n"
                 + "- Call them when the player asks about stats, items, progress, or general goals/progression advice (query skills/quests/diaries first for tailored advice).\n"
                 + "- Do not guess player details; call the relevant tools to check.\n"
-                + "- Always call the 'search_osrs_wiki' tool when asked about monster locations, weaknesses, drop rates, item recipes, slayer requirements, or quest requirements. Do not guess these facts.\n"
+                + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item recipes/uses, slayer/quest requirements, farming patch locations/types/mechanics, or skilling training methods. Do not guess these facts.\n"
                 + "\n"
                 + "GROUNDING RULES:\n"
                 + "1. Never invent stats, quests, items, locations, or NPCs for the player's character.\n"
@@ -802,8 +823,10 @@ public class AiService {
                 + "4. If location name is approximate, say so.\n"
                 + "5. For Ironman/UIM/GIM accounts, do not recommend invalid trading, Grand Exchange, or banking options.\n"
                 + "6. Respect disabled tools/errors and keep answers practical and concise. Avoid markdown headings.\n"
-                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, and requirements. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
+                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, farming patch locations/types, and skilling training methods. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
                 + "8. Use tool result data to answer the user's original question. Do not change the conversation topic to unrelated tool outputs if they do not address the user's query.\n"
+                + "9. Never assume or state that a skilling/farming patch, dungeon, monster, NPC, or shop exists in a specific location unless you have verified it using the 'search_osrs_wiki' tool or it is explicitly mentioned in the GAME CONTEXT.\n"
+                + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation
