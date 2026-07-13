@@ -46,7 +46,7 @@ public class ClaudeProviderHandler implements ProviderHandler {
             tools.add(createClaudeFunction("get_player_slayer_task",
                     "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak."));
             tools.add(createClaudeFunction("get_player_quests",
-                    "Retrieve the player's quest points and list of in-progress quests."));
+                    "Retrieve the player's quest points, and lists of completed and in-progress quests."));
             tools.add(createClaudeFunction("get_player_achievement_diaries",
                     "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
             tools.add(createClaudeFunction("get_player_bank",

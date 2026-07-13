@@ -426,12 +426,17 @@ public class AiService {
             case "get_player_quests":
                 int qp = client.getVarpValue(VarPlayerID.QP);
                 result.addProperty("questPoints", qp);
+                JsonArray completed = new JsonArray();
                 JsonArray inProgress = new JsonArray();
                 for (Quest quest : Quest.values()) {
-                    if (quest.getState(client) == QuestState.IN_PROGRESS) {
+                    QuestState state = quest.getState(client);
+                    if (state == QuestState.FINISHED) {
+                        completed.add(quest.getName());
+                    } else if (state == QuestState.IN_PROGRESS) {
                         inProgress.add(quest.getName());
                     }
                 }
+                result.add("completedQuests", completed);
                 result.add("inProgressQuests", inProgress);
                 break;
 
