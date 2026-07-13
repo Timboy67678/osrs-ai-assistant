@@ -49,8 +49,12 @@ public class ClaudeProviderHandler implements ProviderHandler {
                     "Retrieve the player's quest points, and lists of completed and in-progress quests."));
             tools.add(createClaudeFunction("get_player_achievement_diaries",
                     "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
-            tools.add(createClaudeFunction("get_player_bank",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open."));
+            JsonObject bankParams = new JsonObject();
+            bankParams.add("filter", createClaudeParamObj("string", "Optional search query to filter bank items by name (case-insensitive). Use this if looking for specific items to avoid size limits."));
+            bankParams.add("minValue", createClaudeParamObj("integer", "Optional minimum value (Grand Exchange price or High Alch value) to filter items."));
+            tools.add(createClaudeFunctionWithOptionalParams("get_player_bank",
+                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
+                    bankParams));
         }
         tools.add(createClaudeFunctionWithParams("search_osrs_wiki",
                 "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information on items, monsters, spells, quests, or activities.",
@@ -89,12 +93,30 @@ public class ClaudeProviderHandler implements ProviderHandler {
         return tool;
     }
 
+    private JsonObject createClaudeParamObj(String type, String description) {
+        JsonObject val = new JsonObject();
+        val.addProperty("type", type);
+        val.addProperty("description", description);
+        return val;
+    }
+
+    private JsonObject createClaudeFunctionWithOptionalParams(String name, String description, JsonObject properties) {
+        JsonObject tool = new JsonObject();
+        tool.addProperty("name", name);
+        tool.addProperty("description", description);
+
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "object");
+        schema.add("properties", properties);
+        schema.add("required", new JsonArray());
+
+        tool.add("input_schema", schema);
+        return tool;
+    }
+
     private JsonObject createClaudeStringParam(String name, String description) {
         JsonObject prop = new JsonObject();
-        JsonObject val = new JsonObject();
-        val.addProperty("type", "string");
-        val.addProperty("description", description);
-        prop.add(name, val);
+        prop.add(name, createClaudeParamObj("string", description));
         return prop;
     }
 

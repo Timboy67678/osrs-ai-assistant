@@ -318,7 +318,7 @@ public class AiService {
                         CompletableFuture<Void> clientFuture = new CompletableFuture<>();
                         clientThread.invokeLater(() -> {
                             try {
-                                clientThreadResult[0] = executeToolOnClientThread(tc.name);
+                                clientThreadResult[0] = executeToolOnClientThread(tc.name, tc.args);
                                 clientFuture.complete(null);
                             } catch (Throwable t) {
                                 clientThreadError[0] = t;
@@ -347,7 +347,7 @@ public class AiService {
     }
 
     @SuppressWarnings("deprecation")
-    private String executeToolOnClientThread(String name) {
+    private String executeToolOnClientThread(String name, JsonObject args) {
         JsonObject result = new JsonObject();
         switch (name) {
             case "get_player_skills":
@@ -363,7 +363,7 @@ public class AiService {
                 JsonObject invItems = new JsonObject();
                 ItemContainer invContainer = client.getItemContainer(InventoryID.INVENTORY);
                 if (invContainer != null) {
-                    invItems = aggregateItemsWithPrices(invContainer);
+                    invItems = aggregateItemsWithPrices(invContainer, null, 0);
                 }
                 result.add("items", invItems);
                 break;
@@ -372,7 +372,7 @@ public class AiService {
                 JsonObject eqItems = new JsonObject();
                 ItemContainer eqContainer = client.getItemContainer(InventoryID.EQUIPMENT);
                 if (eqContainer != null) {
-                    eqItems = aggregateItemsWithPrices(eqContainer);
+                    eqItems = aggregateItemsWithPrices(eqContainer, null, 0);
                 }
                 result.add("items", eqItems);
                 break;
@@ -473,7 +473,9 @@ public class AiService {
                     result.addProperty("message",
                             "The bank is not currently open. Ask the player to open their bank if they want you to check bank items.");
                 } else {
-                    result.add("items", aggregateItemsWithPrices(bankContainer));
+                    String filter = (args != null && args.has("filter")) ? args.get("filter").getAsString() : null;
+                    int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
+                    result.add("items", aggregateItemsWithPrices(bankContainer, filter, minValue));
                 }
                 break;
 
@@ -485,40 +487,96 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private JsonObject aggregateItemsWithPrices(ItemContainer container) {
+    private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
         JsonObject result = new JsonObject();
         Map<String, Long> quantities = new LinkedHashMap<>();
         Map<String, Integer> itemIds = new HashMap<>();
+
+        String search = (filter != null) ? filter.trim().toLowerCase() : null;
+        boolean isIron = isIronman();
 
         for (Item item : container.getItems()) {
             if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
                 continue;
             }
             String itemName = safeItemName(item.getId());
+
+            // Apply name filter if present
+            if (search != null && !itemName.toLowerCase().contains(search)) {
+                continue;
+            }
+
             quantities.put(itemName, quantities.getOrDefault(itemName, 0L) + item.getQuantity());
             itemIds.putIfAbsent(itemName, item.getId());
         }
 
+        // Help sort items by value
+        class BankItem {
+            final String name;
+            final long qty;
+            final int gePrice;
+            final int haPrice;
+            final int sortVal;
+
+            BankItem(String name, long qty, int gePrice, int haPrice) {
+                this.name = name;
+                this.qty = qty;
+                this.gePrice = gePrice;
+                this.haPrice = haPrice;
+                this.sortVal = isIron ? haPrice : gePrice;
+            }
+        }
+
+        List<BankItem> list = new ArrayList<>();
         for (Map.Entry<String, Long> entry : quantities.entrySet()) {
             String name = entry.getKey();
             long qty = entry.getValue();
             int itemId = itemIds.get(name);
             int price = itemManager.getItemPrice(itemId);
+            if (price <= 0 && "Coins".equals(name)) {
+                price = 1;
+            }
             int haPrice = safeHighAlchPrice(itemId);
 
-            JsonObject detail = new JsonObject();
-            detail.addProperty("qty", qty);
-            if (price > 0) {
-                detail.addProperty("gePrice", price);
-            } else if ("Coins".equals(name)) {
-                detail.addProperty("gePrice", 1);
-            } else {
-                detail.addProperty("gePrice", 0);
+            // Apply minimum value filter if present based on account type preference
+            int checkVal = isIron ? haPrice : price;
+            if (minValue > 0 && checkVal < minValue) {
+                continue;
             }
-            detail.addProperty("haPrice", haPrice);
-            result.add(name, detail);
+
+            list.add(new BankItem(name, qty, price, haPrice));
         }
+
+        // Sort by sortVal descending
+        list.sort((a, b) -> Integer.compare(b.sortVal, a.sortVal));
+
+        // If there is no name filter, let's limit the bank output to a reasonable size
+        // to prevent timeout and context token bloat. If there is a filter, we return
+        // all matches.
+        int limit = (search == null) ? 200 : Integer.MAX_VALUE;
+        int count = 0;
+        for (BankItem bi : list) {
+            if (count >= limit) {
+                break;
+            }
+            JsonObject detail = new JsonObject();
+            detail.addProperty("qty", bi.qty);
+            detail.addProperty("gePrice", bi.gePrice);
+            detail.addProperty("haPrice", bi.haPrice);
+            result.add(bi.name, detail);
+            count++;
+        }
+
         return result;
+    }
+
+    private boolean isIronman() {
+        try {
+            int accountType = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
+            return accountType >= 1 && accountType <= 6;
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     private int safeHighAlchPrice(int itemId) {
@@ -826,7 +884,7 @@ public class AiService {
                 + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, farming patch locations/types, and skilling training methods. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
                 + "8. Use tool result data to answer the user's original question. Do not change the conversation topic to unrelated tool outputs if they do not address the user's query.\n"
                 + "9. Never assume or state that a skilling/farming patch, dungeon, monster, NPC, or shop exists in a specific location unless you have verified it using the 'search_osrs_wiki' tool or it is explicitly mentioned in the GAME CONTEXT.\n"
-                + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item.\n"
+                + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item. For Ironman/UIM/GIM accounts, define the 'value' or 'expense' of items using their High Alchemy value (haPrice) rather than their Grand Exchange price (gePrice) because they cannot trade; prioritize and quote High Alchemy values for them when asked about value or the most expensive items (though you can mention the GE price as secondary info).\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation

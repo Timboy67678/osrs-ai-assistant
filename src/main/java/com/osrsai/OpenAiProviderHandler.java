@@ -58,8 +58,12 @@ public class OpenAiProviderHandler implements ProviderHandler {
                     "Retrieve the player's quest points, and lists of completed and in-progress quests."));
             tools.add(createOpenAiFunction("get_player_achievement_diaries",
                     "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
-            tools.add(createOpenAiFunction("get_player_bank",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open."));
+            JsonObject bankParams = new JsonObject();
+            bankParams.add("filter", createOpenAiParamObj("string", "Optional search query to filter bank items by name (case-insensitive). Use this if looking for specific items to avoid size limits."));
+            bankParams.add("minValue", createOpenAiParamObj("integer", "Optional minimum value (Grand Exchange price or High Alch value) to filter items."));
+            tools.add(createOpenAiFunctionWithOptionalParams("get_player_bank",
+                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
+                    bankParams));
         }
         tools.add(createOpenAiFunctionWithParams("search_osrs_wiki",
                 "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information on items, monsters, spells, quests, or activities.",
@@ -106,12 +110,34 @@ public class OpenAiProviderHandler implements ProviderHandler {
         return tool;
     }
 
+    private JsonObject createOpenAiParamObj(String type, String description) {
+        JsonObject val = new JsonObject();
+        val.addProperty("type", type);
+        val.addProperty("description", description);
+        return val;
+    }
+
+    private JsonObject createOpenAiFunctionWithOptionalParams(String name, String description, JsonObject properties) {
+        JsonObject func = new JsonObject();
+        func.addProperty("name", name);
+        func.addProperty("description", description);
+
+        JsonObject params = new JsonObject();
+        params.addProperty("type", "object");
+        params.add("properties", properties);
+        params.add("required", new JsonArray());
+
+        func.add("parameters", params);
+
+        JsonObject tool = new JsonObject();
+        tool.addProperty("type", "function");
+        tool.add("function", func);
+        return tool;
+    }
+
     private JsonObject createOpenAiStringParam(String name, String description) {
         JsonObject prop = new JsonObject();
-        JsonObject val = new JsonObject();
-        val.addProperty("type", "string");
-        val.addProperty("description", description);
-        prop.add(name, val);
+        prop.add(name, createOpenAiParamObj("string", description));
         return prop;
     }
 
