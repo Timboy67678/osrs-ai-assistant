@@ -171,7 +171,8 @@ public class AiService {
         }
     }
 
-    private void executeRequestLoop(AiProvider provider, String modelId, String endpoint, String apiKey, String clientId, JsonObject requestBody,
+    private void executeRequestLoop(AiProvider provider, String modelId, String endpoint, String apiKey,
+            String clientId, JsonObject requestBody,
             int depth, OsrsAiPanel panel) {
         int maxDepth = Math.max(1, Math.min(MAX_DEPTH_COUNT, config.maxSearchDepth()));
         ProviderHandler handler = provider.getHandler(endpoint);
@@ -248,7 +249,8 @@ public class AiService {
                             }
 
                             // Send updated request recursively
-                            executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, depth + 1, panel);
+                            executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, depth + 1,
+                                    panel);
                         });
                     } else {
                         // Normal text response

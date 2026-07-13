@@ -176,6 +176,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
                 .get("content").getAsString();
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public Request buildHttpRequest(String modelId, String apiKey, String clientId, String jsonBody) {
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
