@@ -5,7 +5,7 @@ public enum AiProvider {
     OPENAI("OpenAI GPT-4o", "gpt-4o"),
     CLAUDE("Anthropic Claude", "claude-3-5-sonnet-20240620"),
     GROK("Grok 4.3", "grok-4.3"),
-    CUSTOM("Custom (OpenAI Compatible)", "custom");
+    CUSTOM("Custom", "custom");
 
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
     private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler(
