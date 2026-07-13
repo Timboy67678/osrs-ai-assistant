@@ -124,6 +124,14 @@ final class LocationResolver {
     );
 
     String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
+        return resolveLocation(worldPoint, inInstance, instanceTemplate, false);
+    }
+
+    String describeForAi(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
+        return resolveLocation(worldPoint, inInstance, instanceTemplate, true);
+    }
+
+    private String resolveLocation(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate, boolean forAi) {
         if (worldPoint == null) {
             return "Unknown";
         }
@@ -134,9 +142,9 @@ final class LocationResolver {
                     : "Instanced area";
         }
 
-        String regionAlias = getRegionDisplayAlias(worldPoint.getRegionID());
-        if (regionAlias != null) {
-            return regionAlias;
+        RegionAlias alias = REGION_ALIASES.get(worldPoint.getRegionID());
+        if (alias != null) {
+            return forAi ? formatAlias(alias) : alias.displayName;
         }
 
         NamedArea directMatch = findArea(worldPoint);
@@ -149,9 +157,8 @@ final class LocationResolver {
             return regionFallback.name;
         }
 
-        String undergroundDescription = describeUndergroundFromSurfaceOffset(worldPoint);
-        return Objects.requireNonNullElseGet(undergroundDescription, () -> "Unknown area (region " + worldPoint.getRegionID() + ")");
-
+        String underground = resolveUnderground(worldPoint, forAi);
+        return Objects.requireNonNullElseGet(underground, () -> "Unknown area (region " + worldPoint.getRegionID() + ")");
     }
 
     private NamedArea findArea(WorldPoint point) {
@@ -164,7 +171,7 @@ final class LocationResolver {
         return null;
     }
 
-    private String describeUndergroundFromSurfaceOffset(WorldPoint worldPoint) {
+    private String resolveUnderground(WorldPoint worldPoint, boolean forAi) {
         for (int offset : UNDERGROUND_Y_OFFSETS) {
             if (worldPoint.getY() <= offset) {
                 continue;
@@ -172,9 +179,9 @@ final class LocationResolver {
 
             WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset, worldPoint.getPlane());
 
-            String normalizedRegionAlias = getRegionDisplayAlias(normalized.getRegionID());
-            if (normalizedRegionAlias != null) {
-                return normalizedRegionAlias + " (underground)";
+            RegionAlias alias = REGION_ALIASES.get(normalized.getRegionID());
+            if (alias != null) {
+                return (forAi ? formatAlias(alias) : alias.displayName) + " (underground)";
             }
 
             NamedArea area = findArea(normalized);
@@ -216,63 +223,9 @@ final class LocationResolver {
      * reason about well-known area names even when the in-game display differs.
      * e.g. "Kourend Underground (Catacombs of Kourend)"
      */
-    String describeForAi(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
-        if (worldPoint == null) {
-            return "Unknown";
-        }
 
-        if (inInstance) {
-            return instanceTemplate != null
-                    ? describeInstanceTemplate(instanceTemplate)
-                    : "Instanced area";
-        }
 
-        RegionAlias alias = REGION_ALIASES.get(worldPoint.getRegionID());
-        if (alias != null) {
-            return formatAlias(alias);
-        }
 
-        NamedArea directMatch = findArea(worldPoint);
-        if (directMatch != null) {
-            return directMatch.name;
-        }
-
-        NamedArea regionFallback = findAreaByRegion(worldPoint.getRegionID(), worldPoint.getPlane());
-        if (regionFallback != null) {
-            return regionFallback.name;
-        }
-
-        String underground = describeUndergroundForAiFromSurfaceOffset(worldPoint);
-        return Objects.requireNonNullElseGet(underground, () -> "Unknown area (region " + worldPoint.getRegionID() + ")");
-
-    }
-
-    private String describeUndergroundForAiFromSurfaceOffset(WorldPoint worldPoint) {
-        for (int offset : UNDERGROUND_Y_OFFSETS) {
-            if (worldPoint.getY() <= offset) {
-                continue;
-            }
-
-            WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset, worldPoint.getPlane());
-
-            RegionAlias alias = REGION_ALIASES.get(normalized.getRegionID());
-            if (alias != null) {
-                return formatAlias(alias) + " (underground)";
-            }
-
-            NamedArea area = findArea(normalized);
-            if (area != null) {
-                return area.name + " (underground)";
-            }
-
-            NamedArea regionFallback = findAreaByRegion(normalized.getRegionID(), normalized.getPlane());
-            if (regionFallback != null) {
-                return regionFallback.name + " (underground)";
-            }
-        }
-
-        return null;
-    }
 
     private static String formatAlias(RegionAlias alias) {
         if (alias.canonicalName.equals(alias.displayName)) {
@@ -282,10 +235,7 @@ final class LocationResolver {
         return alias.displayName + " (also known as: " + alias.canonicalName + ")";
     }
 
-    private static String getRegionDisplayAlias(int regionId) {
-        RegionAlias alias = REGION_ALIASES.get(regionId);
-        return alias == null ? null : alias.displayName;
-    }
+
 
     private static Map<Integer, RegionAlias> loadRegionAliases() {
         Map<Integer, RegionAlias> aliases = new HashMap<>();

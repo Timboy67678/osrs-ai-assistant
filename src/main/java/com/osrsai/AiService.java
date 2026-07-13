@@ -76,6 +76,30 @@ public class AiService {
 
     private final LocationResolver locationResolver = new LocationResolver();
 
+    private OkHttpClient aiClient;
+    private OkHttpClient wikiClient;
+
+    private synchronized OkHttpClient getAiClient() {
+        if (aiClient == null) {
+            aiClient = okHttpClient.newBuilder()
+                    .connectTimeout(60, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .build();
+        }
+        return aiClient;
+    }
+
+    private synchronized OkHttpClient getWikiClient() {
+        if (wikiClient == null) {
+            wikiClient = okHttpClient.newBuilder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS)
+                    .build();
+        }
+        return wikiClient;
+    }
+
     public void sendQuestion(String question, OsrsAiPanel panel) {
         String apiKey = config.apiKey();
         if (apiKey == null || apiKey.isEmpty()) {
@@ -150,11 +174,7 @@ public class AiService {
         String jsonBody = gson.toJson(requestBody);
         Request request = handler.buildHttpRequest(provider.getModelId(), apiKey, clientId, jsonBody);
 
-        OkHttpClient aiClient = okHttpClient.newBuilder()
-                .connectTimeout(60, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(60, TimeUnit.SECONDS)
-                .build();
+        OkHttpClient aiClient = getAiClient();
 
         aiClient.newCall(request).enqueue(new Callback() {
             @Override
@@ -671,7 +691,7 @@ public class AiService {
                     .addQueryParameter("format", "json")
                     .build();
 
-            OkHttpClient wikiClient = wikiHttpClient();
+            OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
                     .header("User-Agent", "OSRS AI Assistant RuneLite Plugin")
@@ -707,7 +727,7 @@ public class AiService {
                     .addQueryParameter("format", "json")
                     .build();
 
-            OkHttpClient wikiClient = wikiHttpClient();
+            OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
                     .header("User-Agent", "OSRS AI Assistant RuneLite Plugin")
@@ -748,12 +768,7 @@ public class AiService {
         return null;
     }
 
-    private OkHttpClient wikiHttpClient() {
-        return okHttpClient.newBuilder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
-    }
+
 
     static String buildSystemPrompt(String context, String recentConversation) {
         String compactConversation = trimToPromptBudget(recentConversation, MAX_RECENT_CONVERSATION_CHARS,

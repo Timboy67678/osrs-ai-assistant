@@ -176,7 +176,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
 
     @Override
     public Request buildHttpRequest(String modelId, String apiKey, String clientId, String jsonBody) {
-        RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.parse("application/json"));
         Request.Builder builder = new Request.Builder()
                 .url(apiUrl)
                 .header("Authorization", "Bearer " + apiKey)

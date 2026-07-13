@@ -4,10 +4,7 @@ import com.google.inject.Provides;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
-
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.events.GameStateChanged;
-
 import java.awt.image.BufferedImage;
 
 import net.runelite.client.config.ConfigManager;
@@ -97,10 +94,7 @@ public class OsrsAiPlugin extends Plugin {
         }
     }
 
-    @Subscribe
-    public void onGameStateChanged(GameStateChanged gameStateChanged) {
 
-    }
 
     @Provides
     OsrsAiConfig provideConfig(ConfigManager configManager) {

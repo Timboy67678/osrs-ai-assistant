@@ -192,7 +192,7 @@ public class GeminiProviderHandler implements ProviderHandler {
 
     @Override
     public Request buildHttpRequest(String modelId, String apiKey, String clientId, String jsonBody) {
-        RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.parse("application/json"));
         return new Request.Builder()
                 .url(String.format(GEMINI_API_URL_TEMPLATE, modelId) + apiKey)
                 .post(body)

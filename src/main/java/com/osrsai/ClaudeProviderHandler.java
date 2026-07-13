@@ -163,7 +163,7 @@ public class ClaudeProviderHandler implements ProviderHandler {
 
     @Override
     public Request buildHttpRequest(String modelId, String apiKey, String clientId, String jsonBody) {
-        RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.parse("application/json"));
         return new Request.Builder()
                 .url(CLAUDE_API_URL)
                 .header("x-api-key", apiKey)
