@@ -13,7 +13,8 @@ public class ClaudeProviderHandler implements ProviderHandler {
     private static final String CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 
     @Override
-    public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question, boolean shareCharInfo) {
+    public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
+            boolean shareCharInfo) {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("system", AiService.buildSystemPrompt(context, recentConversation));
@@ -129,7 +130,8 @@ public class ClaudeProviderHandler implements ProviderHandler {
     }
 
     @Override
-    public void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot, List<AiService.ToolResult> results) {
+    public void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot,
+            List<AiService.ToolResult> results) {
         JsonArray messages = requestBody.getAsJsonArray("messages");
 
         // Add assistant message with tool use block(s)

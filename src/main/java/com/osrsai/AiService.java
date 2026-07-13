@@ -768,8 +768,6 @@ public class AiService {
         return null;
     }
 
-
-
     static String buildSystemPrompt(String context, String recentConversation) {
         String compactConversation = trimToPromptBudget(recentConversation, MAX_RECENT_CONVERSATION_CHARS,
                 "...[recent conversation truncated]", true);

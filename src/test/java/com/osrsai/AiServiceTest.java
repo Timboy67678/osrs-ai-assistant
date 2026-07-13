@@ -8,18 +8,16 @@ import com.google.gson.Gson;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class AiServiceTest
-{
+public class AiServiceTest {
     @Test
-    public void testWikiSearch() throws Exception
-    {
+    public void testWikiSearch() throws Exception {
         AiService aiService = new AiService();
-        
+
         // Initialize Gson
         Field gsonField = AiService.class.getDeclaredField("gson");
         gsonField.setAccessible(true);
         gsonField.set(aiService, new Gson());
-        
+
         // Initialize OkHttpClient
         Field okHttpClientField = AiService.class.getDeclaredField("okHttpClient");
         okHttpClientField.setAccessible(true);
@@ -37,8 +35,7 @@ public class AiServiceTest
     }
 
     @Test
-    public void describeAccountTypeIncludesIronmanVariants() throws Exception
-    {
+    public void describeAccountTypeIncludesIronmanVariants() throws Exception {
         AiService aiService = new AiService();
         Method describeAccountType = AiService.class.getDeclaredMethod("describeAccountType", Integer.class);
         describeAccountType.setAccessible(true);
@@ -54,8 +51,7 @@ public class AiServiceTest
     }
 
     @Test
-    public void buildSystemPromptIncludesGroundingRules()
-    {
+    public void buildSystemPromptIncludesGroundingRules() {
         String prompt = AiService.buildSystemPrompt("Location Name: Grand Exchange", "You: Where am I?");
 
         Assert.assertTrue(prompt.contains("GROUNDING RULES"));
@@ -66,8 +62,7 @@ public class AiServiceTest
     }
 
     @Test
-    public void trimToPromptBudgetCapsLongText()
-    {
+    public void trimToPromptBudgetCapsLongText() {
         String text = "1234567890";
         String trimmed = AiService.trimToPromptBudget(text, 8, "...[cut]");
 
@@ -76,16 +71,15 @@ public class AiServiceTest
     }
 
     @Test
-    public void trimToPromptBudgetNormalizesEmptyText()
-    {
+    public void trimToPromptBudgetNormalizesEmptyText() {
         Assert.assertEquals("None", AiService.trimToPromptBudget("   ", 10, "...[cut]"));
         Assert.assertEquals("abc", AiService.trimToPromptBudget("  abc  ", 10, "...[cut]"));
     }
 
     @Test
-    public void extractSearchQueryCleansConversationalPrefixes()
-    {
-        Assert.assertEquals("super antipoison", AiService.extractSearchQuery("what are the ingredients for super antipoison?"));
+    public void extractSearchQueryCleansConversationalPrefixes() {
+        Assert.assertEquals("super antipoison",
+                AiService.extractSearchQuery("what are the ingredients for super antipoison?"));
         Assert.assertEquals("super antipoison", AiService.extractSearchQuery("how to make super antipoison"));
         Assert.assertEquals("grand exchange", AiService.extractSearchQuery("where is the grand exchange?"));
         Assert.assertEquals("king roald", AiService.extractSearchQuery("tell me about king roald"));

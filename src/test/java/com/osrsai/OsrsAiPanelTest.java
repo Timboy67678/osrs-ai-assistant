@@ -4,11 +4,9 @@ import java.lang.reflect.Method;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class OsrsAiPanelTest
-{
+public class OsrsAiPanelTest {
     @Test
-    public void formatsHeadingsListsAndEscaping() throws Exception
-    {
+    public void formatsHeadingsListsAndEscaping() throws Exception {
         OsrsAiPanel panel = new OsrsAiPanel(null);
         Method formatter = OsrsAiPanel.class.getDeclaredMethod("formatMarkdownToHtml", String.class);
         formatter.setAccessible(true);
@@ -23,4 +21,3 @@ public class OsrsAiPanelTest
         Assert.assertTrue(html.contains("Safe &lt;tag&gt;"));
     }
 }
-

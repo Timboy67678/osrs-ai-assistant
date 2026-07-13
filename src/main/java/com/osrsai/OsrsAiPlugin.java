@@ -17,11 +17,8 @@ import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 
 @Slf4j
-@PluginDescriptor(
-        name = "OSRS AI Assistant",
-        description = "An AI chatbot assistant that reads your in-game stats. WARNING: Sends query & selected game details to third-party AI APIs (Gemini/OpenAI/Claude/Grok). Requires an external API key.",
-        tags = {"ai", "chatbot", "gemini", "assistant"}
-)
+@PluginDescriptor(name = "OSRS AI Assistant", description = "An AI chatbot assistant that reads your in-game stats. WARNING: Sends query & selected game details to third-party AI APIs (Gemini/OpenAI/Claude/Grok). Requires an external API key.", tags = {
+        "ai", "chatbot", "gemini", "assistant" })
 public class OsrsAiPlugin extends Plugin {
     @Inject
     private OsrsAiConfig config;
@@ -93,8 +90,6 @@ public class OsrsAiPlugin extends Plugin {
             }
         }
     }
-
-
 
     @Provides
     OsrsAiConfig provideConfig(ConfigManager configManager) {

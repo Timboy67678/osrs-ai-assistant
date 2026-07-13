@@ -19,7 +19,8 @@ public class OpenAiProviderHandler implements ProviderHandler {
     }
 
     @Override
-    public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question, boolean shareCharInfo) {
+    public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
+            boolean shareCharInfo) {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("temperature", LOW_TEMPERATURE);
@@ -145,7 +146,8 @@ public class OpenAiProviderHandler implements ProviderHandler {
     }
 
     @Override
-    public void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot, List<AiService.ToolResult> results) {
+    public void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot,
+            List<AiService.ToolResult> results) {
         JsonArray messages = requestBody.getAsJsonArray("messages");
 
         // Add assistant message (which contains the tool calls)

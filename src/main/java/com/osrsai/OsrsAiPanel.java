@@ -344,9 +344,11 @@ public class OsrsAiPanel extends PluginPanel {
                 share = plugin.getConfig().shareCharacterInfo();
             }
             if (share) {
-                warningLabel.setText("<html><div style='text-align: center;'>⚠️ Sends query & game context to external AI APIs</div></html>");
+                warningLabel.setText(
+                        "<html><div style='text-align: center;'>⚠️ Sends query & game context to external AI APIs</div></html>");
             } else {
-                warningLabel.setText("<html><div style='text-align: center;'>⚠️ Sends query text to external AI APIs</div></html>");
+                warningLabel.setText(
+                        "<html><div style='text-align: center;'>⚠️ Sends query text to external AI APIs</div></html>");
             }
             warningLabel.revalidate();
             warningLabel.repaint();

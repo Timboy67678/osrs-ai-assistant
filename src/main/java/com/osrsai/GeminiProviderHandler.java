@@ -15,7 +15,8 @@ public class GeminiProviderHandler implements ProviderHandler {
     private final Gson gson = new Gson();
 
     @Override
-    public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question, boolean shareCharInfo) {
+    public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
+            boolean shareCharInfo) {
         String fullPrompt = AiService.buildSystemPrompt(context, recentConversation)
                 + "\n\nCURRENT USER QUESTION:\n"
                 + question;
@@ -153,7 +154,8 @@ public class GeminiProviderHandler implements ProviderHandler {
     }
 
     @Override
-    public void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot, List<AiService.ToolResult> results) {
+    public void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot,
+            List<AiService.ToolResult> results) {
         JsonArray contents = requestBody.getAsJsonArray("contents");
 
         // Add model message containing the function calls

@@ -12,10 +12,11 @@ import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 
 final class LocationResolver {
-    private static final int[] UNDERGROUND_Y_OFFSETS = {6400, 12800};
+    private static final int[] UNDERGROUND_Y_OFFSETS = { 6400, 12800 };
     private static final String REGION_ALIAS_RESOURCE = "/com/osrsai/region-aliases.properties";
 
-    // Region aliases are easier to maintain than large rectangle lists for named dungeon zones.
+    // Region aliases are easier to maintain than large rectangle lists for named
+    // dungeon zones.
     private static final Map<Integer, RegionAlias> REGION_ALIASES = loadRegionAliases();
 
     private static final List<NamedArea> KNOWN_AREAS = Arrays.asList(
@@ -120,8 +121,7 @@ final class LocationResolver {
             new NamedArea("Chaos Temple", new WorldArea(2940, 3810, 72, 66, 0)),
             new NamedArea("Lava Maze", new WorldArea(3010, 3830, 94, 80, 0)),
             new NamedArea("Black Chinchompa Hunting Ground", new WorldArea(3100, 3770, 90, 80, 0)),
-            new NamedArea("Wilderness", new WorldArea(2940, 3520, 360, 560, 0))
-    );
+            new NamedArea("Wilderness", new WorldArea(2940, 3520, 360, 560, 0)));
 
     String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, false);
@@ -131,7 +131,8 @@ final class LocationResolver {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, true);
     }
 
-    private String resolveLocation(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate, boolean forAi) {
+    private String resolveLocation(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate,
+            boolean forAi) {
         if (worldPoint == null) {
             return "Unknown";
         }
@@ -158,7 +159,8 @@ final class LocationResolver {
         }
 
         String underground = resolveUnderground(worldPoint, forAi);
-        return Objects.requireNonNullElseGet(underground, () -> "Unknown area (region " + worldPoint.getRegionID() + ")");
+        return Objects.requireNonNullElseGet(underground,
+                () -> "Unknown area (region " + worldPoint.getRegionID() + ")");
     }
 
     private NamedArea findArea(WorldPoint point) {
@@ -177,7 +179,8 @@ final class LocationResolver {
                 continue;
             }
 
-            WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset, worldPoint.getPlane());
+            WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset,
+                    worldPoint.getPlane());
 
             RegionAlias alias = REGION_ALIASES.get(normalized.getRegionID());
             if (alias != null) {
@@ -218,14 +221,13 @@ final class LocationResolver {
     }
 
     /**
-     * Returns a location string enriched with the canonical OSRS name when it differs from the
-     * display name. This is the preferred method for building AI prompt context so the model can
+     * Returns a location string enriched with the canonical OSRS name when it
+     * differs from the
+     * display name. This is the preferred method for building AI prompt context so
+     * the model can
      * reason about well-known area names even when the in-game display differs.
      * e.g. "Kourend Underground (Catacombs of Kourend)"
      */
-
-
-
 
     private static String formatAlias(RegionAlias alias) {
         if (alias.canonicalName.equals(alias.displayName)) {
@@ -234,8 +236,6 @@ final class LocationResolver {
 
         return alias.displayName + " (also known as: " + alias.canonicalName + ")";
     }
-
-
 
     private static Map<Integer, RegionAlias> loadRegionAliases() {
         Map<Integer, RegionAlias> aliases = new HashMap<>();
@@ -316,8 +316,7 @@ final class LocationResolver {
 
         overlapping.sort((a, b) -> Integer.compare(
                 b.worldArea.getWidth() * b.worldArea.getHeight(),
-                a.worldArea.getWidth() * a.worldArea.getHeight()
-        ));
+                a.worldArea.getWidth() * a.worldArea.getHeight()));
 
         return overlapping.get(0);
     }

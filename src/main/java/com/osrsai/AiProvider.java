@@ -7,9 +7,11 @@ public enum AiProvider {
     GROK("Grok 4.3", "grok-4.3");
 
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
-    private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler("https://api.openai.com/v1/chat/completions");
+    private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler(
+            "https://api.openai.com/v1/chat/completions");
     private static final ProviderHandler CLAUDE_HANDLER = new ClaudeProviderHandler();
-    private static final ProviderHandler GROK_HANDLER = new OpenAiProviderHandler("https://api.x.ai/v1/chat/completions");
+    private static final ProviderHandler GROK_HANDLER = new OpenAiProviderHandler(
+            "https://api.x.ai/v1/chat/completions");
 
     private final String name;
     private final String modelId;

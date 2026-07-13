@@ -5,13 +5,15 @@ import java.util.List;
 import okhttp3.Request;
 
 public interface ProviderHandler {
-    JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question, boolean shareCharInfo);
+    JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
+            boolean shareCharInfo);
 
     boolean hasToolCalls(JsonObject responseRoot);
 
     List<AiService.ToolCall> extractToolCalls(JsonObject responseRoot);
 
-    void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot, List<AiService.ToolResult> results);
+    void updateRequestWithToolResults(JsonObject requestBody, JsonObject responseRoot,
+            List<AiService.ToolResult> results);
 
     String extractResponseText(JsonObject responseRoot);
 
