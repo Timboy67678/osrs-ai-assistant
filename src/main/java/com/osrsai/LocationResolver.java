@@ -90,7 +90,6 @@ final class LocationResolver {
             new NamedArea("Fossil Island", new WorldArea(3648, 3712, 192, 200, 0)),
             new NamedArea("Ape Atoll", new WorldArea(2680, 2680, 170, 130, 0)),
             new NamedArea("Entrana", new WorldArea(2790, 3320, 90, 80, 0)),
-            new NamedArea("Karamja", new WorldArea(2760, 2860, 260, 380, 0)),
             new NamedArea("Tutorial Island", new WorldArea(3080, 3080, 120, 100, 0)),
             new NamedArea("Rellekka", new WorldArea(2620, 3630, 96, 88, 0)),
             new NamedArea("Fremennik Slayer Cave", new WorldArea(2780, 10020, 160, 150, 0)),
@@ -112,16 +111,33 @@ final class LocationResolver {
             new NamedArea("Wintertodt Camp", new WorldArea(1610, 3930, 70, 70, 0)),
             new NamedArea("Farming Guild", new WorldArea(1210, 3700, 100, 100, 0)),
             new NamedArea("Woodcutting Guild", new WorldArea(1540, 3440, 130, 120, 0)),
-            new NamedArea("Kebos Lowlands", new WorldArea(1100, 3500, 430, 420, 0)),
             new NamedArea("Kourend Woodland", new WorldArea(1480, 3440, 220, 210, 0)),
-            new NamedArea("Great Kourend", new WorldArea(1560, 3450, 360, 360, 0)),
             new NamedArea("Ferox Enclave", new WorldArea(3110, 3620, 48, 42, 0)),
             new NamedArea("Wilderness Resource Area", new WorldArea(3160, 3920, 72, 56, 0)),
             new NamedArea("Mage Arena", new WorldArea(3080, 3920, 74, 68, 0)),
             new NamedArea("Chaos Temple", new WorldArea(2940, 3810, 72, 66, 0)),
             new NamedArea("Lava Maze", new WorldArea(3010, 3830, 94, 80, 0)),
             new NamedArea("Black Chinchompa Hunting Ground", new WorldArea(3100, 3770, 90, 80, 0)),
-            new NamedArea("Wilderness", new WorldArea(2940, 3520, 360, 560, 0)));
+            new NamedArea("Varlamore Hunter Guild", new WorldArea(1530, 3410, 80, 70, 0)),
+            new NamedArea("Civitas illa Fortis", new WorldArea(1600, 3000, 240, 270, 0)),
+            new NamedArea("Aldarin", new WorldArea(1350, 2880, 130, 140, 0)),
+            new NamedArea("Avium Savannah", new WorldArea(1470, 3000, 230, 450, 0)),
+            new NamedArea("Sunset Coast", new WorldArea(1200, 2900, 160, 320, 0)),
+            new NamedArea("Varlamore Mountain Range", new WorldArea(1400, 3100, 100, 150, 0)));
+
+    private static final List<NamedArea> PROVINCE_FALLBACKS = Arrays.asList(
+            new NamedArea("Kebos Lowlands", new WorldArea(1100, 3500, 430, 420, 0)),
+            new NamedArea("Great Kourend", new WorldArea(1560, 3450, 360, 360, 0)),
+            new NamedArea("Wilderness", new WorldArea(2940, 3520, 360, 560, 0)),
+            new NamedArea("Karamja", new WorldArea(2760, 2860, 260, 380, 0)),
+            new NamedArea("Varlamore", new WorldArea(1200, 2700, 650, 780, 0)),
+            new NamedArea("Tirannwn", new WorldArea(2100, 3050, 260, 300, 0)),
+            new NamedArea("Kandarin", new WorldArea(2100, 2900, 760, 650, 0)),
+            new NamedArea("Asgarnia", new WorldArea(2860, 3100, 200, 420, 0)),
+            new NamedArea("Misthalin", new WorldArea(3060, 3140, 270, 380, 0)),
+            new NamedArea("Kharidian Desert", new WorldArea(3100, 2600, 350, 510, 0)),
+            new NamedArea("Morytania", new WorldArea(3380, 3140, 340, 460, 0)),
+            new NamedArea("Fremennik Province", new WorldArea(2580, 3550, 270, 300, 0)));
 
     String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, false);
@@ -159,8 +175,21 @@ final class LocationResolver {
         }
 
         String underground = resolveUnderground(worldPoint, forAi);
-        return Objects.requireNonNullElseGet(underground,
-                () -> "Unknown area (region " + worldPoint.getRegionID() + ")");
+        if (underground != null) {
+            return underground;
+        }
+
+        NamedArea provinceFallback = findProvinceFallback(worldPoint);
+        if (provinceFallback != null) {
+            return provinceFallback.name;
+        }
+
+        String provinceUnderground = resolveProvinceUnderground(worldPoint, forAi);
+        if (provinceUnderground != null) {
+            return provinceUnderground;
+        }
+
+        return "Unknown area (region " + worldPoint.getRegionID() + ")";
     }
 
     private NamedArea findArea(WorldPoint point) {
@@ -319,6 +348,32 @@ final class LocationResolver {
                 a.worldArea.getWidth() * a.worldArea.getHeight()));
 
         return overlapping.get(0);
+    }
+
+    private NamedArea findProvinceFallback(WorldPoint point) {
+        for (NamedArea area : PROVINCE_FALLBACKS) {
+            if (point.isInArea2D(area.worldArea)) {
+                return area;
+            }
+        }
+        return null;
+    }
+
+    private String resolveProvinceUnderground(WorldPoint worldPoint, boolean forAi) {
+        for (int offset : UNDERGROUND_Y_OFFSETS) {
+            if (worldPoint.getY() <= offset) {
+                continue;
+            }
+
+            WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset,
+                    worldPoint.getPlane());
+
+            NamedArea area = findProvinceFallback(normalized);
+            if (area != null) {
+                return area.name + " (underground)";
+            }
+        }
+        return null;
     }
 
     private static boolean overlaps(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
