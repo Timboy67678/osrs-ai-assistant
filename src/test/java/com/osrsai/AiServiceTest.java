@@ -170,6 +170,29 @@ public class AiServiceTest {
         Assert.assertTrue(resultComma.has("Item 556"));
         Assert.assertTrue(resultComma.has("Item 560"));
         Assert.assertFalse(resultComma.has("Item 995"));
+
+        // Run multi-filter with AND: "Item AND 560"
+        com.google.gson.JsonObject resultAnd = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "Item AND 560", 0);
+
+        Assert.assertTrue(resultAnd.has("Item 560"));
+        Assert.assertFalse(resultAnd.has("Item 995"));
+        Assert.assertFalse(resultAnd.has("Item 556"));
+
+        // Run multi-filter with &: "Item & 556"
+        com.google.gson.JsonObject resultAmp = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "Item & 556", 0);
+
+        Assert.assertTrue(resultAmp.has("Item 556"));
+        Assert.assertFalse(resultAmp.has("Item 560"));
+
+        // Run DNF query: "995 & Item OR 560 & Item"
+        com.google.gson.JsonObject resultDnf = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "995 & Item OR 560 & Item", 0);
+
+        Assert.assertTrue(resultDnf.has("Item 995"));
+        Assert.assertTrue(resultDnf.has("Item 560"));
+        Assert.assertFalse(resultDnf.has("Item 556"));
     }
 
     @Test

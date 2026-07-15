@@ -500,15 +500,30 @@ public class AiService {
 
             // Apply name filter if present
             if (tokens != null && tokens.length > 0) {
-                boolean matches = false;
-                for (String token : tokens) {
-                    String cleanToken = token.trim();
-                    if (!cleanToken.isEmpty() && itemName.toLowerCase().contains(cleanToken)) {
-                        matches = true;
+                boolean matchesAnyOrGroup = false;
+                for (String orGroup : tokens) {
+                    String cleanGroup = orGroup.trim();
+                    if (cleanGroup.isEmpty()) {
+                        continue;
+                    }
+
+                    // Split the OR group by " and " or "&" to find all AND tokens
+                    String[] andTokens = cleanGroup.split("\\s+and\\s+|\\s*&\\s*");
+                    boolean matchesAllAndTokens = true;
+                    for (String andToken : andTokens) {
+                        String cleanAndToken = andToken.trim();
+                        if (!cleanAndToken.isEmpty() && !itemName.toLowerCase().contains(cleanAndToken)) {
+                            matchesAllAndTokens = false;
+                            break;
+                        }
+                    }
+
+                    if (matchesAllAndTokens) {
+                        matchesAnyOrGroup = true;
                         break;
                     }
                 }
-                if (!matches) {
+                if (!matchesAnyOrGroup) {
                     continue;
                 }
             }
