@@ -117,7 +117,7 @@ public class AiService {
 
             clientThread.invokeLater(() -> {
                 try {
-                    final String gameContext = buildContext();
+                    final String gameContext = buildGameContext();
                     final String clientId = config.clientId();
                     final String customModel = config.customModel();
                     final String modelId = (customModel != null && !customModel.trim().isEmpty())
@@ -282,8 +282,6 @@ public class AiService {
             }
         });
     }
-
-
 
     private CompletableFuture<List<ToolResult>> executeToolsAsync(List<ToolCall> toolCalls) {
         CompletableFuture<List<ToolResult>> future = new CompletableFuture<>();
@@ -595,7 +593,7 @@ public class AiService {
     }
 
     @SuppressWarnings("deprecation")
-    private String buildContext() {
+    private String buildGameContext() {
         if (!config.shareCharacterInfo()) {
             return "Player is not sharing character details with the AI (this option is disabled in the settings).";
         }
@@ -620,6 +618,8 @@ public class AiService {
         sb.append("Account Type: ").append(describeAccountType(accountTypeVarbit)).append("\n");
         sb.append("World: ").append(client.getWorld()).append("\n");
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
+        int spellbookVar = client.getVarbitValue(4070);
+        sb.append("Active Spellbook: ").append(describeSpellbook(spellbookVar)).append("\n");
         sb.append("Run Energy: ").append(client.getEnergy()).append("%\n");
         sb.append("Weight: ").append(client.getWeight()).append(" kg\n");
         sb.append("Hitpoints: ")
@@ -982,7 +982,7 @@ public class AiService {
                 + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, and bank (when open).\n"
                 + "- Call them when the player asks about stats, items, progress, or general goals/progression advice (query skills/quests/diaries first for tailored advice).\n"
                 + "- Do not guess player details; call the relevant tools to check.\n"
-                + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item recipes/uses, slayer/quest requirements, farming patch locations/types/mechanics, or skilling training methods. Do not guess these facts.\n"
+                + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item recipes/uses, slayer/quest requirements, farming patch locations/types/mechanics, skilling training methods, shop locations, shop stock, or travel/teleportation options. Do not guess these facts.\n"
                 + "\n"
                 + "GROUNDING RULES:\n"
                 + "1. Never invent stats, quests, items, locations, or NPCs for the player's character.\n"
@@ -991,10 +991,11 @@ public class AiService {
                 + "4. If location name is approximate, say so.\n"
                 + "5. For Ironman/UIM/GIM accounts, do not recommend invalid trading, Grand Exchange, or banking options.\n"
                 + "6. Respect disabled tools/errors and keep answers practical and concise. Avoid markdown headings.\n"
-                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, farming patch locations/types, and skilling training methods. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
+                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, farming patch locations/types, skilling training methods, shop locations, shop stock, and travel/teleportation options. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
                 + "8. Use tool result data to answer the user's original question. Do not change the conversation topic to unrelated tool outputs if they do not address the user's query.\n"
                 + "9. Never assume or state that a skilling/farming patch, dungeon, monster, NPC, or shop exists in a specific location unless you have verified it using the 'search_osrs_wiki' tool or it is explicitly mentioned in the GAME CONTEXT.\n"
                 + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item. For Ironman/UIM/GIM accounts, define the 'value' or 'expense' of items using their High Alchemy value (haPrice) rather than their Grand Exchange price (gePrice) because they cannot trade; prioritize and quote High Alchemy values for them when asked about value or the most expensive items (though you can mention the GE price as secondary info).\n"
+                + "11. When recommending travel routes, check the player's active spellbook in GAME CONTEXT. If they are on Ancients, Lunar, or Arceuus, remember they do NOT have access to standard spellbook teleports (e.g. Varrock, Falador, Lumbridge, Camelot, Ardougne teleports) unless they use teleport tablets, a portal chamber, or specific teleportation items (like Chronicle, Ring of wealth, Book of the dead). Do not recommend running massive distances across Gielinor when much closer vendors or options exist.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation
@@ -1064,6 +1065,21 @@ public class AiService {
             case 0:
             default:
                 return "Normal";
+        }
+    }
+
+    private String describeSpellbook(int val) {
+        switch (val) {
+            case 0:
+                return "Standard";
+            case 1:
+                return "Ancient Magicks";
+            case 2:
+                return "Lunar";
+            case 3:
+                return "Arceuus";
+            default:
+                return "Unknown (" + val + ")";
         }
     }
 

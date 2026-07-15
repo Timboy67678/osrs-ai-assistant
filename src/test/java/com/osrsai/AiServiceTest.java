@@ -63,6 +63,8 @@ public class AiServiceTest {
         Assert.assertTrue(prompt.contains("Never assume or state that a skilling/farming patch"));
         Assert.assertTrue(prompt.contains("Never guess, assume, or invent item prices"));
         Assert.assertTrue(prompt.contains("High Alchemy values"));
+        Assert.assertTrue(prompt.contains("active spellbook"));
+        Assert.assertTrue(prompt.contains("travel/teleportation"));
     }
 
     @Test
@@ -98,5 +100,18 @@ public class AiServiceTest {
         Assert.assertEquals("dagannoth", AiService.extractSearchQuery("Dagannoth elemental weakness"));
         Assert.assertEquals("blood runes", AiService.extractSearchQuery("where can i buy blood runes"));
         Assert.assertEquals("fire rune", AiService.extractSearchQuery("how to get a fire rune drop rate"));
+    }
+
+    @Test
+    public void describeSpellbookIncludesAllSpellbooks() throws Exception {
+        AiService aiService = new AiService();
+        Method describeSpellbook = AiService.class.getDeclaredMethod("describeSpellbook", int.class);
+        describeSpellbook.setAccessible(true);
+
+        Assert.assertEquals("Standard", describeSpellbook.invoke(aiService, 0));
+        Assert.assertEquals("Ancient Magicks", describeSpellbook.invoke(aiService, 1));
+        Assert.assertEquals("Lunar", describeSpellbook.invoke(aiService, 2));
+        Assert.assertEquals("Arceuus", describeSpellbook.invoke(aiService, 3));
+        Assert.assertEquals("Unknown (4)", describeSpellbook.invoke(aiService, 4));
     }
 }
