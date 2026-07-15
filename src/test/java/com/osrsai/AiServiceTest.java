@@ -90,4 +90,13 @@ public class AiServiceTest {
         Assert.assertEquals("guthix rest", AiService.extractSearchQuery("recipe for guthix rest"));
         Assert.assertEquals("hello", AiService.extractSearchQuery("hello"));
     }
+
+    @Test
+    public void extractSearchQueryCleansConversationalSuffixes() {
+        Assert.assertEquals("blood runes", AiService.extractSearchQuery("blood runes buy shops locations"));
+        Assert.assertEquals("blood rune", AiService.extractSearchQuery("blood rune shop locations OSRS"));
+        Assert.assertEquals("dagannoth", AiService.extractSearchQuery("Dagannoth elemental weakness"));
+        Assert.assertEquals("blood runes", AiService.extractSearchQuery("where can i buy blood runes"));
+        Assert.assertEquals("fire rune", AiService.extractSearchQuery("how to get a fire rune drop rate"));
+    }
 }
