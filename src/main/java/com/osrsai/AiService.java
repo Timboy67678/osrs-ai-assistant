@@ -476,6 +476,10 @@ public class AiService {
         Map<String, Integer> itemIds = new HashMap<>();
 
         String search = (filter != null) ? filter.trim().toLowerCase() : null;
+        String[] tokens = null;
+        if (search != null) {
+            tokens = search.split("\\s+or\\s+|\\s*,\\s*|\\s*\\|\\s*");
+        }
         boolean isIron = isIronman();
 
         for (Item item : container.getItems()) {
@@ -485,8 +489,18 @@ public class AiService {
             String itemName = safeItemName(item.getId());
 
             // Apply name filter if present
-            if (search != null && !itemName.toLowerCase().contains(search)) {
-                continue;
+            if (tokens != null && tokens.length > 0) {
+                boolean matches = false;
+                for (String token : tokens) {
+                    String cleanToken = token.trim();
+                    if (!cleanToken.isEmpty() && itemName.toLowerCase().contains(cleanToken)) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (!matches) {
+                    continue;
+                }
             }
 
             quantities.put(itemName, quantities.getOrDefault(itemName, 0L) + item.getQuantity());
@@ -515,7 +529,12 @@ public class AiService {
             String name = entry.getKey();
             long qty = entry.getValue();
             int itemId = itemIds.get(name);
-            int price = itemManager.getItemPrice(itemId);
+            int price = 0;
+            if (itemManager != null) {
+                try {
+                    price = itemManager.getItemPrice(itemId);
+                } catch (Exception e) {}
+            }
             if (price <= 0 && "Coins".equals(name)) {
                 price = 1;
             }

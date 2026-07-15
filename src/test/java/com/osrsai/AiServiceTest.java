@@ -115,4 +115,47 @@ public class AiServiceTest {
         Assert.assertEquals("Arceuus", describeSpellbook.invoke(aiService, 3));
         Assert.assertEquals("Unknown (4)", describeSpellbook.invoke(aiService, 4));
     }
+
+    @Test
+    public void aggregateItemsWithPricesSupportsMultiFilters() throws Exception {
+        AiService aiService = new AiService();
+
+        // Create a mock ItemContainer using a Dynamic Proxy
+        net.runelite.api.ItemContainer mockContainer = (net.runelite.api.ItemContainer) java.lang.reflect.Proxy.newProxyInstance(
+                net.runelite.api.ItemContainer.class.getClassLoader(),
+                new Class<?>[] { net.runelite.api.ItemContainer.class },
+                (proxy, method, args) -> {
+                    if ("getItems".equals(method.getName())) {
+                        return new net.runelite.api.Item[] {
+                                new net.runelite.api.Item(995, 1000), // Coins -> "Item 995"
+                                new net.runelite.api.Item(556, 50),   // Air rune -> "Item 556"
+                                new net.runelite.api.Item(560, 20)    // Death rune -> "Item 560"
+                        };
+                    }
+                    return null;
+                }
+        );
+
+        // Get private method aggregateItemsWithPrices
+        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
+                net.runelite.api.ItemContainer.class, String.class, int.class);
+        aggregateItemsWithPrices.setAccessible(true);
+
+        // Run multi-filter with "995 OR 560"
+        com.google.gson.JsonObject result = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "995 OR 560", 0);
+
+        Assert.assertNotNull(result);
+        Assert.assertTrue(result.has("Item 995"));
+        Assert.assertTrue(result.has("Item 560"));
+        Assert.assertFalse(result.has("Item 556"));
+
+        // Run multi-filter with comma: "556, 560"
+        com.google.gson.JsonObject resultComma = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "556, 560", 0);
+
+        Assert.assertTrue(resultComma.has("Item 556"));
+        Assert.assertTrue(resultComma.has("Item 560"));
+        Assert.assertFalse(resultComma.has("Item 995"));
+    }
 }
