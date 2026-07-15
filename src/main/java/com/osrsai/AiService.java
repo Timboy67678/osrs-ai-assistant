@@ -486,6 +486,16 @@ public class AiService {
             if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
                 continue;
             }
+            if (itemManager != null) {
+                try {
+                    net.runelite.api.ItemComposition comp = itemManager.getItemComposition(item.getId());
+                    if (comp != null && comp.getPlaceholderTemplateId() != -1) {
+                        continue;
+                    }
+                } catch (Exception e) {
+                    // Ignore composition errors, default to not ignoring
+                }
+            }
             String itemName = safeItemName(item.getId());
 
             // Apply name filter if present

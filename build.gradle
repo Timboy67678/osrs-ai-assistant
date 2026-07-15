@@ -18,6 +18,7 @@ dependencies {
     annotationProcessor "org.projectlombok:lombok:1.18.30"
 
     testImplementation "junit:junit:4.12"
+    testImplementation "org.mockito:mockito-core:4.11.0"
     testImplementation "net.runelite:client:$runeLiteVersion"
     testImplementation "net.runelite:jshell:$runeLiteVersion"
     testImplementation 'ch.qos.logback:logback-classic:1.2.9'

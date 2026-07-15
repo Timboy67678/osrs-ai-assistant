@@ -6,19 +6,44 @@ import okhttp3.OkHttpClient;
 import com.google.gson.Gson;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
 
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
+import net.runelite.api.ItemComposition;
+import net.runelite.client.game.ItemManager;
+
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class AiServiceTest {
-    @Test
-    public void testWikiSearch() throws Exception {
-        AiService aiService = new AiService();
 
-        // Initialize Gson
+    @InjectMocks
+    private AiService aiService;
+
+    @Mock
+    private OkHttpClient okHttpClient;
+
+    @Mock
+    private ItemManager itemManager;
+
+    @Mock
+    private net.runelite.api.Client client;
+
+    @Before
+    public void setUp() throws Exception {
         Field gsonField = AiService.class.getDeclaredField("gson");
         gsonField.setAccessible(true);
         gsonField.set(aiService, new Gson());
+    }
 
-        // Initialize OkHttpClient
+    @Test
+    public void testWikiSearch() throws Exception {
+        // Set a real OkHttpClient for this integration test
         Field okHttpClientField = AiService.class.getDeclaredField("okHttpClient");
         okHttpClientField.setAccessible(true);
         okHttpClientField.set(aiService, new OkHttpClient());
@@ -36,7 +61,6 @@ public class AiServiceTest {
 
     @Test
     public void describeAccountTypeIncludesIronmanVariants() throws Exception {
-        AiService aiService = new AiService();
         Method describeAccountType = AiService.class.getDeclaredMethod("describeAccountType", Integer.class);
         describeAccountType.setAccessible(true);
 
@@ -105,7 +129,6 @@ public class AiServiceTest {
 
     @Test
     public void describeSpellbookIncludesAllSpellbooks() throws Exception {
-        AiService aiService = new AiService();
         Method describeSpellbook = AiService.class.getDeclaredMethod("describeSpellbook", int.class);
         describeSpellbook.setAccessible(true);
 
@@ -118,27 +141,17 @@ public class AiServiceTest {
 
     @Test
     public void aggregateItemsWithPricesSupportsMultiFilters() throws Exception {
-        AiService aiService = new AiService();
-
-        // Create a mock ItemContainer using a Dynamic Proxy
-        net.runelite.api.ItemContainer mockContainer = (net.runelite.api.ItemContainer) java.lang.reflect.Proxy.newProxyInstance(
-                net.runelite.api.ItemContainer.class.getClassLoader(),
-                new Class<?>[] { net.runelite.api.ItemContainer.class },
-                (proxy, method, args) -> {
-                    if ("getItems".equals(method.getName())) {
-                        return new net.runelite.api.Item[] {
-                                new net.runelite.api.Item(995, 1000), // Coins -> "Item 995"
-                                new net.runelite.api.Item(556, 50),   // Air rune -> "Item 556"
-                                new net.runelite.api.Item(560, 20)    // Death rune -> "Item 560"
-                        };
-                    }
-                    return null;
-                }
-        );
+        // Create mock ItemContainer
+        ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
+        Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
+                new Item(995, 1000), // Coins -> "Item 995"
+                new Item(556, 50),   // Air rune -> "Item 556"
+                new Item(560, 20)    // Death rune -> "Item 560"
+        });
 
         // Get private method aggregateItemsWithPrices
         Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
-                net.runelite.api.ItemContainer.class, String.class, int.class);
+                ItemContainer.class, String.class, int.class);
         aggregateItemsWithPrices.setAccessible(true);
 
         // Run multi-filter with "995 OR 560"
@@ -157,5 +170,39 @@ public class AiServiceTest {
         Assert.assertTrue(resultComma.has("Item 556"));
         Assert.assertTrue(resultComma.has("Item 560"));
         Assert.assertFalse(resultComma.has("Item 995"));
+    }
+
+    @Test
+    public void aggregateItemsWithPricesFiltersOutPlaceholders() throws Exception {
+        // Mock normal item composition
+        ItemComposition normalItem = Mockito.mock(ItemComposition.class);
+        Mockito.when(normalItem.getName()).thenReturn("Coins");
+        Mockito.when(normalItem.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(itemManager.getItemComposition(995)).thenReturn(normalItem);
+
+        // Mock placeholder item composition
+        ItemComposition placeholderItem = Mockito.mock(ItemComposition.class);
+        Mockito.when(placeholderItem.getName()).thenReturn("Abyssal whip");
+        Mockito.when(placeholderItem.getPlaceholderTemplateId()).thenReturn(1440);
+        Mockito.when(itemManager.getItemComposition(4152)).thenReturn(placeholderItem);
+
+        // Create mock ItemContainer
+        ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
+        Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
+                new Item(995, 1000), // Coins (normal)
+                new Item(4152, 1)    // Abyssal whip (placeholder)
+        });
+
+        // Invoke aggregateItemsWithPrices
+        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
+                ItemContainer.class, String.class, int.class);
+        aggregateItemsWithPrices.setAccessible(true);
+
+        com.google.gson.JsonObject result = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, null, 0);
+
+        Assert.assertNotNull(result);
+        Assert.assertTrue(result.has("Coins"));
+        Assert.assertFalse(result.has("Abyssal whip"));
     }
 }
