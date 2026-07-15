@@ -543,7 +543,8 @@ public class AiService {
             if (itemManager != null) {
                 try {
                     price = itemManager.getItemPrice(itemId);
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                }
             }
             if (price <= 0 && "Coins".equals(name)) {
                 price = 1;
