@@ -981,6 +981,7 @@ public class AiService {
                 + "INTEGRATION TOOLS:\n"
                 + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, and bank (when open).\n"
                 + "- Call them when the player asks about stats, items, progress, or general goals/progression advice (query skills/quests/diaries first for tailored advice).\n"
+                + "- When asked about travel, reaching a destination, or teleportation, you MUST call the relevant inventory/equipment/bank tools to check if the player has teleportation items (such as Book of the Dead, Chronicle, teleport tablets, jewelry, runes) equipped, in inventory, or in their bank (if open) to tailor the travel route. Do not guess or assume their items.\n"
                 + "- Do not guess player details; call the relevant tools to check.\n"
                 + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item recipes/uses, slayer/quest requirements, farming patch locations/types/mechanics, skilling training methods, shop locations, shop stock, or travel/teleportation options. Do not guess these facts.\n"
                 + "\n"

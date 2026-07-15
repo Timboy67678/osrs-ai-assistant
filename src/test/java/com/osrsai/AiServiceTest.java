@@ -65,6 +65,7 @@ public class AiServiceTest {
         Assert.assertTrue(prompt.contains("High Alchemy values"));
         Assert.assertTrue(prompt.contains("active spellbook"));
         Assert.assertTrue(prompt.contains("travel/teleportation"));
+        Assert.assertTrue(prompt.contains("Book of the Dead"));
     }
 
     @Test
