@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -45,30 +46,44 @@ public class GeminiProviderHandler implements ProviderHandler {
 
     private JsonArray buildGeminiTools(boolean shareCharInfo) {
         JsonArray declarations = new JsonArray();
-        if (shareCharInfo) {
-            declarations.add(createGeminiFunction("get_player_skills",
-                    "Retrieve the player's current levels (both real and boosted) for all skills."));
-            declarations.add(createGeminiFunction("get_player_inventory",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory."));
-            declarations.add(createGeminiFunction("get_player_equipment",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player."));
-            declarations.add(createGeminiFunction("get_player_slayer_task",
-                    "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak."));
-            declarations.add(createGeminiFunction("get_player_quests",
-                    "Retrieve the player's quest points, and lists of completed and in-progress quests."));
-            declarations.add(createGeminiFunction("get_player_achievement_diaries",
-                    "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
-            JsonObject bankParams = new JsonObject();
-            bankParams.add("filter", createGeminiParamObj("STRING", "Optional search query to filter bank items by name (case-insensitive). Use this if looking for specific items to avoid size limits."));
-            bankParams.add("minValue", createGeminiParamObj("INTEGER", "Optional minimum value (Grand Exchange price or High Alch value) to filter items."));
-            declarations.add(createGeminiFunctionWithOptionalParams("get_player_bank",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
-                    bankParams));
+        for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
+            if (def.requiresCharacterInfo && !shareCharInfo) {
+                continue;
+            }
+
+            JsonObject decl = new JsonObject();
+            decl.addProperty("name", def.name);
+            decl.addProperty("description", def.description);
+
+            JsonObject params = new JsonObject();
+            params.addProperty("type", "OBJECT");
+
+            JsonObject properties = new JsonObject();
+            JsonArray required = new JsonArray();
+
+            for (AiService.ToolParameter p : def.parameters) {
+                JsonObject prop = new JsonObject();
+                if (p.type.startsWith("array")) {
+                    prop.addProperty("type", "ARRAY");
+                    JsonObject items = new JsonObject();
+                    items.addProperty("type", p.type.endsWith("integer") ? "INTEGER" : "STRING");
+                    prop.add("items", items);
+                } else {
+                    prop.addProperty("type", p.type.toUpperCase(Locale.ROOT));
+                }
+                prop.addProperty("description", p.description);
+                properties.add(p.name, prop);
+
+                if (p.required) {
+                    required.add(p.name);
+                }
+            }
+
+            params.add("properties", properties);
+            params.add("required", required);
+            decl.add("parameters", params);
+            declarations.add(decl);
         }
-        declarations.add(createGeminiFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information on items, monsters, spells, quests, or activities.",
-                createGeminiStringParam("query",
-                        "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').")));
 
         JsonObject tool = new JsonObject();
         tool.add("functionDeclarations", declarations);
@@ -76,63 +91,6 @@ public class GeminiProviderHandler implements ProviderHandler {
         JsonArray tools = new JsonArray();
         tools.add(tool);
         return tools;
-    }
-
-    private JsonObject createGeminiFunction(String name, String description) {
-        JsonObject decl = new JsonObject();
-        decl.addProperty("name", name);
-        decl.addProperty("description", description);
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "OBJECT");
-        params.add("properties", new JsonObject());
-        decl.add("parameters", params);
-        return decl;
-    }
-
-    private JsonObject createGeminiFunctionWithParams(String name, String description, JsonObject properties) {
-        JsonObject decl = new JsonObject();
-        decl.addProperty("name", name);
-        decl.addProperty("description", description);
-
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "OBJECT");
-        params.add("properties", properties);
-
-        JsonArray required = new JsonArray();
-        for (String key : properties.keySet()) {
-            required.add(key);
-        }
-        params.add("required", required);
-
-        decl.add("parameters", params);
-        return decl;
-    }
-
-    private JsonObject createGeminiParamObj(String type, String description) {
-        JsonObject val = new JsonObject();
-        val.addProperty("type", type);
-        val.addProperty("description", description);
-        return val;
-    }
-
-    private JsonObject createGeminiFunctionWithOptionalParams(String name, String description, JsonObject properties) {
-        JsonObject decl = new JsonObject();
-        decl.addProperty("name", name);
-        decl.addProperty("description", description);
-
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "OBJECT");
-        params.add("properties", properties);
-        params.add("required", new JsonArray());
-
-        decl.add("parameters", params);
-        return decl;
-    }
-
-    private JsonObject createGeminiStringParam(String name, String description) {
-        JsonObject prop = new JsonObject();
-        prop.add(name, createGeminiParamObj("STRING", description));
-        return prop;
     }
 
     @Override

@@ -45,100 +45,49 @@ public class OpenAiProviderHandler implements ProviderHandler {
 
     private JsonArray buildOpenAiTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
-        if (shareCharInfo) {
-            tools.add(createOpenAiFunction("get_player_skills",
-                    "Retrieve the player's current levels (both real and boosted) for all skills."));
-            tools.add(createOpenAiFunction("get_player_inventory",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory."));
-            tools.add(createOpenAiFunction("get_player_equipment",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player."));
-            tools.add(createOpenAiFunction("get_player_slayer_task",
-                    "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak."));
-            tools.add(createOpenAiFunction("get_player_quests",
-                    "Retrieve the player's quest points, and lists of completed and in-progress quests."));
-            tools.add(createOpenAiFunction("get_player_achievement_diaries",
-                    "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
-            JsonObject bankParams = new JsonObject();
-            bankParams.add("filter", createOpenAiParamObj("string", "Optional search query to filter bank items by name (case-insensitive). Use this if looking for specific items to avoid size limits."));
-            bankParams.add("minValue", createOpenAiParamObj("integer", "Optional minimum value (Grand Exchange price or High Alch value) to filter items."));
-            tools.add(createOpenAiFunctionWithOptionalParams("get_player_bank",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
-                    bankParams));
+        for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
+            if (def.requiresCharacterInfo && !shareCharInfo) {
+                continue;
+            }
+
+            JsonObject func = new JsonObject();
+            func.addProperty("name", def.name);
+            func.addProperty("description", def.description);
+
+            JsonObject params = new JsonObject();
+            params.addProperty("type", "object");
+
+            JsonObject properties = new JsonObject();
+            JsonArray required = new JsonArray();
+
+            for (AiService.ToolParameter p : def.parameters) {
+                JsonObject prop = new JsonObject();
+                if (p.type.startsWith("array")) {
+                    prop.addProperty("type", "array");
+                    JsonObject items = new JsonObject();
+                    items.addProperty("type", p.type.endsWith("integer") ? "integer" : "string");
+                    prop.add("items", items);
+                } else {
+                    prop.addProperty("type", p.type);
+                }
+                prop.addProperty("description", p.description);
+                properties.add(p.name, prop);
+
+                if (p.required) {
+                    required.add(p.name);
+                }
+            }
+
+            params.add("properties", properties);
+            params.add("required", required);
+            func.add("parameters", params);
+
+            JsonObject tool = new JsonObject();
+            tool.addProperty("type", "function");
+            tool.add("function", func);
+            tools.add(tool);
         }
-        tools.add(createOpenAiFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information on items, monsters, spells, quests, or activities.",
-                createOpenAiStringParam("query",
-                        "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').")));
         return tools;
-    }
-
-    private JsonObject createOpenAiFunction(String name, String description) {
-        JsonObject func = new JsonObject();
-        func.addProperty("name", name);
-        func.addProperty("description", description);
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "object");
-        params.add("properties", new JsonObject());
-        func.add("parameters", params);
-
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-        tool.add("function", func);
-        return tool;
-    }
-
-    private JsonObject createOpenAiFunctionWithParams(String name, String description, JsonObject properties) {
-        JsonObject func = new JsonObject();
-        func.addProperty("name", name);
-        func.addProperty("description", description);
-
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "object");
-        params.add("properties", properties);
-
-        JsonArray required = new JsonArray();
-        for (String key : properties.keySet()) {
-            required.add(key);
-        }
-        params.add("required", required);
-
-        func.add("parameters", params);
-
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-        tool.add("function", func);
-        return tool;
-    }
-
-    private JsonObject createOpenAiParamObj(String type, String description) {
-        JsonObject val = new JsonObject();
-        val.addProperty("type", type);
-        val.addProperty("description", description);
-        return val;
-    }
-
-    private JsonObject createOpenAiFunctionWithOptionalParams(String name, String description, JsonObject properties) {
-        JsonObject func = new JsonObject();
-        func.addProperty("name", name);
-        func.addProperty("description", description);
-
-        JsonObject params = new JsonObject();
-        params.addProperty("type", "object");
-        params.add("properties", properties);
-        params.add("required", new JsonArray());
-
-        func.add("parameters", params);
-
-        JsonObject tool = new JsonObject();
-        tool.addProperty("type", "function");
-        tool.add("function", func);
-        return tool;
-    }
-
-    private JsonObject createOpenAiStringParam(String name, String description) {
-        JsonObject prop = new JsonObject();
-        prop.add(name, createOpenAiParamObj("string", description));
-        return prop;
     }
 
     @Override

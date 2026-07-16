@@ -28,6 +28,8 @@ import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
+import net.runelite.http.api.item.ItemStats;
+import net.runelite.http.api.item.ItemEquipmentStats;
 import javax.swing.SwingUtilities;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -352,12 +354,58 @@ public class AiService {
                 break;
 
             case "get_player_equipment":
-                JsonObject eqItems = new JsonObject();
+                JsonObject eqSlots = new JsonObject();
                 ItemContainer eqContainer = client.getItemContainer(InventoryID.EQUIPMENT);
                 if (eqContainer != null) {
-                    eqItems = aggregateItemsWithPrices(eqContainer, null, 0);
+                    Item[] items = eqContainer.getItems();
+                    for (int i = 0; i < items.length; i++) {
+                        Item item = items[i];
+                        if (item == null || item.getId() <= 0) {
+                            continue;
+                        }
+                        String slotName = getSlotName(i);
+                        JsonObject itemDetail = new JsonObject();
+                        itemDetail.addProperty("id", item.getId());
+                        itemDetail.addProperty("name", safeItemName(item.getId()));
+                        itemDetail.addProperty("qty", item.getQuantity());
+
+                        int gePrice = 0;
+                        if (itemManager != null) {
+                            try {
+                                gePrice = itemManager.getItemPrice(item.getId());
+                            } catch (Exception ignored) {}
+                        }
+                        if (gePrice <= 0 && "Coins".equals(safeItemName(item.getId()))) {
+                            gePrice = 1;
+                        }
+                        itemDetail.addProperty("gePrice", gePrice);
+                        itemDetail.addProperty("haPrice", safeHighAlchPrice(item.getId()));
+
+                        ItemStats stats = itemManager.getItemStats(item.getId(), false);
+                        if (stats != null && stats.getEquipment() != null) {
+                            ItemEquipmentStats eq = stats.getEquipment();
+                            JsonObject statsObj = new JsonObject();
+                            statsObj.addProperty("astab", eq.getAstab());
+                            statsObj.addProperty("aslash", eq.getAslash());
+                            statsObj.addProperty("ascrush", eq.getAcrush());
+                            statsObj.addProperty("asmagic", eq.getAmagic());
+                            statsObj.addProperty("asrange", eq.getArange());
+                            statsObj.addProperty("dstab", eq.getDstab());
+                            statsObj.addProperty("dslash", eq.getDslash());
+                            statsObj.addProperty("dcrush", eq.getDcrush());
+                            statsObj.addProperty("dmagic", eq.getDmagic());
+                            statsObj.addProperty("drange", eq.getDrange());
+                            statsObj.addProperty("str", eq.getStr());
+                            statsObj.addProperty("rstr", eq.getRstr());
+                            statsObj.addProperty("mdmg", eq.getMdmg());
+                            statsObj.addProperty("prayer", eq.getPrayer());
+                            statsObj.addProperty("aspeed", eq.getAspeed());
+                            itemDetail.add("stats", statsObj);
+                        }
+                        eqSlots.add(slotName, itemDetail);
+                    }
                 }
-                result.add("items", eqItems);
+                result.add("slots", eqSlots);
                 break;
 
             case "get_player_slayer_task":
@@ -460,6 +508,34 @@ public class AiService {
                     int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
                     result.add("items", aggregateItemsWithPrices(bankContainer, filter, minValue));
                 }
+                break;
+
+            case "get_item_stats":
+                JsonObject itemsStats = new JsonObject();
+                if (args != null) {
+                    if (args.has("itemIds")) {
+                        JsonArray ids = args.getAsJsonArray("itemIds");
+                        for (int i = 0; i < ids.size(); i++) {
+                            int itemId = ids.get(i).getAsInt();
+                            itemsStats.add(String.valueOf(itemId), buildItemStatsJson(itemId));
+                        }
+                    }
+                    if (args.has("itemNames")) {
+                        JsonArray names = args.getAsJsonArray("itemNames");
+                        for (int i = 0; i < names.size(); i++) {
+                            String itemName = names.get(i).getAsString();
+                            Integer itemId = findItemIdInContainers(itemName);
+                            if (itemId != null) {
+                                itemsStats.add(itemName, buildItemStatsJson(itemId));
+                            } else {
+                                JsonObject errorObj = new JsonObject();
+                                errorObj.addProperty("error", "Item not found in equipment, inventory, or bank.");
+                                itemsStats.add(itemName, errorObj);
+                            }
+                        }
+                    }
+                }
+                result.add("items", itemsStats);
                 break;
 
             default:
@@ -588,6 +664,7 @@ public class AiService {
                 break;
             }
             JsonObject detail = new JsonObject();
+            detail.addProperty("id", itemIds.get(bi.name));
             detail.addProperty("qty", bi.qty);
             detail.addProperty("gePrice", bi.gePrice);
             detail.addProperty("haPrice", bi.haPrice);
@@ -635,6 +712,76 @@ public class AiService {
             this.call = call;
             this.resultJson = resultJson;
         }
+    }
+
+    public static class ToolParameter {
+        public final String name;
+        public final String type; // "string", "integer", "array_string", "array_integer"
+        public final String description;
+        public final boolean required;
+
+        public ToolParameter(String name, String type, String description, boolean required) {
+            this.name = name;
+            this.type = type;
+            this.description = description;
+            this.required = required;
+        }
+    }
+
+    public static class ToolDefinition {
+        public final String name;
+        public final String description;
+        public final List<ToolParameter> parameters = new ArrayList<>();
+        public final boolean requiresCharacterInfo;
+
+        public ToolDefinition(String name, String description, boolean requiresCharacterInfo) {
+            this.name = name;
+            this.description = description;
+            this.requiresCharacterInfo = requiresCharacterInfo;
+        }
+
+        public ToolDefinition addParam(String name, String type, String description, boolean required) {
+            this.parameters.add(new ToolParameter(name, type, description, required));
+            return this;
+        }
+    }
+
+    public static List<ToolDefinition> getToolRegistry() {
+        List<ToolDefinition> registry = new ArrayList<>();
+
+        registry.add(new ToolDefinition("get_player_skills",
+            "Retrieve the player's current levels (both real and boosted) for all skills.", true));
+
+        registry.add(new ToolDefinition("get_player_inventory",
+            "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.", true));
+
+        registry.add(new ToolDefinition("get_player_equipment",
+            "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player.", true));
+
+        registry.add(new ToolDefinition("get_player_slayer_task",
+            "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak.", true));
+
+        registry.add(new ToolDefinition("get_player_quests",
+            "Retrieve the player's quest points, and lists of completed and in-progress quests.", true));
+
+        registry.add(new ToolDefinition("get_player_achievement_diaries",
+            "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).", true));
+
+        registry.add(new ToolDefinition("get_player_bank",
+            "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.", true)
+                .addParam("filter", "string", "Optional search query to filter bank items by name (case-insensitive).", false)
+                .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
+
+        registry.add(new ToolDefinition("get_item_stats",
+            "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.", true)
+                .addParam("itemIds", "array_integer", "Optional list of OSRS item IDs to retrieve stats for.", false)
+                .addParam("itemNames", "array_string", "Optional list of item names to search for in containers and retrieve stats.", false));
+
+        registry.add(new ToolDefinition("search_osrs_wiki",
+            "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.", false)
+                .addParam("query", "string", "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').", true));
+
+        return registry;
     }
 
     @SuppressWarnings("deprecation")
@@ -1158,5 +1305,99 @@ public class AiService {
         obj.addProperty("Hard", getDiaryStatus(hard));
         obj.addProperty("Elite", getDiaryStatus(elite));
         return obj;
+    }
+
+    private Integer findItemIdInContainers(String name) {
+        String search = name.trim().toLowerCase();
+        ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
+        if (eq != null) {
+            for (Item item : eq.getItems()) {
+                if (item != null && item.getId() > 0 && safeItemName(item.getId()).toLowerCase().contains(search)) {
+                    return item.getId();
+                }
+            }
+        }
+        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+        if (inv != null) {
+            for (Item item : inv.getItems()) {
+                if (item != null && item.getId() > 0 && safeItemName(item.getId()).toLowerCase().contains(search)) {
+                    return item.getId();
+                }
+            }
+        }
+        ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+        if (bank != null) {
+            for (Item item : bank.getItems()) {
+                if (item != null && item.getId() > 0 && safeItemName(item.getId()).toLowerCase().contains(search)) {
+                    return item.getId();
+                }
+            }
+        }
+        return null;
+    }
+
+    private JsonObject buildItemStatsJson(int itemId) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("id", itemId);
+        obj.addProperty("name", safeItemName(itemId));
+
+        int gePrice = 0;
+        if (itemManager != null) {
+            try {
+                gePrice = itemManager.getItemPrice(itemId);
+            } catch (Exception ignored) {}
+        }
+        obj.addProperty("gePrice", gePrice);
+        obj.addProperty("haPrice", safeHighAlchPrice(itemId));
+
+        ItemStats stats = itemManager.getItemStats(itemId, false);
+        if (stats == null) {
+            obj.addProperty("equipable", false);
+            return obj;
+        }
+
+        obj.addProperty("equipable", stats.isEquipable());
+        obj.addProperty("weight", stats.getWeight());
+        obj.addProperty("geLimit", stats.getGeLimit());
+
+        if (stats.isEquipable() && stats.getEquipment() != null) {
+            ItemEquipmentStats eq = stats.getEquipment();
+            JsonObject eqObj = new JsonObject();
+            eqObj.addProperty("astab", eq.getAstab());
+            eqObj.addProperty("aslash", eq.getAslash());
+            eqObj.addProperty("ascrush", eq.getAcrush());
+            eqObj.addProperty("asmagic", eq.getAmagic());
+            eqObj.addProperty("asrange", eq.getArange());
+            eqObj.addProperty("dstab", eq.getDstab());
+            eqObj.addProperty("dslash", eq.getDslash());
+            eqObj.addProperty("dcrush", eq.getDcrush());
+            eqObj.addProperty("dmagic", eq.getDmagic());
+            eqObj.addProperty("drange", eq.getDrange());
+            eqObj.addProperty("str", eq.getStr());
+            eqObj.addProperty("rstr", eq.getRstr());
+            eqObj.addProperty("mdmg", eq.getMdmg());
+            eqObj.addProperty("prayer", eq.getPrayer());
+            eqObj.addProperty("aspeed", eq.getAspeed());
+
+            obj.add("equipment", eqObj);
+        }
+        return obj;
+    }
+
+    private String getSlotName(int index) {
+        switch (index) {
+            case 0: return "Head";
+            case 1: return "Cape";
+            case 2: return "Amulet";
+            case 3: return "Weapon";
+            case 4: return "Body";
+            case 5: return "Shield";
+            case 6: return "Legs";
+            case 7: return "Gloves";
+            case 8: return "Boots";
+            case 9: return "Ring";
+            case 10: return "Ammo";
+            default: return "Unknown (" + index + ")";
+        }
     }
 }

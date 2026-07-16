@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -36,88 +37,45 @@ public class ClaudeProviderHandler implements ProviderHandler {
 
     private JsonArray buildClaudeTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
-        if (shareCharInfo) {
-            tools.add(createClaudeFunction("get_player_skills",
-                    "Retrieve the player's current levels (both real and boosted) for all skills."));
-            tools.add(createClaudeFunction("get_player_inventory",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory."));
-            tools.add(createClaudeFunction("get_player_equipment",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player."));
-            tools.add(createClaudeFunction("get_player_slayer_task",
-                    "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak."));
-            tools.add(createClaudeFunction("get_player_quests",
-                    "Retrieve the player's quest points, and lists of completed and in-progress quests."));
-            tools.add(createClaudeFunction("get_player_achievement_diaries",
-                    "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite)."));
-            JsonObject bankParams = new JsonObject();
-            bankParams.add("filter", createClaudeParamObj("string", "Optional search query to filter bank items by name (case-insensitive). Use this if looking for specific items to avoid size limits."));
-            bankParams.add("minValue", createClaudeParamObj("integer", "Optional minimum value (Grand Exchange price or High Alch value) to filter items."));
-            tools.add(createClaudeFunctionWithOptionalParams("get_player_bank",
-                    "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
-                    bankParams));
+        for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
+            if (def.requiresCharacterInfo && !shareCharInfo) {
+                continue;
+            }
+
+            JsonObject tool = new JsonObject();
+            tool.addProperty("name", def.name);
+            tool.addProperty("description", def.description);
+
+            JsonObject schema = new JsonObject();
+            schema.addProperty("type", "object");
+
+            JsonObject properties = new JsonObject();
+            JsonArray required = new JsonArray();
+
+            for (AiService.ToolParameter p : def.parameters) {
+                JsonObject prop = new JsonObject();
+                if (p.type.startsWith("array")) {
+                    prop.addProperty("type", "array");
+                    JsonObject items = new JsonObject();
+                    items.addProperty("type", p.type.endsWith("integer") ? "integer" : "string");
+                    prop.add("items", items);
+                } else {
+                    prop.addProperty("type", p.type.toLowerCase(Locale.ROOT));
+                }
+                prop.addProperty("description", p.description);
+                properties.add(p.name, prop);
+
+                if (p.required) {
+                    required.add(p.name);
+                }
+            }
+
+            schema.add("properties", properties);
+            schema.add("required", required);
+            tool.add("input_schema", schema);
+            tools.add(tool);
         }
-        tools.add(createClaudeFunctionWithParams("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information on items, monsters, spells, quests, or activities.",
-                createClaudeStringParam("query",
-                        "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').")));
         return tools;
-    }
-
-    private JsonObject createClaudeFunction(String name, String description) {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", name);
-        tool.addProperty("description", description);
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "object");
-        schema.add("properties", new JsonObject());
-        tool.add("input_schema", schema);
-        return tool;
-    }
-
-    private JsonObject createClaudeFunctionWithParams(String name, String description, JsonObject properties) {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", name);
-        tool.addProperty("description", description);
-
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "object");
-        schema.add("properties", properties);
-
-        JsonArray required = new JsonArray();
-        for (String key : properties.keySet()) {
-            required.add(key);
-        }
-        schema.add("required", required);
-
-        tool.add("input_schema", schema);
-        return tool;
-    }
-
-    private JsonObject createClaudeParamObj(String type, String description) {
-        JsonObject val = new JsonObject();
-        val.addProperty("type", type);
-        val.addProperty("description", description);
-        return val;
-    }
-
-    private JsonObject createClaudeFunctionWithOptionalParams(String name, String description, JsonObject properties) {
-        JsonObject tool = new JsonObject();
-        tool.addProperty("name", name);
-        tool.addProperty("description", description);
-
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "object");
-        schema.add("properties", properties);
-        schema.add("required", new JsonArray());
-
-        tool.add("input_schema", schema);
-        return tool;
-    }
-
-    private JsonObject createClaudeStringParam(String name, String description) {
-        JsonObject prop = new JsonObject();
-        prop.add(name, createClaudeParamObj("string", description));
-        return prop;
     }
 
     @Override
