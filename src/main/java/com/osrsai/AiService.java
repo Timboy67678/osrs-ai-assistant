@@ -53,6 +53,7 @@ public class AiService {
 
     // URI Constants
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
+    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions";
 
     @Inject
     private Client client;
@@ -133,7 +134,7 @@ public class AiService {
                     final String customEndpoint = config.customEndpoint();
                     final String endpoint = (customEndpoint != null && !customEndpoint.trim().isEmpty())
                             ? customEndpoint.trim()
-                            : "http://localhost:11434/v1/chat/completions";
+                            : DEFAULT_CUSTOM_ENDPOINT;
 
                     CompletableFuture.runAsync(() -> {
                         try {
@@ -377,7 +378,8 @@ public class AiService {
                         if (itemManager != null) {
                             try {
                                 gePrice = itemManager.getItemPrice(item.getId());
-                            } catch (Exception ignored) {}
+                            } catch (Exception ignored) {
+                            }
                         }
                         if (gePrice <= 0 && "Coins".equals(safeItemName(item.getId()))) {
                             gePrice = 1;
@@ -542,8 +544,7 @@ public class AiService {
                 result.add("items", itemsStats);
                 break;
 
-            case "get_player_clues":
-            {
+            case "get_player_clues": {
                 // 1. Scan for clue items in inventory
                 JsonArray invClueItems = new JsonArray();
                 ItemContainer invCont = client.getItemContainer(InventoryID.INVENTORY);
@@ -597,38 +598,41 @@ public class AiService {
                             foundPlugin = true;
                             if (pluginManager.isPluginEnabled(p)) {
                                 if (p instanceof net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) {
-                                    net.runelite.client.plugins.cluescrolls.ClueScrollPlugin clueScrollPlugin = 
-                                        (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
-                                    net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = clueScrollPlugin.getClue();
+                                    net.runelite.client.plugins.cluescrolls.ClueScrollPlugin clueScrollPlugin = (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
+                                    net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = clueScrollPlugin
+                                            .getClue();
                                     if (clue != null) {
                                         activeClueObj.addProperty("status", "Active clue scroll detected");
                                         activeClueObj.addProperty("type", clue.getClass().getSimpleName());
 
                                         // Render hint using PanelComponent
-                                        net.runelite.client.ui.overlay.components.PanelComponent panel = 
-                                            new net.runelite.client.ui.overlay.components.PanelComponent();
+                                        net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
                                         try {
                                             clue.makeOverlayHint(panel, clueScrollPlugin);
                                             JsonArray hintLines = new JsonArray();
                                             for (Object child : panel.getChildren()) {
                                                 if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
-                                                    net.runelite.client.ui.overlay.components.LineComponent lc = 
-                                                        (net.runelite.client.ui.overlay.components.LineComponent) child;
-                                                    
-                                                    // Use reflection to read private left/right fields to bypass getter compilation issue
+                                                    net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
+
+                                                    // Use reflection to read private left/right fields to bypass getter
+                                                    // compilation issue
                                                     String left = "";
                                                     String right = "";
                                                     try {
-                                                        java.lang.reflect.Field leftField = lc.getClass().getDeclaredField("left");
+                                                        java.lang.reflect.Field leftField = lc.getClass()
+                                                                .getDeclaredField("left");
                                                         leftField.setAccessible(true);
                                                         left = (String) leftField.get(lc);
-                                                    } catch (Exception ignored) {}
-                                                    
+                                                    } catch (Exception ignored) {
+                                                    }
+
                                                     try {
-                                                        java.lang.reflect.Field rightField = lc.getClass().getDeclaredField("right");
+                                                        java.lang.reflect.Field rightField = lc.getClass()
+                                                                .getDeclaredField("right");
                                                         rightField.setAccessible(true);
                                                         right = (String) rightField.get(lc);
-                                                    } catch (Exception ignored) {}
+                                                    } catch (Exception ignored) {
+                                                    }
 
                                                     if (left != null && !left.trim().isEmpty()) {
                                                         if (right != null && !right.trim().isEmpty()) {
@@ -638,16 +642,17 @@ public class AiService {
                                                         }
                                                     }
                                                 } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
-                                                    net.runelite.client.ui.overlay.components.TitleComponent tc = 
-                                                        (net.runelite.client.ui.overlay.components.TitleComponent) child;
-                                                    
+                                                    net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
+
                                                     // Use reflection to read private text field
                                                     String text = "";
                                                     try {
-                                                        java.lang.reflect.Field textField = tc.getClass().getDeclaredField("text");
+                                                        java.lang.reflect.Field textField = tc.getClass()
+                                                                .getDeclaredField("text");
                                                         textField.setAccessible(true);
                                                         text = (String) textField.get(tc);
-                                                    } catch (Exception ignored) {}
+                                                    } catch (Exception ignored) {
+                                                    }
 
                                                     if (text != null && !text.trim().isEmpty()) {
                                                         hintLines.add(text);
@@ -658,14 +663,17 @@ public class AiService {
                                             }
                                             activeClueObj.add("details", hintLines);
                                         } catch (Throwable t) {
-                                            activeClueObj.addProperty("error", "Failed to format clue details: " + t.getMessage());
+                                            activeClueObj.addProperty("error",
+                                                    "Failed to format clue details: " + t.getMessage());
                                         }
                                     } else {
-                                        activeClueObj.addProperty("status", "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
+                                        activeClueObj.addProperty("status",
+                                                "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
                                     }
                                 }
                             } else {
-                                activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
+                                activeClueObj.addProperty("status",
+                                        "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
                             }
                             break;
                         }
@@ -892,39 +900,51 @@ public class AiService {
         List<ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new ToolDefinition("get_player_skills",
-            "Retrieve the player's current levels (both real and boosted) for all skills.", true));
+                "Retrieve the player's current levels (both real and boosted) for all skills.", true));
 
         registry.add(new ToolDefinition("get_player_inventory",
-            "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.", true));
+                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.",
+                true));
 
         registry.add(new ToolDefinition("get_player_equipment",
-            "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player.", true));
+                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player.",
+                true));
 
         registry.add(new ToolDefinition("get_player_slayer_task",
-            "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak.", true));
+                "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak.",
+                true));
 
         registry.add(new ToolDefinition("get_player_quests",
-            "Retrieve the player's quest points, and lists of completed and in-progress quests.", true));
+                "Retrieve the player's quest points, and lists of completed and in-progress quests.", true));
 
         registry.add(new ToolDefinition("get_player_achievement_diaries",
-            "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).", true));
+                "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).",
+                true));
 
         registry.add(new ToolDefinition("get_player_bank",
-            "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.", true)
-                .addParam("filter", "string", "Optional search query to filter bank items by name (case-insensitive).", false)
+                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
+                true)
+                .addParam("filter", "string", "Optional search query to filter bank items by name (case-insensitive).",
+                        false)
                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 
         registry.add(new ToolDefinition("get_item_stats",
-            "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.", true)
+                "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.",
+                true)
                 .addParam("itemIds", "array_integer", "Optional list of OSRS item IDs to retrieve stats for.", false)
-                .addParam("itemNames", "array_string", "Optional list of item names to search for in containers and retrieve stats.", false));
+                .addParam("itemNames", "array_string",
+                        "Optional list of item names to search for in containers and retrieve stats.", false));
 
         registry.add(new ToolDefinition("get_player_clues",
-            "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.", true));
+                "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.",
+                true));
 
         registry.add(new ToolDefinition("search_osrs_wiki",
-            "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.", false)
-                .addParam("query", "string", "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').", true));
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.",
+                false)
+                .addParam("query", "string",
+                        "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",
+                        true));
 
         return registry;
     }
@@ -1489,7 +1509,8 @@ public class AiService {
         if (itemManager != null) {
             try {
                 gePrice = itemManager.getItemPrice(itemId);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         obj.addProperty("gePrice", gePrice);
         obj.addProperty("haPrice", safeHighAlchPrice(itemId));
@@ -1530,18 +1551,30 @@ public class AiService {
 
     private String getSlotName(int index) {
         switch (index) {
-            case 0: return "Head";
-            case 1: return "Cape";
-            case 2: return "Amulet";
-            case 3: return "Weapon";
-            case 4: return "Body";
-            case 5: return "Shield";
-            case 6: return "Legs";
-            case 7: return "Gloves";
-            case 8: return "Boots";
-            case 9: return "Ring";
-            case 10: return "Ammo";
-            default: return "Unknown (" + index + ")";
+            case 0:
+                return "Head";
+            case 1:
+                return "Cape";
+            case 2:
+                return "Amulet";
+            case 3:
+                return "Weapon";
+            case 4:
+                return "Body";
+            case 5:
+                return "Shield";
+            case 6:
+                return "Legs";
+            case 7:
+                return "Gloves";
+            case 8:
+                return "Boots";
+            case 9:
+                return "Ring";
+            case 10:
+                return "Ammo";
+            default:
+                return "Unknown (" + index + ")";
         }
     }
 }
