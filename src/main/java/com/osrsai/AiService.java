@@ -24,7 +24,9 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.Varbits;
 import net.runelite.api.SoundEffectID;
+import net.runelite.api.ParamID;
 import net.runelite.client.Notifier;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
@@ -75,6 +77,9 @@ public class AiService {
 
     @Inject
     private ConfigManager configManager;
+
+    @Inject
+    private PluginManager pluginManager;
 
     private final LocationResolver locationResolver = new LocationResolver();
 
@@ -538,6 +543,144 @@ public class AiService {
                 result.add("items", itemsStats);
                 break;
 
+            case "get_player_clues":
+            {
+                // 1. Scan for clue items in inventory
+                JsonArray invClueItems = new JsonArray();
+                ItemContainer invCont = client.getItemContainer(InventoryID.INVENTORY);
+                if (invCont != null) {
+                    for (Item item : invCont.getItems()) {
+                        if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                            continue;
+                        }
+                        net.runelite.api.ItemComposition comp = client.getItemDefinition(item.getId());
+                        if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
+                            JsonObject clueItem = new JsonObject();
+                            clueItem.addProperty("id", item.getId());
+                            clueItem.addProperty("name", comp.getName());
+                            clueItem.addProperty("qty", item.getQuantity());
+                            clueItem.addProperty("location", "Inventory");
+                            invClueItems.add(clueItem);
+                        }
+                    }
+                }
+                result.add("inventoryClues", invClueItems);
+
+                // 2. Scan for clue items in bank
+                JsonArray bankClueItems = new JsonArray();
+                ItemContainer bankCont = client.getItemContainer(InventoryID.BANK);
+                if (bankCont != null) {
+                    for (Item item : bankCont.getItems()) {
+                        if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                            continue;
+                        }
+                        net.runelite.api.ItemComposition comp = client.getItemDefinition(item.getId());
+                        if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
+                            JsonObject clueItem = new JsonObject();
+                            clueItem.addProperty("id", item.getId());
+                            clueItem.addProperty("name", comp.getName());
+                            clueItem.addProperty("qty", item.getQuantity());
+                            clueItem.addProperty("location", "Bank");
+                            bankClueItems.add(clueItem);
+                        }
+                    }
+                }
+                result.add("bankClues", bankClueItems);
+
+                // 3. Locate ClueScrollPlugin via PluginManager
+                JsonObject activeClueObj = new JsonObject();
+                activeClueObj.addProperty("status", "No active clue scroll detected");
+                boolean foundPlugin = false;
+
+                if (pluginManager != null) {
+                    for (net.runelite.client.plugins.Plugin p : pluginManager.getPlugins()) {
+                        if (p.getClass().getName().equals("net.runelite.client.plugins.cluescrolls.ClueScrollPlugin")) {
+                            foundPlugin = true;
+                            if (pluginManager.isPluginEnabled(p)) {
+                                if (p instanceof net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) {
+                                    net.runelite.client.plugins.cluescrolls.ClueScrollPlugin clueScrollPlugin = 
+                                        (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
+                                    net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = clueScrollPlugin.getClue();
+                                    if (clue != null) {
+                                        activeClueObj.addProperty("status", "Active clue scroll detected");
+                                        activeClueObj.addProperty("type", clue.getClass().getSimpleName());
+
+                                        // Render hint using PanelComponent
+                                        net.runelite.client.ui.overlay.components.PanelComponent panel = 
+                                            new net.runelite.client.ui.overlay.components.PanelComponent();
+                                        try {
+                                            clue.makeOverlayHint(panel, clueScrollPlugin);
+                                            JsonArray hintLines = new JsonArray();
+                                            for (Object child : panel.getChildren()) {
+                                                if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
+                                                    net.runelite.client.ui.overlay.components.LineComponent lc = 
+                                                        (net.runelite.client.ui.overlay.components.LineComponent) child;
+                                                    
+                                                    // Use reflection to read private left/right fields to bypass getter compilation issue
+                                                    String left = "";
+                                                    String right = "";
+                                                    try {
+                                                        java.lang.reflect.Field leftField = lc.getClass().getDeclaredField("left");
+                                                        leftField.setAccessible(true);
+                                                        left = (String) leftField.get(lc);
+                                                    } catch (Exception ignored) {}
+                                                    
+                                                    try {
+                                                        java.lang.reflect.Field rightField = lc.getClass().getDeclaredField("right");
+                                                        rightField.setAccessible(true);
+                                                        right = (String) rightField.get(lc);
+                                                    } catch (Exception ignored) {}
+
+                                                    if (left != null && !left.trim().isEmpty()) {
+                                                        if (right != null && !right.trim().isEmpty()) {
+                                                            hintLines.add(left + ": " + right);
+                                                        } else {
+                                                            hintLines.add(left);
+                                                        }
+                                                    }
+                                                } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
+                                                    net.runelite.client.ui.overlay.components.TitleComponent tc = 
+                                                        (net.runelite.client.ui.overlay.components.TitleComponent) child;
+                                                    
+                                                    // Use reflection to read private text field
+                                                    String text = "";
+                                                    try {
+                                                        java.lang.reflect.Field textField = tc.getClass().getDeclaredField("text");
+                                                        textField.setAccessible(true);
+                                                        text = (String) textField.get(tc);
+                                                    } catch (Exception ignored) {}
+
+                                                    if (text != null && !text.trim().isEmpty()) {
+                                                        hintLines.add(text);
+                                                    }
+                                                } else {
+                                                    hintLines.add(child.toString());
+                                                }
+                                            }
+                                            activeClueObj.add("details", hintLines);
+                                        } catch (Throwable t) {
+                                            activeClueObj.addProperty("error", "Failed to format clue details: " + t.getMessage());
+                                        }
+                                    } else {
+                                        activeClueObj.addProperty("status", "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
+                                    }
+                                }
+                            } else {
+                                activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (!foundPlugin) {
+                    activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin was not found.");
+                }
+
+                result.add("activeClue", activeClueObj);
+                break;
+            }
+
             default:
                 result.addProperty("status", "error");
                 result.addProperty("message", "Unknown tool: " + name);
@@ -677,6 +820,7 @@ public class AiService {
 
     private boolean isIronman() {
         try {
+            @SuppressWarnings("deprecation")
             int accountType = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
             return accountType >= 1 && accountType <= 6;
         } catch (Exception ex) {
@@ -776,6 +920,9 @@ public class AiService {
             "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.", true)
                 .addParam("itemIds", "array_integer", "Optional list of OSRS item IDs to retrieve stats for.", false)
                 .addParam("itemNames", "array_string", "Optional list of item names to search for in containers and retrieve stats.", false));
+
+        registry.add(new ToolDefinition("get_player_clues",
+            "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.", true));
 
         registry.add(new ToolDefinition("search_osrs_wiki",
             "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.", false)
@@ -1309,6 +1456,7 @@ public class AiService {
 
     private Integer findItemIdInContainers(String name) {
         String search = name.trim().toLowerCase();
+        @SuppressWarnings("deprecation")
         ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
         if (eq != null) {
             for (Item item : eq.getItems()) {
@@ -1317,6 +1465,7 @@ public class AiService {
                 }
             }
         }
+        @SuppressWarnings("deprecation")
         ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
         if (inv != null) {
             for (Item item : inv.getItems()) {
@@ -1325,6 +1474,7 @@ public class AiService {
                 }
             }
         }
+        @SuppressWarnings("deprecation")
         ItemContainer bank = client.getItemContainer(InventoryID.BANK);
         if (bank != null) {
             for (Item item : bank.getItems()) {
@@ -1350,6 +1500,7 @@ public class AiService {
         obj.addProperty("gePrice", gePrice);
         obj.addProperty("haPrice", safeHighAlchPrice(itemId));
 
+        @SuppressWarnings("deprecation")
         ItemStats stats = itemManager.getItemStats(itemId, false);
         if (stats == null) {
             obj.addProperty("equipable", false);

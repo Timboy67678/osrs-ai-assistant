@@ -34,6 +34,9 @@ public class AiServiceTest {
     @Mock
     private net.runelite.api.Client client;
 
+    @Mock
+    private net.runelite.client.plugins.PluginManager pluginManager;
+
     @Before
     public void setUp() throws Exception {
         Field gsonField = AiService.class.getDeclaredField("gson");
@@ -228,5 +231,53 @@ public class AiServiceTest {
         Assert.assertNotNull(result);
         Assert.assertTrue(result.has("Coins"));
         Assert.assertFalse(result.has("Abyssal whip"));
+    }
+
+    @Test
+    public void testGetPlayerCluesTool() throws Exception {
+        // Mock items in inventory
+        ItemContainer invMock = Mockito.mock(ItemContainer.class);
+        Item clueInInv = new Item(12001, 1);
+        Mockito.when(invMock.getItems()).thenReturn(new Item[] { clueInInv });
+        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.INVENTORY)).thenReturn(invMock);
+
+        // Mock items in bank
+        ItemContainer bankMock = Mockito.mock(ItemContainer.class);
+        Item clueInBank = new Item(12002, 1);
+        Mockito.when(bankMock.getItems()).thenReturn(new Item[] { clueInBank });
+        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(bankMock);
+
+        // Mock ItemCompositions
+        ItemComposition invComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(invComp.getName()).thenReturn("Clue scroll (easy)");
+        Mockito.when(invComp.getIntValue(net.runelite.api.ParamID.CLUE_SCROLL)).thenReturn(1);
+        Mockito.when(client.getItemDefinition(12001)).thenReturn(invComp);
+
+        ItemComposition bankComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(bankComp.getName()).thenReturn("Clue scroll (hard)");
+        Mockito.when(bankComp.getIntValue(net.runelite.api.ParamID.CLUE_SCROLL)).thenReturn(1);
+        Mockito.when(client.getItemDefinition(12002)).thenReturn(bankComp);
+
+        // Invoke the tool via reflection
+        Method executeToolOnClientThread = AiService.class.getDeclaredMethod("executeToolOnClientThread", String.class, com.google.gson.JsonObject.class);
+        executeToolOnClientThread.setAccessible(true);
+
+        String jsonResult = (String) executeToolOnClientThread.invoke(aiService, "get_player_clues", new com.google.gson.JsonObject());
+        System.out.println("Result of get_player_clues: " + jsonResult);
+        
+        Assert.assertNotNull(jsonResult);
+        com.google.gson.JsonObject rootObj = new Gson().fromJson(jsonResult, com.google.gson.JsonObject.class);
+        
+        Assert.assertTrue(rootObj.has("inventoryClues"));
+        Assert.assertTrue(rootObj.has("bankClues"));
+        Assert.assertTrue(rootObj.has("activeClue"));
+        
+        com.google.gson.JsonArray invArray = rootObj.getAsJsonArray("inventoryClues");
+        Assert.assertEquals(1, invArray.size());
+        Assert.assertEquals("Clue scroll (easy)", invArray.get(0).getAsJsonObject().get("name").getAsString());
+
+        com.google.gson.JsonArray bankArray = rootObj.getAsJsonArray("bankClues");
+        Assert.assertEquals(1, bankArray.size());
+        Assert.assertEquals("Clue scroll (hard)", bankArray.get(0).getAsJsonObject().get("name").getAsString());
     }
 }
