@@ -336,7 +336,6 @@ public class AiService {
         return future;
     }
 
-    @SuppressWarnings("deprecation")
     private String executeToolOnClientThread(String name, JsonObject args) {
         JsonObject result = new JsonObject();
         switch (name) {
@@ -820,7 +819,6 @@ public class AiService {
 
     private boolean isIronman() {
         try {
-            @SuppressWarnings("deprecation")
             int accountType = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
             return accountType >= 1 && accountType <= 6;
         } catch (Exception ex) {
@@ -931,7 +929,6 @@ public class AiService {
         return registry;
     }
 
-    @SuppressWarnings("deprecation")
     private String buildGameContext() {
         if (!config.shareCharacterInfo()) {
             return "Player is not sharing character details with the AI (this option is disabled in the settings).";
@@ -1456,7 +1453,6 @@ public class AiService {
 
     private Integer findItemIdInContainers(String name) {
         String search = name.trim().toLowerCase();
-        @SuppressWarnings("deprecation")
         ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
         if (eq != null) {
             for (Item item : eq.getItems()) {
@@ -1465,7 +1461,6 @@ public class AiService {
                 }
             }
         }
-        @SuppressWarnings("deprecation")
         ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
         if (inv != null) {
             for (Item item : inv.getItems()) {
@@ -1474,7 +1469,6 @@ public class AiService {
                 }
             }
         }
-        @SuppressWarnings("deprecation")
         ItemContainer bank = client.getItemContainer(InventoryID.BANK);
         if (bank != null) {
             for (Item item : bank.getItems()) {
@@ -1500,7 +1494,6 @@ public class AiService {
         obj.addProperty("gePrice", gePrice);
         obj.addProperty("haPrice", safeHighAlchPrice(itemId));
 
-        @SuppressWarnings("deprecation")
         ItemStats stats = itemManager.getItemStats(itemId, false);
         if (stats == null) {
             obj.addProperty("equipable", false);
