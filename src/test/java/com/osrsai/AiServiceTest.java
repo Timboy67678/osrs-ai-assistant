@@ -258,11 +258,12 @@ public class AiServiceTest {
         Mockito.when(bankComp.getIntValue(net.runelite.api.ParamID.CLUE_SCROLL)).thenReturn(1);
         Mockito.when(client.getItemDefinition(12002)).thenReturn(bankComp);
 
-        // Invoke the tool via reflection
-        Method executeToolOnClientThread = AiService.class.getDeclaredMethod("executeToolOnClientThread", String.class, com.google.gson.JsonObject.class);
-        executeToolOnClientThread.setAccessible(true);
-
-        String jsonResult = (String) executeToolOnClientThread.invoke(aiService, "get_player_clues", new com.google.gson.JsonObject());
+        // Invoke the tool via registry executor
+        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+                .filter(d -> d.name.equals("get_player_clues"))
+                .findFirst()
+                .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
+        String jsonResult = def.executor.execute(aiService, new com.google.gson.JsonObject());
         System.out.println("Result of get_player_clues: " + jsonResult);
         
         Assert.assertNotNull(jsonResult);

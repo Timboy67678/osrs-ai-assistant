@@ -3,12 +3,16 @@ package com.osrsai;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+
 import javax.inject.Inject;
+
 import lombok.extern.slf4j.Slf4j;
+
 import net.runelite.api.Client;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
@@ -32,13 +36,16 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemStats;
 import net.runelite.http.api.item.ItemEquipmentStats;
+
 import javax.swing.SwingUtilities;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+
 import org.jetbrains.annotations.NotNull;
 
 @Slf4j
@@ -1387,6 +1394,7 @@ public class AiService {
                 + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item. For Ironman/UIM/GIM accounts, define the 'value' or 'expense' of items using their High Alchemy value (haPrice) rather than their Grand Exchange price (gePrice) because they cannot trade; prioritize and quote High Alchemy values for them when asked about value or the most expensive items (though you can mention the GE price as secondary info).\n"
                 + "11. When recommending travel routes, check the player's active spellbook in GAME CONTEXT. If they are on Ancients, Lunar, or Arceuus, remember they do NOT have access to standard spellbook teleports (e.g. Varrock, Falador, Lumbridge, Camelot, Ardougne teleports) unless they use teleport tablets, a portal chamber, or specific teleportation items (like Chronicle, Ring of wealth, Book of the dead). Do not recommend running massive distances across Gielinor when much closer vendors or options exist.\n"
                 + "12. Never assume or guess whether an item is one-handed or two-handed, or what equipment slot/stats it has. Always call the 'search_osrs_wiki' tool to verify an item's hands or slot details if not explicitly clear from the current game context.\n"
+                + "13. Never confidently assume or state that an item (especially unique, high-tier, or dragon/barrows/quest items) is useless or has no uses in clue scrolls, quests, or other activities. Always urge caution and advise the player to search the OSRS Wiki (or call 'search_osrs_wiki' yourself) before suggesting they alch, discard, sell, or destroy unique/rare/high-tier gear, as many obscure clue scroll steps (such as hard/elite/master emote clues or Falo the Bard) require specific items.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation
