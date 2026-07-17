@@ -595,7 +595,7 @@ public class AiService {
         registry.add(new ToolDefinition("get_player_bank",
                 "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
                 true, true, AiService::executeGetPlayerBank)
-                .addParam("filter", "string", "Optional search query to filter bank items by name (case-insensitive).",
+                .addParam("filter", "string", "Optional search query to filter bank items strictly by item name substring (case-insensitive, e.g. 'bar' or 'ore'). Do NOT filter by skill or category name (e.g. do NOT use 'crafting' as a filter).",
                         false)
                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 
@@ -820,6 +820,11 @@ public class AiService {
         } else {
             String filter = (args != null && args.has("filter")) ? args.get("filter").getAsString() : null;
             int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
+            result.addProperty("status", "success");
+            result.addProperty("bankOpen", true);
+            if (filter != null) {
+                result.addProperty("filterApplied", filter);
+            }
             result.add("items", aggregateItemsWithPrices(bankContainer, filter, minValue));
         }
         return gson.toJson(result);

@@ -333,4 +333,49 @@ public class AiServiceTest {
         Assert.assertEquals(-1, strengthObj.get("nextLevelXp").getAsInt());
         Assert.assertEquals(0, strengthObj.get("xpToNextLevel").getAsInt());
     }
+
+    @Test
+    public void testGetPlayerBankTool() throws Exception {
+        // Create mock ItemContainer for bank
+        ItemContainer bankMock = Mockito.mock(ItemContainer.class);
+        Item goldOre = new Item(444, 100);
+        Mockito.when(bankMock.getItems()).thenReturn(new Item[] { goldOre });
+        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(bankMock);
+
+        // Mock ItemComposition for Gold ore
+        ItemComposition comp = Mockito.mock(ItemComposition.class);
+        Mockito.when(comp.getName()).thenReturn("Gold ore");
+        Mockito.when(comp.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(itemManager.getItemComposition(444)).thenReturn(comp);
+
+        // Retrieve tool definition
+        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+                .filter(d -> d.name.equals("get_player_bank"))
+                .findFirst()
+                .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
+
+        // Test with a filter that matches
+        com.google.gson.JsonObject argsMatch = new com.google.gson.JsonObject();
+        argsMatch.addProperty("filter", "gold");
+        String jsonResultMatch = def.executor.execute(aiService, argsMatch);
+        System.out.println("Result of get_player_bank (match): " + jsonResultMatch);
+
+        com.google.gson.JsonObject rootObjMatch = new Gson().fromJson(jsonResultMatch, com.google.gson.JsonObject.class);
+        Assert.assertEquals("success", rootObjMatch.get("status").getAsString());
+        Assert.assertTrue(rootObjMatch.get("bankOpen").getAsBoolean());
+        Assert.assertEquals("gold", rootObjMatch.get("filterApplied").getAsString());
+        Assert.assertTrue(rootObjMatch.getAsJsonObject("items").has("Gold ore"));
+
+        // Test with a filter that does NOT match
+        com.google.gson.JsonObject argsNoMatch = new com.google.gson.JsonObject();
+        argsNoMatch.addProperty("filter", "crafting");
+        String jsonResultNoMatch = def.executor.execute(aiService, argsNoMatch);
+        System.out.println("Result of get_player_bank (no match): " + jsonResultNoMatch);
+
+        com.google.gson.JsonObject rootObjNoMatch = new Gson().fromJson(jsonResultNoMatch, com.google.gson.JsonObject.class);
+        Assert.assertEquals("success", rootObjNoMatch.get("status").getAsString());
+        Assert.assertTrue(rootObjNoMatch.get("bankOpen").getAsBoolean());
+        Assert.assertEquals("crafting", rootObjNoMatch.get("filterApplied").getAsString());
+        Assert.assertEquals(0, rootObjNoMatch.getAsJsonObject("items").size());
+    }
 }
