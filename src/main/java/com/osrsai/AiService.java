@@ -1246,7 +1246,7 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin")
+                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1294,7 +1294,7 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin")
+                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1330,7 +1330,7 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin")
+                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
