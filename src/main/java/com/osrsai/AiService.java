@@ -298,18 +298,25 @@ public class AiService {
             for (ToolCall tc : toolCalls) {
                 try {
                     log.info("Executing tool: {}", tc.name);
+
+                    ToolDefinition def = getToolRegistry().stream()
+                            .filter(d -> d.name.equals(tc.name))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (def == null) {
+                        throw new IllegalArgumentException("Unknown tool: " + tc.name);
+                    }
+
                     String output;
-                    if ("search_osrs_wiki".equals(tc.name)) {
-                        String query = tc.args.has("query") ? tc.args.get("query").getAsString() : "";
-                        output = executeWikiSearch(query);
-                    } else {
+                    if (def.runOnClientThread) {
                         // Client-thread bound tools
                         final String[] clientThreadResult = new String[1];
                         final Throwable[] clientThreadError = new Throwable[1];
                         CompletableFuture<Void> clientFuture = new CompletableFuture<>();
                         clientThread.invokeLater(() -> {
                             try {
-                                clientThreadResult[0] = executeToolOnClientThread(tc.name, tc.args);
+                                clientThreadResult[0] = def.executor.execute(this, tc.args);
                                 clientFuture.complete(null);
                             } catch (Throwable t) {
                                 clientThreadError[0] = t;
@@ -321,6 +328,9 @@ public class AiService {
                             throw new Exception(clientThreadError[0]);
                         }
                         output = clientThreadResult[0];
+                    } else {
+                        // Background-thread/network tools
+                        output = def.executor.execute(this, tc.args);
                     }
                     log.info("Tool {} returned result length: {}", tc.name, output.length());
                     results.add(new ToolResult(tc, output));
@@ -335,365 +345,6 @@ public class AiService {
             future.complete(results);
         });
         return future;
-    }
-
-    private String executeToolOnClientThread(String name, JsonObject args) {
-        JsonObject result = new JsonObject();
-        switch (name) {
-            case "get_player_skills":
-                for (Skill skill : Skill.values()) {
-                    if (!"OVERALL".equals(skill.name())) {
-                        result.addProperty(skill.getName(),
-                                client.getBoostedSkillLevel(skill) + "/" + client.getRealSkillLevel(skill));
-                    }
-                }
-                break;
-
-            case "get_player_inventory":
-                JsonObject invItems = new JsonObject();
-                ItemContainer invContainer = client.getItemContainer(InventoryID.INVENTORY);
-                if (invContainer != null) {
-                    invItems = aggregateItemsWithPrices(invContainer, null, 0);
-                }
-                result.add("items", invItems);
-                break;
-
-            case "get_player_equipment":
-                JsonObject eqSlots = new JsonObject();
-                ItemContainer eqContainer = client.getItemContainer(InventoryID.EQUIPMENT);
-                if (eqContainer != null) {
-                    Item[] items = eqContainer.getItems();
-                    for (int i = 0; i < items.length; i++) {
-                        Item item = items[i];
-                        if (item == null || item.getId() <= 0) {
-                            continue;
-                        }
-                        String slotName = getSlotName(i);
-                        JsonObject itemDetail = new JsonObject();
-                        itemDetail.addProperty("id", item.getId());
-                        itemDetail.addProperty("name", safeItemName(item.getId()));
-                        itemDetail.addProperty("qty", item.getQuantity());
-
-                        int gePrice = 0;
-                        if (itemManager != null) {
-                            try {
-                                gePrice = itemManager.getItemPrice(item.getId());
-                            } catch (Exception ignored) {
-                            }
-                        }
-                        if (gePrice <= 0 && "Coins".equals(safeItemName(item.getId()))) {
-                            gePrice = 1;
-                        }
-                        itemDetail.addProperty("gePrice", gePrice);
-                        itemDetail.addProperty("haPrice", safeHighAlchPrice(item.getId()));
-
-                        ItemStats stats = itemManager.getItemStats(item.getId(), false);
-                        if (stats != null && stats.getEquipment() != null) {
-                            ItemEquipmentStats eq = stats.getEquipment();
-                            JsonObject statsObj = new JsonObject();
-                            statsObj.addProperty("astab", eq.getAstab());
-                            statsObj.addProperty("aslash", eq.getAslash());
-                            statsObj.addProperty("ascrush", eq.getAcrush());
-                            statsObj.addProperty("asmagic", eq.getAmagic());
-                            statsObj.addProperty("asrange", eq.getArange());
-                            statsObj.addProperty("dstab", eq.getDstab());
-                            statsObj.addProperty("dslash", eq.getDslash());
-                            statsObj.addProperty("dcrush", eq.getDcrush());
-                            statsObj.addProperty("dmagic", eq.getDmagic());
-                            statsObj.addProperty("drange", eq.getDrange());
-                            statsObj.addProperty("str", eq.getStr());
-                            statsObj.addProperty("rstr", eq.getRstr());
-                            statsObj.addProperty("mdmg", eq.getMdmg());
-                            statsObj.addProperty("prayer", eq.getPrayer());
-                            statsObj.addProperty("aspeed", eq.getAspeed());
-                            itemDetail.add("stats", statsObj);
-                        }
-                        eqSlots.add(slotName, itemDetail);
-                    }
-                }
-                result.add("slots", eqSlots);
-                break;
-
-            case "get_player_slayer_task":
-                String taskName = configManager.getRSProfileConfiguration("slayer", "taskName");
-                if (taskName == null || taskName.isEmpty()) {
-                    taskName = configManager.getConfiguration("slayer", "taskName");
-                }
-                String amount = configManager.getRSProfileConfiguration("slayer", "amount");
-                if (amount == null || amount.isEmpty()) {
-                    amount = configManager.getConfiguration("slayer", "amount");
-                }
-                String pointsStr = configManager.getRSProfileConfiguration("slayer", "points");
-                if (pointsStr == null || pointsStr.isEmpty()) {
-                    pointsStr = configManager.getConfiguration("slayer", "points");
-                }
-                String streakStr = configManager.getRSProfileConfiguration("slayer", "streak");
-                if (streakStr == null || streakStr.isEmpty()) {
-                    streakStr = configManager.getConfiguration("slayer", "streak");
-                }
-                int pointsVal = 0;
-                if (pointsStr != null && !pointsStr.isEmpty()) {
-                    try {
-                        pointsVal = Integer.parseInt(pointsStr);
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-                if (pointsVal != 0) {
-                    result.addProperty("points", pointsVal);
-                }
-                if (streakStr != null && !streakStr.isEmpty()) {
-                    try {
-                        result.addProperty("streak", Integer.parseInt(streakStr));
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-                if (taskName != null && !taskName.isEmpty() && amount != null) {
-                    result.addProperty("task", taskName);
-                    result.addProperty("quantity", Integer.parseInt(amount));
-                } else {
-                    result.addProperty("task", "None");
-                    result.addProperty("quantity", 0);
-                }
-                break;
-
-            case "get_player_quests":
-                int qp = client.getVarpValue(VarPlayerID.QP);
-                result.addProperty("questPoints", qp);
-                JsonArray completed = new JsonArray();
-                JsonArray inProgress = new JsonArray();
-                for (Quest quest : Quest.values()) {
-                    QuestState state = quest.getState(client);
-                    if (state == QuestState.FINISHED) {
-                        completed.add(quest.getName());
-                    } else if (state == QuestState.IN_PROGRESS) {
-                        inProgress.add(quest.getName());
-                    }
-                }
-                result.add("completedQuests", completed);
-                result.add("inProgressQuests", inProgress);
-                break;
-
-            case "get_player_achievement_diaries":
-                JsonObject diaries = new JsonObject();
-                diaries.add("Ardougne", createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM,
-                        Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE));
-                diaries.add("Desert", createDiaryProgress(Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM,
-                        Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE));
-                diaries.add("Falador", createDiaryProgress(Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM,
-                        Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE));
-                diaries.add("Fremennik", createDiaryProgress(Varbits.DIARY_FREMENNIK_EASY,
-                        Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE));
-                diaries.add("Kandarin", createDiaryProgress(Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM,
-                        Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE));
-                diaries.add("Karamja", createDiaryProgress(Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM,
-                        Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE));
-                diaries.add("Kourend", createDiaryProgress(Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM,
-                        Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE));
-                diaries.add("Lumbridge", createDiaryProgress(Varbits.DIARY_LUMBRIDGE_EASY,
-                        Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE));
-                diaries.add("Morytania", createDiaryProgress(Varbits.DIARY_MORYTANIA_EASY,
-                        Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE));
-                diaries.add("Varrock", createDiaryProgress(Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM,
-                        Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE));
-                diaries.add("Western", createDiaryProgress(Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM,
-                        Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE));
-                diaries.add("Wilderness",
-                        createDiaryProgress(Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM,
-                                Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
-                result.add("diaries", diaries);
-                break;
-
-            case "get_player_bank":
-                ItemContainer bankContainer = client.getItemContainer(InventoryID.BANK);
-                if (bankContainer == null || bankContainer.getItems().length == 0) {
-                    result.addProperty("status", "error");
-                    result.addProperty("message",
-                            "The bank is not currently open. Ask the player to open their bank if they want you to check bank items.");
-                } else {
-                    String filter = (args != null && args.has("filter")) ? args.get("filter").getAsString() : null;
-                    int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
-                    result.add("items", aggregateItemsWithPrices(bankContainer, filter, minValue));
-                }
-                break;
-
-            case "get_item_stats":
-                JsonObject itemsStats = new JsonObject();
-                if (args != null) {
-                    if (args.has("itemIds")) {
-                        JsonArray ids = args.getAsJsonArray("itemIds");
-                        for (int i = 0; i < ids.size(); i++) {
-                            int itemId = ids.get(i).getAsInt();
-                            itemsStats.add(String.valueOf(itemId), buildItemStatsJson(itemId));
-                        }
-                    }
-                    if (args.has("itemNames")) {
-                        JsonArray names = args.getAsJsonArray("itemNames");
-                        for (int i = 0; i < names.size(); i++) {
-                            String itemName = names.get(i).getAsString();
-                            Integer itemId = findItemIdInContainers(itemName);
-                            if (itemId != null) {
-                                itemsStats.add(itemName, buildItemStatsJson(itemId));
-                            } else {
-                                JsonObject errorObj = new JsonObject();
-                                errorObj.addProperty("error", "Item not found in equipment, inventory, or bank.");
-                                itemsStats.add(itemName, errorObj);
-                            }
-                        }
-                    }
-                }
-                result.add("items", itemsStats);
-                break;
-
-            case "get_player_clues": {
-                // 1. Scan for clue items in inventory
-                JsonArray invClueItems = new JsonArray();
-                ItemContainer invCont = client.getItemContainer(InventoryID.INVENTORY);
-                if (invCont != null) {
-                    for (Item item : invCont.getItems()) {
-                        if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
-                            continue;
-                        }
-                        net.runelite.api.ItemComposition comp = client.getItemDefinition(item.getId());
-                        if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
-                            JsonObject clueItem = new JsonObject();
-                            clueItem.addProperty("id", item.getId());
-                            clueItem.addProperty("name", comp.getName());
-                            clueItem.addProperty("qty", item.getQuantity());
-                            clueItem.addProperty("location", "Inventory");
-                            invClueItems.add(clueItem);
-                        }
-                    }
-                }
-                result.add("inventoryClues", invClueItems);
-
-                // 2. Scan for clue items in bank
-                JsonArray bankClueItems = new JsonArray();
-                ItemContainer bankCont = client.getItemContainer(InventoryID.BANK);
-                if (bankCont != null) {
-                    for (Item item : bankCont.getItems()) {
-                        if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
-                            continue;
-                        }
-                        net.runelite.api.ItemComposition comp = client.getItemDefinition(item.getId());
-                        if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
-                            JsonObject clueItem = new JsonObject();
-                            clueItem.addProperty("id", item.getId());
-                            clueItem.addProperty("name", comp.getName());
-                            clueItem.addProperty("qty", item.getQuantity());
-                            clueItem.addProperty("location", "Bank");
-                            bankClueItems.add(clueItem);
-                        }
-                    }
-                }
-                result.add("bankClues", bankClueItems);
-
-                // 3. Locate ClueScrollPlugin via PluginManager
-                JsonObject activeClueObj = new JsonObject();
-                activeClueObj.addProperty("status", "No active clue scroll detected");
-                boolean foundPlugin = false;
-
-                if (pluginManager != null) {
-                    for (net.runelite.client.plugins.Plugin p : pluginManager.getPlugins()) {
-                        if (p.getClass().getName().equals("net.runelite.client.plugins.cluescrolls.ClueScrollPlugin")) {
-                            foundPlugin = true;
-                            if (pluginManager.isPluginEnabled(p)) {
-                                if (p instanceof net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) {
-                                    net.runelite.client.plugins.cluescrolls.ClueScrollPlugin clueScrollPlugin = (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
-                                    net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = clueScrollPlugin
-                                            .getClue();
-                                    if (clue != null) {
-                                        activeClueObj.addProperty("status", "Active clue scroll detected");
-                                        activeClueObj.addProperty("type", clue.getClass().getSimpleName());
-
-                                        // Render hint using PanelComponent
-                                        net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
-                                        try {
-                                            clue.makeOverlayHint(panel, clueScrollPlugin);
-                                            JsonArray hintLines = new JsonArray();
-                                            for (Object child : panel.getChildren()) {
-                                                if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
-                                                    net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
-
-                                                    // Use reflection to read private left/right fields to bypass getter
-                                                    // compilation issue
-                                                    String left = "";
-                                                    String right = "";
-                                                    try {
-                                                        java.lang.reflect.Field leftField = lc.getClass()
-                                                                .getDeclaredField("left");
-                                                        leftField.setAccessible(true);
-                                                        left = (String) leftField.get(lc);
-                                                    } catch (Exception ignored) {
-                                                    }
-
-                                                    try {
-                                                        java.lang.reflect.Field rightField = lc.getClass()
-                                                                .getDeclaredField("right");
-                                                        rightField.setAccessible(true);
-                                                        right = (String) rightField.get(lc);
-                                                    } catch (Exception ignored) {
-                                                    }
-
-                                                    if (left != null && !left.trim().isEmpty()) {
-                                                        if (right != null && !right.trim().isEmpty()) {
-                                                            hintLines.add(left + ": " + right);
-                                                        } else {
-                                                            hintLines.add(left);
-                                                        }
-                                                    }
-                                                } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
-                                                    net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
-
-                                                    // Use reflection to read private text field
-                                                    String text = "";
-                                                    try {
-                                                        java.lang.reflect.Field textField = tc.getClass()
-                                                                .getDeclaredField("text");
-                                                        textField.setAccessible(true);
-                                                        text = (String) textField.get(tc);
-                                                    } catch (Exception ignored) {
-                                                    }
-
-                                                    if (text != null && !text.trim().isEmpty()) {
-                                                        hintLines.add(text);
-                                                    }
-                                                } else {
-                                                    hintLines.add(child.toString());
-                                                }
-                                            }
-                                            activeClueObj.add("details", hintLines);
-                                        } catch (Throwable t) {
-                                            activeClueObj.addProperty("error",
-                                                    "Failed to format clue details: " + t.getMessage());
-                                        }
-                                    } else {
-                                        activeClueObj.addProperty("status",
-                                                "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
-                                    }
-                                }
-                            } else {
-                                activeClueObj.addProperty("status",
-                                        "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                if (!foundPlugin) {
-                    activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin was not found.");
-                }
-
-                result.add("activeClue", activeClueObj);
-                break;
-            }
-
-            default:
-                result.addProperty("status", "error");
-                result.addProperty("message", "Unknown tool: " + name);
-                break;
-        }
-        return gson.toJson(result);
     }
 
     private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
@@ -878,16 +529,26 @@ public class AiService {
         }
     }
 
+    @FunctionalInterface
+    public interface ToolExecutor {
+        String execute(AiService service, JsonObject args) throws Exception;
+    }
+
     public static class ToolDefinition {
         public final String name;
         public final String description;
         public final List<ToolParameter> parameters = new ArrayList<>();
         public final boolean requiresCharacterInfo;
+        public final boolean runOnClientThread;
+        public final ToolExecutor executor;
 
-        public ToolDefinition(String name, String description, boolean requiresCharacterInfo) {
+        public ToolDefinition(String name, String description, boolean requiresCharacterInfo,
+                              boolean runOnClientThread, ToolExecutor executor) {
             this.name = name;
             this.description = description;
             this.requiresCharacterInfo = requiresCharacterInfo;
+            this.runOnClientThread = runOnClientThread;
+            this.executor = executor;
         }
 
         public ToolDefinition addParam(String name, String type, String description, boolean required) {
@@ -900,54 +561,407 @@ public class AiService {
         List<ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new ToolDefinition("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted) for all skills.", true));
+                "Retrieve the player's current levels (both real and boosted) for all skills.",
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    for (Skill skill : Skill.values()) {
+                        if (!"OVERALL".equals(skill.name())) {
+                            result.addProperty(skill.getName(),
+                                    service.client.getBoostedSkillLevel(skill) + "/" + service.client.getRealSkillLevel(skill));
+                        }
+                    }
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("get_player_inventory",
                 "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.",
-                true));
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    JsonObject invItems = new JsonObject();
+                    ItemContainer invContainer = service.client.getItemContainer(InventoryID.INVENTORY);
+                    if (invContainer != null) {
+                        invItems = service.aggregateItemsWithPrices(invContainer, null, 0);
+                    }
+                    result.add("items", invItems);
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("get_player_equipment",
                 "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player.",
-                true));
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    JsonObject eqSlots = new JsonObject();
+                    ItemContainer eqContainer = service.client.getItemContainer(InventoryID.EQUIPMENT);
+                    if (eqContainer != null) {
+                        Item[] items = eqContainer.getItems();
+                        for (int i = 0; i < items.length; i++) {
+                            Item item = items[i];
+                            if (item == null || item.getId() <= 0) {
+                                continue;
+                            }
+                            String slotName = service.getSlotName(i);
+                            JsonObject itemDetail = new JsonObject();
+                            itemDetail.addProperty("id", item.getId());
+                            itemDetail.addProperty("name", service.safeItemName(item.getId()));
+                            itemDetail.addProperty("qty", item.getQuantity());
+
+                            int gePrice = 0;
+                            if (service.itemManager != null) {
+                                try {
+                                    gePrice = service.itemManager.getItemPrice(item.getId());
+                                } catch (Exception ignored) {
+                                }
+                            }
+                            if (gePrice <= 0 && "Coins".equals(service.safeItemName(item.getId()))) {
+                                gePrice = 1;
+                            }
+                            itemDetail.addProperty("gePrice", gePrice);
+                            itemDetail.addProperty("haPrice", service.safeHighAlchPrice(item.getId()));
+
+                            ItemStats stats = service.itemManager.getItemStats(item.getId(), false);
+                            if (stats != null && stats.getEquipment() != null) {
+                                ItemEquipmentStats eq = stats.getEquipment();
+                                JsonObject statsObj = new JsonObject();
+                                statsObj.addProperty("astab", eq.getAstab());
+                                statsObj.addProperty("aslash", eq.getAslash());
+                                statsObj.addProperty("ascrush", eq.getAcrush());
+                                statsObj.addProperty("asmagic", eq.getAmagic());
+                                statsObj.addProperty("asrange", eq.getArange());
+                                statsObj.addProperty("dstab", eq.getDstab());
+                                statsObj.addProperty("dslash", eq.getDslash());
+                                statsObj.addProperty("dcrush", eq.getDcrush());
+                                statsObj.addProperty("dmagic", eq.getDmagic());
+                                statsObj.addProperty("drange", eq.getDrange());
+                                statsObj.addProperty("str", eq.getStr());
+                                statsObj.addProperty("rstr", eq.getRstr());
+                                statsObj.addProperty("mdmg", eq.getMdmg());
+                                statsObj.addProperty("prayer", eq.getPrayer());
+                                statsObj.addProperty("aspeed", eq.getAspeed());
+                                itemDetail.add("stats", statsObj);
+                            }
+                            eqSlots.add(slotName, itemDetail);
+                        }
+                    }
+                    result.add("slots", eqSlots);
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("get_player_slayer_task",
                 "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak.",
-                true));
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    String taskName = service.configManager.getRSProfileConfiguration("slayer", "taskName");
+                    if (taskName == null || taskName.isEmpty()) {
+                        taskName = service.configManager.getConfiguration("slayer", "taskName");
+                    }
+                    String amount = service.configManager.getRSProfileConfiguration("slayer", "amount");
+                    if (amount == null || amount.isEmpty()) {
+                        amount = service.configManager.getConfiguration("slayer", "amount");
+                    }
+                    String pointsStr = service.configManager.getRSProfileConfiguration("slayer", "points");
+                    if (pointsStr == null || pointsStr.isEmpty()) {
+                        pointsStr = service.configManager.getConfiguration("slayer", "points");
+                    }
+                    String streakStr = service.configManager.getRSProfileConfiguration("slayer", "streak");
+                    if (streakStr == null || streakStr.isEmpty()) {
+                        streakStr = service.configManager.getConfiguration("slayer", "streak");
+                    }
+                    int pointsVal = 0;
+                    if (pointsStr != null && !pointsStr.isEmpty()) {
+                        try {
+                            pointsVal = Integer.parseInt(pointsStr);
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                    if (pointsVal != 0) {
+                        result.addProperty("points", pointsVal);
+                    }
+                    if (streakStr != null && !streakStr.isEmpty()) {
+                        try {
+                            result.addProperty("streak", Integer.parseInt(streakStr));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                    if (taskName != null && !taskName.isEmpty() && amount != null) {
+                        result.addProperty("task", taskName);
+                        result.addProperty("quantity", Integer.parseInt(amount));
+                    } else {
+                        result.addProperty("task", "None");
+                        result.addProperty("quantity", 0);
+                    }
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("get_player_quests",
-                "Retrieve the player's quest points, and lists of completed and in-progress quests.", true));
+                "Retrieve the player's quest points, and lists of completed and in-progress quests.",
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    int qp = service.client.getVarpValue(VarPlayerID.QP);
+                    result.addProperty("questPoints", qp);
+                    JsonArray completed = new JsonArray();
+                    JsonArray inProgress = new JsonArray();
+                    for (Quest quest : Quest.values()) {
+                        QuestState state = quest.getState(service.client);
+                        if (state == QuestState.FINISHED) {
+                            completed.add(quest.getName());
+                        } else if (state == QuestState.IN_PROGRESS) {
+                            inProgress.add(quest.getName());
+                        }
+                    }
+                    result.add("completedQuests", completed);
+                    result.add("inProgressQuests", inProgress);
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("get_player_achievement_diaries",
                 "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).",
-                true));
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    JsonObject diaries = new JsonObject();
+                    diaries.add("Ardougne", service.createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM,
+                            Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE));
+                    diaries.add("Desert", service.createDiaryProgress(Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM,
+                            Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE));
+                    diaries.add("Falador", service.createDiaryProgress(Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM,
+                            Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE));
+                    diaries.add("Fremennik", service.createDiaryProgress(Varbits.DIARY_FREMENNIK_EASY,
+                            Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE));
+                    diaries.add("Kandarin", service.createDiaryProgress(Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM,
+                            Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE));
+                    diaries.add("Karamja", service.createDiaryProgress(Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM,
+                            Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE));
+                    diaries.add("Kourend", service.createDiaryProgress(Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM,
+                            Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE));
+                    diaries.add("Lumbridge", service.createDiaryProgress(Varbits.DIARY_LUMBRIDGE_EASY,
+                            Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE));
+                    diaries.add("Morytania", service.createDiaryProgress(Varbits.DIARY_MORYTANIA_EASY,
+                            Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE));
+                    diaries.add("Varrock", service.createDiaryProgress(Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM,
+                            Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE));
+                    diaries.add("Western", service.createDiaryProgress(Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM,
+                            Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE));
+                    diaries.add("Wilderness",
+                            service.createDiaryProgress(Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM,
+                                    Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
+                    result.add("diaries", diaries);
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("get_player_bank",
                 "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
-                true)
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    ItemContainer bankContainer = service.client.getItemContainer(InventoryID.BANK);
+                    if (bankContainer == null || bankContainer.getItems().length == 0) {
+                        result.addProperty("status", "error");
+                        result.addProperty("message",
+                                "The bank is not currently open. Ask the player to open their bank if they want you to check bank items.");
+                    } else {
+                        String filter = (args != null && args.has("filter")) ? args.get("filter").getAsString() : null;
+                        int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
+                        result.add("items", service.aggregateItemsWithPrices(bankContainer, filter, minValue));
+                    }
+                    return service.gson.toJson(result);
+                })
                 .addParam("filter", "string", "Optional search query to filter bank items by name (case-insensitive).",
                         false)
                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 
         registry.add(new ToolDefinition("get_item_stats",
                 "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.",
-                true)
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    JsonObject itemsStats = new JsonObject();
+                    if (args != null) {
+                        if (args.has("itemIds")) {
+                            JsonArray ids = args.getAsJsonArray("itemIds");
+                            for (int i = 0; i < ids.size(); i++) {
+                                int itemId = ids.get(i).getAsInt();
+                                itemsStats.add(String.valueOf(itemId), service.buildItemStatsJson(itemId));
+                            }
+                        }
+                        if (args.has("itemNames")) {
+                            JsonArray names = args.getAsJsonArray("itemNames");
+                            for (int i = 0; i < names.size(); i++) {
+                                String itemName = names.get(i).getAsString();
+                                Integer itemId = service.findItemIdInContainers(itemName);
+                                if (itemId != null) {
+                                    itemsStats.add(itemName, service.buildItemStatsJson(itemId));
+                                } else {
+                                    JsonObject errorObj = new JsonObject();
+                                    errorObj.addProperty("error", "Item not found in equipment, inventory, or bank.");
+                                    itemsStats.add(itemName, errorObj);
+                                }
+                            }
+                        }
+                    }
+                    result.add("items", itemsStats);
+                    return service.gson.toJson(result);
+                })
                 .addParam("itemIds", "array_integer", "Optional list of OSRS item IDs to retrieve stats for.", false)
                 .addParam("itemNames", "array_string",
                         "Optional list of item names to search for in containers and retrieve stats.", false));
 
         registry.add(new ToolDefinition("get_player_clues",
                 "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.",
-                true));
+                true, true, (service, args) -> {
+                    JsonObject result = new JsonObject();
+                    // 1. Scan for clue items in inventory
+                    JsonArray invClueItems = new JsonArray();
+                    ItemContainer invCont = service.client.getItemContainer(InventoryID.INVENTORY);
+                    if (invCont != null) {
+                        for (Item item : invCont.getItems()) {
+                            if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                                continue;
+                            }
+                            net.runelite.api.ItemComposition comp = service.client.getItemDefinition(item.getId());
+                            if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
+                                JsonObject clueItem = new JsonObject();
+                                clueItem.addProperty("id", item.getId());
+                                clueItem.addProperty("name", comp.getName());
+                                clueItem.addProperty("qty", item.getQuantity());
+                                clueItem.addProperty("location", "Inventory");
+                                invClueItems.add(clueItem);
+                            }
+                        }
+                    }
+                    result.add("inventoryClues", invClueItems);
+
+                    // 2. Scan for clue items in bank
+                    JsonArray bankClueItems = new JsonArray();
+                    ItemContainer bankCont = service.client.getItemContainer(InventoryID.BANK);
+                    if (bankCont != null) {
+                        for (Item item : bankCont.getItems()) {
+                            if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                                continue;
+                            }
+                            net.runelite.api.ItemComposition comp = service.client.getItemDefinition(item.getId());
+                            if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
+                                JsonObject clueItem = new JsonObject();
+                                clueItem.addProperty("id", item.getId());
+                                clueItem.addProperty("name", comp.getName());
+                                clueItem.addProperty("qty", item.getQuantity());
+                                clueItem.addProperty("location", "Bank");
+                                bankClueItems.add(clueItem);
+                            }
+                        }
+                    }
+                    result.add("bankClues", bankClueItems);
+
+                    // 3. Locate ClueScrollPlugin via PluginManager
+                    JsonObject activeClueObj = new JsonObject();
+                    activeClueObj.addProperty("status", "No active clue scroll detected");
+                    boolean foundPlugin = false;
+
+                    if (service.pluginManager != null) {
+                        for (net.runelite.client.plugins.Plugin p : service.pluginManager.getPlugins()) {
+                            if (p.getClass().getName().equals("net.runelite.client.plugins.cluescrolls.ClueScrollPlugin")) {
+                                foundPlugin = true;
+                                if (service.pluginManager.isPluginEnabled(p)) {
+                                    if (p instanceof net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) {
+                                        net.runelite.client.plugins.cluescrolls.ClueScrollPlugin clueScrollPlugin = (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
+                                        net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = clueScrollPlugin
+                                                .getClue();
+                                        if (clue != null) {
+                                            activeClueObj.addProperty("status", "Active clue scroll detected");
+                                            activeClueObj.addProperty("type", clue.getClass().getSimpleName());
+
+                                            // Render hint using PanelComponent
+                                            net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
+                                            try {
+                                                clue.makeOverlayHint(panel, clueScrollPlugin);
+                                                JsonArray hintLines = new JsonArray();
+                                                for (Object child : panel.getChildren()) {
+                                                    if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
+                                                        net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
+
+                                                        // Use reflection to read private left/right fields to bypass getter
+                                                        // compilation issue
+                                                        String left = "";
+                                                        String right = "";
+                                                        try {
+                                                            java.lang.reflect.Field leftField = lc.getClass()
+                                                                    .getDeclaredField("left");
+                                                            leftField.setAccessible(true);
+                                                            left = (String) leftField.get(lc);
+                                                        } catch (Exception ignored) {
+                                                        }
+
+                                                        try {
+                                                            java.lang.reflect.Field rightField = lc.getClass()
+                                                                    .getDeclaredField("right");
+                                                            rightField.setAccessible(true);
+                                                            right = (String) rightField.get(lc);
+                                                        } catch (Exception ignored) {
+                                                        }
+
+                                                        if (left != null && !left.trim().isEmpty()) {
+                                                            if (right != null && !right.trim().isEmpty()) {
+                                                                hintLines.add(left + ": " + right);
+                                                            } else {
+                                                                hintLines.add(left);
+                                                            }
+                                                        }
+                                                    } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
+                                                        net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
+
+                                                        // Use reflection to read private text field
+                                                        String text = "";
+                                                        try {
+                                                            java.lang.reflect.Field textField = tc.getClass()
+                                                                    .getDeclaredField("text");
+                                                            textField.setAccessible(true);
+                                                            text = (String) textField.get(tc);
+                                                        } catch (Exception ignored) {
+                                                        }
+
+                                                        if (text != null && !text.trim().isEmpty()) {
+                                                            hintLines.add(text);
+                                                        }
+                                                    } else {
+                                                        hintLines.add(child.toString());
+                                                    }
+                                                }
+                                                activeClueObj.add("details", hintLines);
+                                            } catch (Throwable t) {
+                                                activeClueObj.addProperty("error",
+                                                        "Failed to format clue details: " + t.getMessage());
+                                            }
+                                        } else {
+                                            activeClueObj.addProperty("status",
+                                                    "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
+                                        }
+                                    }
+                                } else {
+                                    activeClueObj.addProperty("status",
+                                            "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!foundPlugin) {
+                        activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin was not found.");
+                    }
+
+                    result.add("activeClue", activeClueObj);
+                    return service.gson.toJson(result);
+                }));
 
         registry.add(new ToolDefinition("search_osrs_wiki",
                 "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.",
-                false)
+                false, false, (service, args) -> {
+                    String query = args.has("query") ? args.get("query").getAsString() : "";
+                    return service.executeWikiSearch(query);
+                })
                 .addParam("query", "string",
                         "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",
                         true));
 
         return registry;
     }
+
 
     private String buildGameContext() {
         if (!config.shareCharacterInfo()) {
