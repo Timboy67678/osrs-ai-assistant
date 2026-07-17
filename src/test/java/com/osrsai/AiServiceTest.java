@@ -17,6 +17,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.Skill;
+import net.runelite.api.Experience;
 import net.runelite.client.game.ItemManager;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
@@ -280,5 +282,55 @@ public class AiServiceTest {
         com.google.gson.JsonArray bankArray = rootObj.getAsJsonArray("bankClues");
         Assert.assertEquals(1, bankArray.size());
         Assert.assertEquals("Clue scroll (hard)", bankArray.get(0).getAsJsonObject().get("name").getAsString());
+    }
+
+    @Test
+    public void testGetPlayerSkillsTool() throws Exception {
+        // Mock default behavior for all skills
+        Mockito.when(client.getBoostedSkillLevel(Mockito.any(Skill.class))).thenReturn(1);
+        Mockito.when(client.getRealSkillLevel(Mockito.any(Skill.class))).thenReturn(1);
+        Mockito.when(client.getSkillExperience(Mockito.any(Skill.class))).thenReturn(0);
+
+        // Specific values for Attack
+        Mockito.when(client.getBoostedSkillLevel(Skill.ATTACK)).thenReturn(60);
+        Mockito.when(client.getRealSkillLevel(Skill.ATTACK)).thenReturn(55);
+        Mockito.when(client.getSkillExperience(Skill.ATTACK)).thenReturn(170000);
+
+        // Specific values for a capped level (Strength at max virtual level)
+        Mockito.when(client.getBoostedSkillLevel(Skill.STRENGTH)).thenReturn(99);
+        Mockito.when(client.getRealSkillLevel(Skill.STRENGTH)).thenReturn(99);
+        Mockito.when(client.getSkillExperience(Skill.STRENGTH)).thenReturn(200000000);
+
+        // Retrieve tool definition
+        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+                .filter(d -> d.name.equals("get_player_skills"))
+                .findFirst()
+                .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
+
+        String jsonResult = def.executor.execute(aiService, new com.google.gson.JsonObject());
+        System.out.println("Result of get_player_skills: " + jsonResult);
+
+        Assert.assertNotNull(jsonResult);
+        com.google.gson.JsonObject rootObj = new Gson().fromJson(jsonResult, com.google.gson.JsonObject.class);
+
+        // Verify Attack structure and calculations
+        Assert.assertTrue(rootObj.has("Attack"));
+        com.google.gson.JsonObject attackObj = rootObj.getAsJsonObject("Attack");
+        Assert.assertEquals(60, attackObj.get("boosted").getAsInt());
+        Assert.assertEquals(55, attackObj.get("real").getAsInt());
+        Assert.assertEquals(170000, attackObj.get("xp").getAsInt());
+
+        int expectedNextLevelXp = Experience.getXpForLevel(56);
+        Assert.assertEquals(expectedNextLevelXp, attackObj.get("nextLevelXp").getAsInt());
+        Assert.assertEquals(expectedNextLevelXp - 170000, attackObj.get("xpToNextLevel").getAsInt());
+
+        // Verify Strength capped behavior
+        Assert.assertTrue(rootObj.has("Strength"));
+        com.google.gson.JsonObject strengthObj = rootObj.getAsJsonObject("Strength");
+        Assert.assertEquals(99, strengthObj.get("boosted").getAsInt());
+        Assert.assertEquals(99, strengthObj.get("real").getAsInt());
+        Assert.assertEquals(200000000, strengthObj.get("xp").getAsInt());
+        Assert.assertEquals(-1, strengthObj.get("nextLevelXp").getAsInt());
+        Assert.assertEquals(0, strengthObj.get("xpToNextLevel").getAsInt());
     }
 }

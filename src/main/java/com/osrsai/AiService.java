@@ -14,6 +14,7 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 
 import net.runelite.api.Client;
+import net.runelite.api.Experience;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
@@ -568,7 +569,7 @@ public class AiService {
         List<ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new ToolDefinition("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted) for all skills.",
+                "Retrieve the player's current levels (both real and boosted), experience (XP), next level threshold, and remaining experience for all skills.",
                 true, true, AiService::executeGetPlayerSkills));
 
         registry.add(new ToolDefinition("get_player_inventory",
@@ -623,8 +624,23 @@ public class AiService {
         JsonObject result = new JsonObject();
         for (Skill skill : Skill.values()) {
             if (!"OVERALL".equals(skill.name())) {
-                result.addProperty(skill.getName(),
-                        client.getBoostedSkillLevel(skill) + "/" + client.getRealSkillLevel(skill));
+                JsonObject skillData = new JsonObject();
+                skillData.addProperty("boosted", client.getBoostedSkillLevel(skill));
+                skillData.addProperty("real", client.getRealSkillLevel(skill));
+                int xp = client.getSkillExperience(skill);
+                skillData.addProperty("xp", xp);
+
+                int nextLevel = Experience.getLevelForXp(xp) + 1;
+                if (nextLevel <= Experience.MAX_VIRT_LEVEL) {
+                    int nextXp = Experience.getXpForLevel(nextLevel);
+                    skillData.addProperty("nextLevelXp", nextXp);
+                    skillData.addProperty("xpToNextLevel", Math.max(0, nextXp - xp));
+                } else {
+                    skillData.addProperty("nextLevelXp", -1);
+                    skillData.addProperty("xpToNextLevel", 0);
+                }
+
+                result.add(skill.getName(), skillData);
             }
         }
         return gson.toJson(result);
