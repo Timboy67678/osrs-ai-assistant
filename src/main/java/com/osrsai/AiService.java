@@ -51,6 +51,12 @@ import org.jetbrains.annotations.NotNull;
 
 @Slf4j
 public class AiService {
+    // User Agent String
+    private static final String OSRS_AI_USER_AGENT = "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant";
+
+    // Template Removal Constants
+    private static final int MAX_TEMPLATE_REMOVALS = 5;
+
     // Global Constants
     static final int MAX_DEPTH_COUNT = 10;
 
@@ -1456,8 +1462,7 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent",
-                            "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
+                    .header("User-Agent", OSRS_AI_USER_AGENT)
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1505,8 +1510,7 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent",
-                            "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
+                    .header("User-Agent", OSRS_AI_USER_AGENT)
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1542,8 +1546,7 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent",
-                            "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
+                    .header("User-Agent", OSRS_AI_USER_AGENT)
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1586,26 +1589,15 @@ public class AiService {
         if (wikitext == null) {
             return "";
         }
-        // 1. Remove comments
         String clean = wikitext.replaceAll("(?s)<!--.*?-->", "");
-
-        // 2. Remove tables
         clean = clean.replaceAll("(?s)\\{\\|.*?\\|\\}", "");
-
-        // 3. Remove files and categories links
         clean = clean.replaceAll("(?i)\\[\\[(File|Image|Category):.*?\\]\\]", "");
-
-        // 4. Simplify internal links: [[A|B]] -> B
         clean = clean.replaceAll("\\[\\[[^]]*?\\|([^]]+?)\\]\\]", "$1");
-        // Simplify internal links: [[A]] -> A
         clean = clean.replaceAll("\\[\\[([^]]+?)\\]\\]", "$1");
-
-        // 5. Convert bold/italic
         clean = clean.replaceAll("'''(.*?)'''", "**$1**");
         clean = clean.replaceAll("''(.*?)''", "*$1*");
 
-        // 6. Remove excess templates, especially nested ones.
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < MAX_TEMPLATE_REMOVALS; i++) {
             String next = clean.replaceAll("\\{\\{[^{}]*?\\}\\}", "");
             if (next.equals(clean)) {
                 break;
@@ -1613,7 +1605,6 @@ public class AiService {
             clean = next;
         }
 
-        // 7. Remove multiple blank lines
         clean = clean.replaceAll("(?m)^[ \t]*\r?\n", "");
 
         return clean.trim();
