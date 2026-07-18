@@ -417,6 +417,7 @@ public class OsrsAiPanel extends PluginPanel {
 
     private String formatInlineMarkdown(String text) {
         String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        html = html.replaceAll("`(.*?)`", "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");
         html = html.replaceAll("\\*(.*?)\\*", "<i>$1</i>");
         return html;
@@ -587,8 +588,31 @@ public class OsrsAiPanel extends PluginPanel {
             }
             updatingComboBox = false;
 
-            // Always create a new chat session at startup and select it
-            createNewSession();
+            String activeId = configManager.getConfiguration(CONFIG_GROUP, "active_session_id");
+            ChatSession toSelect = null;
+            if (activeId != null) {
+                for (ChatSession s : sessions) {
+                    if (s.getId().equals(activeId)) {
+                        toSelect = s;
+                        break;
+                    }
+                }
+            }
+
+            if (toSelect != null) {
+                updatingComboBox = true;
+                chatSessionComboBox.setSelectedItem(toSelect);
+                updatingComboBox = false;
+                selectSession(toSelect);
+            } else if (!sessions.isEmpty()) {
+                ChatSession first = sessions.get(0);
+                updatingComboBox = true;
+                chatSessionComboBox.setSelectedItem(first);
+                updatingComboBox = false;
+                selectSession(first);
+            } else {
+                createNewSession();
+            }
         } catch (Exception e) {
             createNewSession();
         }

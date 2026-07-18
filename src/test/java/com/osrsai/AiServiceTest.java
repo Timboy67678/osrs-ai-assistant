@@ -467,4 +467,26 @@ public class AiServiceTest {
         Assert.assertEquals("Aberrant Spectre", taskObj.get("boss").getAsString());
         Assert.assertTrue(taskObj.get("completed").getAsBoolean());
     }
+
+    @Test
+    public void testCleanWikitext() {
+        String raw = "<!-- comment -->Hello [[World|Earth]]! This is a {{stub}} test.\n"
+                + "{| class=\"wikitable\"\n"
+                + "|- \n"
+                + "| Table content\n"
+                + "|}\n"
+                + "[[Category:Test]]\n"
+                + "[[File:Image.png]]\n"
+                + "'''bold''' and ''italic''.";
+        String cleaned = AiService.cleanWikitext(raw);
+        System.out.println("Cleaned: " + cleaned);
+        Assert.assertFalse(cleaned.contains("comment"));
+        Assert.assertFalse(cleaned.contains("wikitable"));
+        Assert.assertFalse(cleaned.contains("Category"));
+        Assert.assertFalse(cleaned.contains("File"));
+        Assert.assertFalse(cleaned.contains("stub"));
+        Assert.assertTrue(cleaned.contains("Earth"));
+        Assert.assertTrue(cleaned.contains("**bold**"));
+        Assert.assertTrue(cleaned.contains("*italic*"));
+    }
 }

@@ -63,6 +63,35 @@ public class AiService {
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions";
 
+    private static final Map<Integer, String> CA_TIER_MAP = Map.of(
+            3981, "Easy",
+            3982, "Medium",
+            3983, "Hard",
+            3984, "Elite",
+            3985, "Master",
+            3986, "Grandmaster");
+
+    private static final Map<Integer, String> CA_TYPE_MAP = Map.of(
+            1, "Stamina",
+            2, "Perfection",
+            3, "Kill Count",
+            4, "Mechanical",
+            5, "Restriction",
+            6, "Speed");
+
+    private static final int[] CA_VARP_IDS = new int[] {
+            VarPlayerID.CA_TASK_COMPLETED_0, VarPlayerID.CA_TASK_COMPLETED_1,
+            VarPlayerID.CA_TASK_COMPLETED_2, VarPlayerID.CA_TASK_COMPLETED_3,
+            VarPlayerID.CA_TASK_COMPLETED_4, VarPlayerID.CA_TASK_COMPLETED_5,
+            VarPlayerID.CA_TASK_COMPLETED_6, VarPlayerID.CA_TASK_COMPLETED_7,
+            VarPlayerID.CA_TASK_COMPLETED_8, VarPlayerID.CA_TASK_COMPLETED_9,
+            VarPlayerID.CA_TASK_COMPLETED_10, VarPlayerID.CA_TASK_COMPLETED_11,
+            VarPlayerID.CA_TASK_COMPLETED_12, VarPlayerID.CA_TASK_COMPLETED_13,
+            VarPlayerID.CA_TASK_COMPLETED_14, VarPlayerID.CA_TASK_COMPLETED_15,
+            VarPlayerID.CA_TASK_COMPLETED_16, VarPlayerID.CA_TASK_COMPLETED_17,
+            VarPlayerID.CA_TASK_COMPLETED_18, VarPlayerID.CA_TASK_COMPLETED_19
+    };
+
     @Inject
     private Client client;
 
@@ -359,6 +388,7 @@ public class AiService {
         JsonObject result = new JsonObject();
         Map<String, Long> quantities = new LinkedHashMap<>();
         Map<String, Integer> itemIds = new HashMap<>();
+        Map<String, Integer> itemHaPrices = new HashMap<>();
 
         String search = (filter != null) ? filter.trim().toLowerCase() : null;
         String[] tokens = null;
@@ -371,17 +401,19 @@ public class AiService {
             if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
                 continue;
             }
+            net.runelite.api.ItemComposition comp = null;
             if (itemManager != null) {
                 try {
-                    net.runelite.api.ItemComposition comp = itemManager.getItemComposition(item.getId());
-                    if (comp != null && comp.getPlaceholderTemplateId() != -1) {
-                        continue;
-                    }
-                } catch (Exception e) {
-                    // Ignore composition errors, default to not ignoring
+                    comp = itemManager.getItemComposition(item.getId());
+                } catch (Exception ignored) {
                 }
             }
-            String itemName = safeItemName(item.getId());
+            if (comp != null && comp.getPlaceholderTemplateId() != -1) {
+                continue;
+            }
+            String itemName = (comp != null && comp.getName() != null && !comp.getName().trim().isEmpty())
+                    ? comp.getName()
+                    : "Item " + item.getId();
 
             // Apply name filter if present
             if (tokens != null && tokens.length > 0) {
@@ -415,6 +447,7 @@ public class AiService {
 
             quantities.put(itemName, quantities.getOrDefault(itemName, 0L) + item.getQuantity());
             itemIds.putIfAbsent(itemName, item.getId());
+            itemHaPrices.putIfAbsent(itemName, comp != null ? comp.getHaPrice() : 0);
         }
 
         // Help sort items by value
@@ -449,7 +482,7 @@ public class AiService {
             if (price <= 0 && "Coins".equals(name)) {
                 price = 1;
             }
-            int haPrice = safeHighAlchPrice(itemId);
+            int haPrice = itemHaPrices.getOrDefault(name, 0);
 
             // Apply minimum value filter if present based on account type preference
             int checkVal = isIron ? haPrice : price;
@@ -490,14 +523,6 @@ public class AiService {
             return accountType >= 1 && accountType <= 6;
         } catch (Exception ex) {
             return false;
-        }
-    }
-
-    private int safeHighAlchPrice(int itemId) {
-        try {
-            return itemManager.getItemComposition(itemId).getHaPrice();
-        } catch (Exception ex) {
-            return 0;
         }
     }
 
@@ -595,7 +620,8 @@ public class AiService {
         registry.add(new ToolDefinition("get_player_bank",
                 "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
                 true, true, AiService::executeGetPlayerBank)
-                .addParam("filter", "string", "Optional search query to filter bank items strictly by item name substring (case-insensitive, e.g. 'bar' or 'ore'). Do NOT filter by skill or category name (e.g. do NOT use 'crafting' as a filter).",
+                .addParam("filter", "string",
+                        "Optional search query to filter bank items strictly by item name substring (case-insensitive, e.g. 'bar' or 'ore'). Do NOT filter by skill or category name (e.g. do NOT use 'crafting' as a filter).",
                         false)
                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 
@@ -620,10 +646,16 @@ public class AiService {
         registry.add(new ToolDefinition("get_player_combat_achievements",
                 "Retrieve the player's Combat Achievement tier completion status (Easy, Medium, Hard, Elite, Master, Grandmaster) and boss/activity kill counts (KC).",
                 true, true, AiService::executeGetPlayerCombatAchievements)
-                .addParam("tier", "string", "Optional. Filter individual tasks strictly by tier (case-insensitive: 'Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster').", false)
-                .addParam("boss", "string", "Optional. Filter individual tasks by boss/monster name substring (case-insensitive, e.g. 'barrows' or 'zulrah').", false)
+                .addParam("tier", "string",
+                        "Optional. Filter individual tasks strictly by tier (case-insensitive: 'Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster').",
+                        false)
+                .addParam("boss", "string",
+                        "Optional. Filter individual tasks by boss/monster name substring (case-insensitive, e.g. 'barrows' or 'zulrah').",
+                        false)
                 .addParam("completed", "boolean", "Optional. Filter individual tasks by completion status.", false)
-                .addParam("taskName", "string", "Optional. Filter individual tasks strictly by task name substring (case-insensitive, e.g. 'noxious foe' or 'barrows novice').", false));
+                .addParam("taskName", "string",
+                        "Optional. Filter individual tasks strictly by task name substring (case-insensitive, e.g. 'noxious foe' or 'barrows novice').",
+                        false));
 
         return registry;
     }
@@ -676,10 +708,21 @@ public class AiService {
                 if (item == null || item.getId() <= 0) {
                     continue;
                 }
+                net.runelite.api.ItemComposition comp = null;
+                if (itemManager != null) {
+                    try {
+                        comp = itemManager.getItemComposition(item.getId());
+                    } catch (Exception ignored) {
+                    }
+                }
+                String itemName = (comp != null && comp.getName() != null && !comp.getName().trim().isEmpty())
+                        ? comp.getName()
+                        : "Item " + item.getId();
+
                 String slotName = getSlotName(i);
                 JsonObject itemDetail = new JsonObject();
                 itemDetail.addProperty("id", item.getId());
-                itemDetail.addProperty("name", safeItemName(item.getId()));
+                itemDetail.addProperty("name", itemName);
                 itemDetail.addProperty("qty", item.getQuantity());
 
                 int gePrice = 0;
@@ -689,13 +732,13 @@ public class AiService {
                     } catch (Exception ignored) {
                     }
                 }
-                if (gePrice <= 0 && "Coins".equals(safeItemName(item.getId()))) {
+                if (gePrice <= 0 && "Coins".equals(itemName)) {
                     gePrice = 1;
                 }
                 itemDetail.addProperty("gePrice", gePrice);
-                itemDetail.addProperty("haPrice", safeHighAlchPrice(item.getId()));
+                itemDetail.addProperty("haPrice", comp != null ? comp.getHaPrice() : 0);
 
-                ItemStats stats = itemManager.getItemStats(item.getId(), false);
+                ItemStats stats = (itemManager != null) ? itemManager.getItemStats(item.getId(), false) : null;
                 if (stats != null && stats.getEquipment() != null) {
                     ItemEquipmentStats eq = stats.getEquipment();
                     JsonObject statsObj = new JsonObject();
@@ -850,48 +893,23 @@ public class AiService {
         }
         result.add("killCounts", killCounts);
 
-        String filterTier = (args != null && args.has("tier")) ? args.get("tier").getAsString().trim().toLowerCase() : null;
-        String filterBoss = (args != null && args.has("boss")) ? args.get("boss").getAsString().trim().toLowerCase() : null;
+        String filterTier = (args != null && args.has("tier")) ? args.get("tier").getAsString().trim().toLowerCase()
+                : null;
+        String filterBoss = (args != null && args.has("boss")) ? args.get("boss").getAsString().trim().toLowerCase()
+                : null;
         Boolean filterCompleted = (args != null && args.has("completed")) ? args.get("completed").getAsBoolean() : null;
-        String filterTaskName = (args != null && args.has("taskName")) ? args.get("taskName").getAsString().trim().toLowerCase() : null;
+        String filterTaskName = (args != null && args.has("taskName"))
+                ? args.get("taskName").getAsString().trim().toLowerCase()
+                : null;
 
-        boolean hasFilters = (filterTier != null || filterBoss != null || filterCompleted != null || filterTaskName != null);
+        boolean hasFilters = (filterTier != null || filterBoss != null || filterCompleted != null
+                || filterTaskName != null);
 
         if (hasFilters) {
             JsonArray tasks = new JsonArray();
+            net.runelite.api.EnumComposition bossEnum = client.getEnum(3971);
 
-            Map<Integer, String> tierMap = Map.of(
-                3981, "Easy",
-                3982, "Medium",
-                3983, "Hard",
-                3984, "Elite",
-                3985, "Master",
-                3986, "Grandmaster"
-            );
-
-            Map<Integer, String> typeMap = Map.of(
-                1, "Stamina",
-                2, "Perfection",
-                3, "Kill Count",
-                4, "Mechanical",
-                5, "Restriction",
-                6, "Speed"
-            );
-
-            int[] varpIds = new int[]{
-                VarPlayerID.CA_TASK_COMPLETED_0, VarPlayerID.CA_TASK_COMPLETED_1,
-                VarPlayerID.CA_TASK_COMPLETED_2, VarPlayerID.CA_TASK_COMPLETED_3,
-                VarPlayerID.CA_TASK_COMPLETED_4, VarPlayerID.CA_TASK_COMPLETED_5,
-                VarPlayerID.CA_TASK_COMPLETED_6, VarPlayerID.CA_TASK_COMPLETED_7,
-                VarPlayerID.CA_TASK_COMPLETED_8, VarPlayerID.CA_TASK_COMPLETED_9,
-                VarPlayerID.CA_TASK_COMPLETED_10, VarPlayerID.CA_TASK_COMPLETED_11,
-                VarPlayerID.CA_TASK_COMPLETED_12, VarPlayerID.CA_TASK_COMPLETED_13,
-                VarPlayerID.CA_TASK_COMPLETED_14, VarPlayerID.CA_TASK_COMPLETED_15,
-                VarPlayerID.CA_TASK_COMPLETED_16, VarPlayerID.CA_TASK_COMPLETED_17,
-                VarPlayerID.CA_TASK_COMPLETED_18, VarPlayerID.CA_TASK_COMPLETED_19
-            };
-
-            for (Map.Entry<Integer, String> tierEntry : tierMap.entrySet()) {
+            for (Map.Entry<Integer, String> tierEntry : CA_TIER_MAP.entrySet()) {
                 int enumId = tierEntry.getKey();
                 String tierName = tierEntry.getValue();
 
@@ -915,16 +933,16 @@ public class AiService {
                     String description = struct.getStringValue(1309);
                     int id = struct.getIntValue(1306);
                     int typeId = struct.getIntValue(1311);
-                    String type = typeMap.get(typeId);
+                    String type = CA_TYPE_MAP.get(typeId);
                     int bossId = struct.getIntValue(1312);
-                    String bossName = getBossName(bossId);
+                    String bossName = getBossName(bossEnum, bossId);
 
                     boolean completed = false;
-                    if (id >= 0 && id < varpIds.length * 32) {
+                    if (id >= 0 && id < CA_VARP_IDS.length * 32) {
                         int varpIndex = id / 32;
                         int bitIndex = id % 32;
-                        if (varpIndex < varpIds.length) {
-                            int varpValue = client.getVarpValue(varpIds[varpIndex]);
+                        if (varpIndex < CA_VARP_IDS.length) {
+                            int varpValue = client.getVarpValue(CA_VARP_IDS[varpIndex]);
                             completed = (varpValue & (1 << bitIndex)) != 0;
                         }
                     }
@@ -956,14 +974,13 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String getBossName(int bossId) {
-        try {
-            net.runelite.api.EnumComposition bossEnum = client.getEnum(3971);
-            if (bossEnum != null) {
+    private String getBossName(net.runelite.api.EnumComposition bossEnum, int bossId) {
+        if (bossEnum != null) {
+            try {
                 return bossEnum.getStringValue(bossId);
+            } catch (Exception e) {
+                log.warn("Failed to get boss name for ID {}: {}", bossId, e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Failed to get boss name for ID {}: {}", bossId, e.getMessage());
         }
         return "Unknown";
     }
@@ -1439,7 +1456,8 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
+                    .header("User-Agent",
+                            "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1487,7 +1505,8 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
+                    .header("User-Agent",
+                            "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1523,7 +1542,8 @@ public class AiService {
             OkHttpClient wikiClient = getWikiClient();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
+                    .header("User-Agent",
+                            "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant")
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
@@ -1546,10 +1566,11 @@ public class AiService {
                             JsonObject rev = revisions.get(0).getAsJsonObject();
                             if (rev.has("*")) {
                                 String wikitext = rev.get("*").getAsString();
-                                if (wikitext.length() > WIKI_EXTRACT_CHARS) {
-                                    wikitext = wikitext.substring(0, WIKI_EXTRACT_CHARS) + "\n...[truncated]";
+                                String cleaned = cleanWikitext(wikitext);
+                                if (cleaned.length() > WIKI_EXTRACT_CHARS) {
+                                    cleaned = cleaned.substring(0, WIKI_EXTRACT_CHARS) + "\n...[truncated]";
                                 }
-                                return wikitext;
+                                return cleaned;
                             }
                         }
                     }
@@ -1559,6 +1580,43 @@ public class AiService {
             log.warn("Wiki extract fetch failed for: {}", title, e);
         }
         return null;
+    }
+
+    static String cleanWikitext(String wikitext) {
+        if (wikitext == null) {
+            return "";
+        }
+        // 1. Remove comments
+        String clean = wikitext.replaceAll("(?s)<!--.*?-->", "");
+
+        // 2. Remove tables
+        clean = clean.replaceAll("(?s)\\{\\|.*?\\|\\}", "");
+
+        // 3. Remove files and categories links
+        clean = clean.replaceAll("(?i)\\[\\[(File|Image|Category):.*?\\]\\]", "");
+
+        // 4. Simplify internal links: [[A|B]] -> B
+        clean = clean.replaceAll("\\[\\[[^]]*?\\|([^]]+?)\\]\\]", "$1");
+        // Simplify internal links: [[A]] -> A
+        clean = clean.replaceAll("\\[\\[([^]]+?)\\]\\]", "$1");
+
+        // 5. Convert bold/italic
+        clean = clean.replaceAll("'''(.*?)'''", "**$1**");
+        clean = clean.replaceAll("''(.*?)''", "*$1*");
+
+        // 6. Remove excess templates, especially nested ones.
+        for (int i = 0; i < 5; i++) {
+            String next = clean.replaceAll("\\{\\{[^{}]*?\\}\\}", "");
+            if (next.equals(clean)) {
+                break;
+            }
+            clean = next;
+        }
+
+        // 7. Remove multiple blank lines
+        clean = clean.replaceAll("(?m)^[ \t]*\r?\n", "");
+
+        return clean.trim();
     }
 
     static String buildSystemPrompt(String context, String recentConversation) {
@@ -1708,27 +1766,35 @@ public class AiService {
 
     private Integer findItemIdInContainers(String name) {
         String search = name.trim().toLowerCase();
+        Set<Integer> checkedIds = new HashSet<>();
+
         ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
         if (eq != null) {
             for (Item item : eq.getItems()) {
-                if (item != null && item.getId() > 0 && safeItemName(item.getId()).toLowerCase().contains(search)) {
-                    return item.getId();
+                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
+                    if (safeItemName(item.getId()).toLowerCase().contains(search)) {
+                        return item.getId();
+                    }
                 }
             }
         }
         ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
         if (inv != null) {
             for (Item item : inv.getItems()) {
-                if (item != null && item.getId() > 0 && safeItemName(item.getId()).toLowerCase().contains(search)) {
-                    return item.getId();
+                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
+                    if (safeItemName(item.getId()).toLowerCase().contains(search)) {
+                        return item.getId();
+                    }
                 }
             }
         }
         ItemContainer bank = client.getItemContainer(InventoryID.BANK);
         if (bank != null) {
             for (Item item : bank.getItems()) {
-                if (item != null && item.getId() > 0 && safeItemName(item.getId()).toLowerCase().contains(search)) {
-                    return item.getId();
+                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
+                    if (safeItemName(item.getId()).toLowerCase().contains(search)) {
+                        return item.getId();
+                    }
                 }
             }
         }
@@ -1738,7 +1804,18 @@ public class AiService {
     private JsonObject buildItemStatsJson(int itemId) {
         JsonObject obj = new JsonObject();
         obj.addProperty("id", itemId);
-        obj.addProperty("name", safeItemName(itemId));
+
+        net.runelite.api.ItemComposition comp = null;
+        if (itemManager != null) {
+            try {
+                comp = itemManager.getItemComposition(itemId);
+            } catch (Exception ignored) {
+            }
+        }
+        String itemName = (comp != null && comp.getName() != null && !comp.getName().trim().isEmpty())
+                ? comp.getName()
+                : "Item " + itemId;
+        obj.addProperty("name", itemName);
 
         int gePrice = 0;
         if (itemManager != null) {
@@ -1747,10 +1824,13 @@ public class AiService {
             } catch (Exception ignored) {
             }
         }
+        if (gePrice <= 0 && "Coins".equals(itemName)) {
+            gePrice = 1;
+        }
         obj.addProperty("gePrice", gePrice);
-        obj.addProperty("haPrice", safeHighAlchPrice(itemId));
+        obj.addProperty("haPrice", comp != null ? comp.getHaPrice() : 0);
 
-        ItemStats stats = itemManager.getItemStats(itemId, false);
+        ItemStats stats = (itemManager != null) ? itemManager.getItemStats(itemId, false) : null;
         if (stats == null) {
             obj.addProperty("equipable", false);
             return obj;
