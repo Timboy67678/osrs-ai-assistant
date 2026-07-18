@@ -20,6 +20,9 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.Skill;
 import net.runelite.api.Experience;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.config.ConfigManager;
+import java.util.Arrays;
+import java.util.List;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class AiServiceTest {
@@ -38,6 +41,9 @@ public class AiServiceTest {
 
     @Mock
     private net.runelite.client.plugins.PluginManager pluginManager;
+
+    @Mock
+    private ConfigManager configManager;
 
     @Before
     public void setUp() throws Exception {
@@ -377,5 +383,88 @@ public class AiServiceTest {
         Assert.assertTrue(rootObjNoMatch.get("bankOpen").getAsBoolean());
         Assert.assertEquals("crafting", rootObjNoMatch.get("filterApplied").getAsString());
         Assert.assertEquals(0, rootObjNoMatch.getAsJsonObject("items").size());
+    }
+
+    @Test
+    public void testGetPlayerCombatAchievementsTool() throws Exception {
+        // Mock Varbits for Combat Achievements Tiers
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_EASY)).thenReturn(2); // Completed
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MEDIUM)).thenReturn(1); // In Progress
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_HARD)).thenReturn(0); // Not Started
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_ELITE)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MASTER)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_GRANDMASTER)).thenReturn(0);
+
+        // Mock ConfigManager profile and keys
+        String profileKey = "rsprofile.12345";
+        Mockito.when(configManager.getRSProfileKey()).thenReturn(profileKey);
+
+        List<String> mockKeys = Arrays.asList("zulrah", "vorkath", "barrows chests");
+        Mockito.when(configManager.getRSProfileConfigurationKeys("killcount", profileKey, "")).thenReturn(mockKeys);
+
+        Mockito.when(configManager.getRSProfileConfiguration("killcount", "zulrah")).thenReturn("150");
+        Mockito.when(configManager.getRSProfileConfiguration("killcount", "vorkath")).thenReturn("320");
+        Mockito.when(configManager.getRSProfileConfiguration("killcount", "barrows chests")).thenReturn("85");
+
+        // Mock client.getEnum for Easy tier (Enum ID 3981)
+        net.runelite.api.EnumComposition mockEasyEnum = Mockito.mock(net.runelite.api.EnumComposition.class);
+        Mockito.when(client.getEnum(3981)).thenReturn(mockEasyEnum);
+        Mockito.when(mockEasyEnum.getIntVals()).thenReturn(new int[] { 100 }); // Struct ID 100
+
+        // Mock client.getStructComposition for Struct 100 (Noxious Foe)
+        net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
+        Mockito.when(client.getStructComposition(100)).thenReturn(mockStruct);
+
+        // Setup struct properties
+        Mockito.when(mockStruct.getStringValue(1308)).thenReturn("Noxious Foe"); // Name
+        Mockito.when(mockStruct.getStringValue(1309)).thenReturn("Kill an Aberrant Spectre."); // Description
+        Mockito.when(mockStruct.getIntValue(1306)).thenReturn(5); // Task ID (Varp index 0, bit index 5)
+        Mockito.when(mockStruct.getIntValue(1311)).thenReturn(3); // Type ID (Kill Count)
+        Mockito.when(mockStruct.getIntValue(1312)).thenReturn(20); // Boss ID 20
+
+        // Mock boss name enum (Enum ID 3971)
+        net.runelite.api.EnumComposition mockBossEnum = Mockito.mock(net.runelite.api.EnumComposition.class);
+        Mockito.when(client.getEnum(3971)).thenReturn(mockBossEnum);
+        Mockito.when(mockBossEnum.getStringValue(20)).thenReturn("Aberrant Spectre");
+
+        // Mock Varp for task completion (Varp index 0, bit index 5 is completed!)
+        Mockito.when(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.CA_TASK_COMPLETED_0)).thenReturn(1 << 5);
+
+        // Retrieve tool definition
+        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+                .filter(d -> d.name.equals("get_player_combat_achievements"))
+                .findFirst()
+                .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
+
+        // 1. Run without filters -> individual tasks should be omitted
+        com.google.gson.JsonObject argsNoFilters = new com.google.gson.JsonObject();
+        String jsonNoFilters = def.executor.execute(aiService, argsNoFilters);
+        com.google.gson.JsonObject rootNoFilters = new Gson().fromJson(jsonNoFilters, com.google.gson.JsonObject.class);
+        Assert.assertTrue(rootNoFilters.has("tiers"));
+        Assert.assertTrue(rootNoFilters.has("killCounts"));
+        Assert.assertFalse(rootNoFilters.has("tasks"));
+
+        // 2. Run with filters (tier=Easy, taskName=Noxious) -> individual tasks should be returned
+        com.google.gson.JsonObject argsWithFilters = new com.google.gson.JsonObject();
+        argsWithFilters.addProperty("tier", "Easy");
+        argsWithFilters.addProperty("taskName", "Noxious");
+        String jsonWithFilters = def.executor.execute(aiService, argsWithFilters);
+        com.google.gson.JsonObject rootWithFilters = new Gson().fromJson(jsonWithFilters, com.google.gson.JsonObject.class);
+
+        Assert.assertTrue(rootWithFilters.has("tiers"));
+        Assert.assertTrue(rootWithFilters.has("killCounts"));
+        Assert.assertTrue(rootWithFilters.has("tasks"));
+
+        com.google.gson.JsonArray tasksArr = rootWithFilters.getAsJsonArray("tasks");
+        Assert.assertEquals(1, tasksArr.size());
+
+        com.google.gson.JsonObject taskObj = tasksArr.get(0).getAsJsonObject();
+        Assert.assertEquals(5, taskObj.get("id").getAsInt());
+        Assert.assertEquals("Noxious Foe", taskObj.get("name").getAsString());
+        Assert.assertEquals("Kill an Aberrant Spectre.", taskObj.get("description").getAsString());
+        Assert.assertEquals("Easy", taskObj.get("tier").getAsString());
+        Assert.assertEquals("Kill Count", taskObj.get("type").getAsString());
+        Assert.assertEquals("Aberrant Spectre", taskObj.get("boss").getAsString());
+        Assert.assertTrue(taskObj.get("completed").getAsBoolean());
     }
 }

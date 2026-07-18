@@ -617,6 +617,14 @@ public class AiService {
                         "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",
                         true));
 
+        registry.add(new ToolDefinition("get_player_combat_achievements",
+                "Retrieve the player's Combat Achievement tier completion status (Easy, Medium, Hard, Elite, Master, Grandmaster) and boss/activity kill counts (KC).",
+                true, true, AiService::executeGetPlayerCombatAchievements)
+                .addParam("tier", "string", "Optional. Filter individual tasks strictly by tier (case-insensitive: 'Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster').", false)
+                .addParam("boss", "string", "Optional. Filter individual tasks by boss/monster name substring (case-insensitive, e.g. 'barrows' or 'zulrah').", false)
+                .addParam("completed", "boolean", "Optional. Filter individual tasks by completion status.", false)
+                .addParam("taskName", "string", "Optional. Filter individual tasks strictly by task name substring (case-insensitive, e.g. 'noxious foe' or 'barrows novice').", false));
+
         return registry;
     }
 
@@ -808,6 +816,170 @@ public class AiService {
                         Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
         result.add("diaries", diaries);
         return gson.toJson(result);
+    }
+
+    private String executeGetPlayerCombatAchievements(JsonObject args) {
+        JsonObject result = new JsonObject();
+        JsonObject tiers = new JsonObject();
+        tiers.addProperty("Easy", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_EASY));
+        tiers.addProperty("Medium", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_MEDIUM));
+        tiers.addProperty("Hard", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_HARD));
+        tiers.addProperty("Elite", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_ELITE));
+        tiers.addProperty("Master", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_MASTER));
+        tiers.addProperty("Grandmaster", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_GRANDMASTER));
+        result.add("tiers", tiers);
+
+        JsonObject killCounts = new JsonObject();
+        String profileKey = configManager.getRSProfileKey();
+        if (profileKey != null) {
+            List<String> keys = configManager.getRSProfileConfigurationKeys("killcount", profileKey, "");
+            if (keys != null) {
+                List<String> sortedKeys = new ArrayList<>(keys);
+                Collections.sort(sortedKeys);
+                for (String key : sortedKeys) {
+                    String valueStr = configManager.getRSProfileConfiguration("killcount", key);
+                    if (valueStr != null) {
+                        try {
+                            int count = Integer.parseInt(valueStr);
+                            killCounts.addProperty(key, count);
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            }
+        }
+        result.add("killCounts", killCounts);
+
+        String filterTier = (args != null && args.has("tier")) ? args.get("tier").getAsString().trim().toLowerCase() : null;
+        String filterBoss = (args != null && args.has("boss")) ? args.get("boss").getAsString().trim().toLowerCase() : null;
+        Boolean filterCompleted = (args != null && args.has("completed")) ? args.get("completed").getAsBoolean() : null;
+        String filterTaskName = (args != null && args.has("taskName")) ? args.get("taskName").getAsString().trim().toLowerCase() : null;
+
+        boolean hasFilters = (filterTier != null || filterBoss != null || filterCompleted != null || filterTaskName != null);
+
+        if (hasFilters) {
+            JsonArray tasks = new JsonArray();
+
+            Map<Integer, String> tierMap = Map.of(
+                3981, "Easy",
+                3982, "Medium",
+                3983, "Hard",
+                3984, "Elite",
+                3985, "Master",
+                3986, "Grandmaster"
+            );
+
+            Map<Integer, String> typeMap = Map.of(
+                1, "Stamina",
+                2, "Perfection",
+                3, "Kill Count",
+                4, "Mechanical",
+                5, "Restriction",
+                6, "Speed"
+            );
+
+            int[] varpIds = new int[]{
+                VarPlayerID.CA_TASK_COMPLETED_0, VarPlayerID.CA_TASK_COMPLETED_1,
+                VarPlayerID.CA_TASK_COMPLETED_2, VarPlayerID.CA_TASK_COMPLETED_3,
+                VarPlayerID.CA_TASK_COMPLETED_4, VarPlayerID.CA_TASK_COMPLETED_5,
+                VarPlayerID.CA_TASK_COMPLETED_6, VarPlayerID.CA_TASK_COMPLETED_7,
+                VarPlayerID.CA_TASK_COMPLETED_8, VarPlayerID.CA_TASK_COMPLETED_9,
+                VarPlayerID.CA_TASK_COMPLETED_10, VarPlayerID.CA_TASK_COMPLETED_11,
+                VarPlayerID.CA_TASK_COMPLETED_12, VarPlayerID.CA_TASK_COMPLETED_13,
+                VarPlayerID.CA_TASK_COMPLETED_14, VarPlayerID.CA_TASK_COMPLETED_15,
+                VarPlayerID.CA_TASK_COMPLETED_16, VarPlayerID.CA_TASK_COMPLETED_17,
+                VarPlayerID.CA_TASK_COMPLETED_18, VarPlayerID.CA_TASK_COMPLETED_19
+            };
+
+            for (Map.Entry<Integer, String> tierEntry : tierMap.entrySet()) {
+                int enumId = tierEntry.getKey();
+                String tierName = tierEntry.getValue();
+
+                if (filterTier != null && !tierName.toLowerCase().equals(filterTier)) {
+                    continue;
+                }
+
+                net.runelite.api.EnumComposition enumComp = client.getEnum(enumId);
+                if (enumComp == null) {
+                    continue;
+                }
+
+                int[] structIds = enumComp.getIntVals();
+                for (int structId : structIds) {
+                    net.runelite.api.StructComposition struct = client.getStructComposition(structId);
+                    if (struct == null) {
+                        continue;
+                    }
+
+                    String name = struct.getStringValue(1308);
+                    String description = struct.getStringValue(1309);
+                    int id = struct.getIntValue(1306);
+                    int typeId = struct.getIntValue(1311);
+                    String type = typeMap.get(typeId);
+                    int bossId = struct.getIntValue(1312);
+                    String bossName = getBossName(bossId);
+
+                    boolean completed = false;
+                    if (id >= 0 && id < varpIds.length * 32) {
+                        int varpIndex = id / 32;
+                        int bitIndex = id % 32;
+                        if (varpIndex < varpIds.length) {
+                            int varpValue = client.getVarpValue(varpIds[varpIndex]);
+                            completed = (varpValue & (1 << bitIndex)) != 0;
+                        }
+                    }
+
+                    if (filterCompleted != null && completed != filterCompleted) {
+                        continue;
+                    }
+                    if (filterBoss != null && !bossName.toLowerCase().contains(filterBoss)) {
+                        continue;
+                    }
+                    if (filterTaskName != null && !name.toLowerCase().contains(filterTaskName)) {
+                        continue;
+                    }
+
+                    JsonObject taskObj = new JsonObject();
+                    taskObj.addProperty("id", id);
+                    taskObj.addProperty("name", name);
+                    taskObj.addProperty("description", description);
+                    taskObj.addProperty("tier", tierName);
+                    taskObj.addProperty("type", type);
+                    taskObj.addProperty("boss", bossName);
+                    taskObj.addProperty("completed", completed);
+                    tasks.add(taskObj);
+                }
+            }
+            result.add("tasks", tasks);
+        }
+
+        return gson.toJson(result);
+    }
+
+    private String getBossName(int bossId) {
+        try {
+            net.runelite.api.EnumComposition bossEnum = client.getEnum(3971);
+            if (bossEnum != null) {
+                return bossEnum.getStringValue(bossId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get boss name for ID {}: {}", bossId, e.getMessage());
+        }
+        return "Unknown";
+    }
+
+    private String getCombatAchievementTierStatus(int varbitId) {
+        int val = client.getVarbitValue(varbitId);
+        switch (val) {
+            case 0:
+                return "Not Started";
+            case 1:
+                return "In Progress";
+            case 2:
+                return "Completed";
+            default:
+                return "Unknown (" + val + ")";
+        }
     }
 
     private String executeGetPlayerBank(JsonObject args) {
@@ -1396,8 +1568,9 @@ public class AiService {
         return "You are an OSRS RuneLite assistant. Use OSRS knowledge, and treat the GAME CONTEXT and tools as truth for the player.\n"
                 + "\n"
                 + "INTEGRATION TOOLS:\n"
-                + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, and bank (when open).\n"
-                + "- Call them when the player asks about stats, items, progress, or general goals/progression advice (query skills/quests/diaries first for tailored advice).\n"
+                + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, bank (when open), and combat achievements / boss kill counts.\n"
+                + "- When asked about combat achievements (overall tier progress or individual task details) or boss kill counts (KC), you MUST call 'get_player_combat_achievements'. Use the optional filters ('tier', 'boss', 'completed', 'taskName') to narrow down individual tasks to fit within the prompt budget (do NOT request all tasks without filtering as it is too large).\n"
+                + "- Call them when the player asks about stats, items, progress, combat achievements, boss kill counts (KC), or general goals/progression advice (query skills/quests/diaries/combat achievements first for tailored advice).\n"
                 + "- When asked about travel, reaching a destination, or teleportation, you MUST call the relevant inventory/equipment/bank tools to check if the player has teleportation items (such as Book of the Dead, Chronicle, teleport tablets, jewelry, runes) equipped, in inventory, or in their bank (if open) to tailor the travel route. Do not guess or assume their items.\n"
                 + "- Do not guess player details; call the relevant tools to check.\n"
                 + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item details (recipes, uses, equipment slots/hands, stats), slayer/quest requirements, farming patch locations/types/mechanics, skilling training methods, shop locations, shop stock, or travel/teleportation options. Do not guess these facts.\n"
