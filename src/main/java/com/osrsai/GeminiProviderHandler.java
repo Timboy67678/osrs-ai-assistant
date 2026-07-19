@@ -164,12 +164,26 @@ public class GeminiProviderHandler implements ProviderHandler {
 
     @Override
     public String extractResponseText(JsonObject responseRoot) {
-        return responseRoot.getAsJsonArray("candidates")
-                .get(0).getAsJsonObject()
-                .getAsJsonObject("content")
-                .getAsJsonArray("parts")
-                .get(0).getAsJsonObject()
-                .get("text").getAsString();
+        if (responseRoot != null && responseRoot.has("candidates")) {
+            JsonArray candidates = responseRoot.getAsJsonArray("candidates");
+            if (candidates.size() > 0) {
+                JsonObject content = candidates.get(0).getAsJsonObject().getAsJsonObject("content");
+                if (content != null && content.has("parts")) {
+                    JsonArray parts = content.getAsJsonArray("parts");
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < parts.size(); i++) {
+                        JsonObject part = parts.get(i).getAsJsonObject();
+                        if (part.has("text")) {
+                            sb.append(part.get("text").getAsString());
+                        }
+                    }
+                    if (sb.length() > 0) {
+                        return sb.toString();
+                    }
+                }
+            }
+        }
+        return "No content returned by Gemini.";
     }
 
     @Override

@@ -138,9 +138,20 @@ public class ClaudeProviderHandler implements ProviderHandler {
 
     @Override
     public String extractResponseText(JsonObject responseRoot) {
-        return responseRoot.getAsJsonArray("content")
-                .get(0).getAsJsonObject()
-                .get("text").getAsString();
+        if (responseRoot != null && responseRoot.has("content")) {
+            JsonArray content = responseRoot.getAsJsonArray("content");
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < content.size(); i++) {
+                JsonObject item = content.get(i).getAsJsonObject();
+                if (item.has("type") && "text".equals(item.get("type").getAsString()) && item.has("text")) {
+                    sb.append(item.get("text").getAsString());
+                }
+            }
+            if (sb.length() > 0) {
+                return sb.toString();
+            }
+        }
+        return "No content returned by Claude.";
     }
 
     @Override

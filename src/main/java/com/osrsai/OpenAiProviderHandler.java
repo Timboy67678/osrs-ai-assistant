@@ -145,10 +145,33 @@ public class OpenAiProviderHandler implements ProviderHandler {
 
     @Override
     public String extractResponseText(JsonObject responseRoot) {
-        return responseRoot.getAsJsonArray("choices")
-                .get(0).getAsJsonObject()
-                .getAsJsonObject("message")
-                .get("content").getAsString();
+        if (responseRoot != null && responseRoot.has("choices")) {
+            JsonArray choices = responseRoot.getAsJsonArray("choices");
+            if (choices.size() > 0) {
+                JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
+                if (message != null) {
+                    if (message.has("content") && !message.get("content").isJsonNull()) {
+                        String content = message.get("content").getAsString();
+                        if (content != null && !content.trim().isEmpty()) {
+                            return content;
+                        }
+                    }
+                    if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
+                        String reasoning = message.get("reasoning_content").getAsString();
+                        if (reasoning != null && !reasoning.trim().isEmpty()) {
+                            return reasoning;
+                        }
+                    }
+                    if (message.has("reasoning") && !message.get("reasoning").isJsonNull()) {
+                        String reasoning = message.get("reasoning").getAsString();
+                        if (reasoning != null && !reasoning.trim().isEmpty()) {
+                            return reasoning;
+                        }
+                    }
+                }
+            }
+        }
+        return "No content returned by the AI.";
     }
 
     @Override
