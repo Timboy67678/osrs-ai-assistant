@@ -667,9 +667,71 @@ public class AiService {
         return registry;
     }
 
+    private String normalizeSkillName(String input) {
+        if (input == null) {
+            return null;
+        }
+        String clean = input.trim().toLowerCase();
+        switch (clean) {
+            case "wc":
+            case "woodcut":
+                return "woodcutting";
+            case "rc":
+            case "runecrafting":
+                return "runecraft";
+            case "hp":
+            case "hitpoint":
+                return "hitpoints";
+            case "range":
+                return "ranged";
+            case "fm":
+                return "firemaking";
+            case "fletch":
+                return "fletching";
+            case "con":
+                return "construction";
+            case "cook":
+                return "cooking";
+            case "craft":
+                return "crafting";
+            case "slay":
+                return "slayer";
+            case "str":
+                return "strength";
+            case "def":
+            case "defense":
+                return "defence";
+            case "att":
+                return "attack";
+            case "agil":
+                return "agility";
+            case "thiev":
+            case "thief":
+                return "thieving";
+            case "herb":
+                return "herblore";
+            case "farm":
+                return "farming";
+            case "hunt":
+                return "hunter";
+            default:
+                return clean;
+        }
+    }
+
+    private void addMilestoneXp(JsonObject skillData, int currentXp) {
+        int[] milestones = {50, 60, 70, 80, 90, 99};
+        for (int level : milestones) {
+            int targetXp = Experience.getXpForLevel(level);
+            if (currentXp < targetXp) {
+                skillData.addProperty("xpTo" + level, targetXp - currentXp);
+            }
+        }
+    }
+
     private String executeGetPlayerSkills(JsonObject args) {
         JsonObject result = new JsonObject();
-        String filterSkill = (args != null && args.has("skill")) ? args.get("skill").getAsString().trim().toLowerCase() : null;
+        String filterSkill = (args != null && args.has("skill")) ? normalizeSkillName(args.get("skill").getAsString()) : null;
 
         for (Skill skill : Skill.values()) {
             if (!"OVERALL".equals(skill.name())) {
@@ -693,6 +755,8 @@ public class AiService {
                     skillData.addProperty("nextLevelXp", -1);
                     skillData.addProperty("xpToNextLevel", 0);
                 }
+
+                addMilestoneXp(skillData, xp);
 
                 result.add(skillName, skillData);
             }

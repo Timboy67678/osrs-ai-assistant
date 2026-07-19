@@ -330,7 +330,15 @@ public class AiServiceTest {
         Assert.assertEquals(expectedNextLevelXp, attackObj.get("nextLevelXp").getAsInt());
         Assert.assertEquals(expectedNextLevelXp - 170000, attackObj.get("xpToNextLevel").getAsInt());
 
-        // Verify Strength capped behavior
+        // Verify milestone XP additions
+        int expectedXpTo60 = Experience.getXpForLevel(60) - 170000;
+        Assert.assertEquals(expectedXpTo60, attackObj.get("xpTo60").getAsInt());
+        int expectedXpTo70 = Experience.getXpForLevel(70) - 170000;
+        Assert.assertEquals(expectedXpTo70, attackObj.get("xpTo70").getAsInt());
+        int expectedXpTo99 = Experience.getXpForLevel(99) - 170000;
+        Assert.assertEquals(expectedXpTo99, attackObj.get("xpTo99").getAsInt());
+
+        // Verify Strength capped behavior has no remaining milestone XP
         Assert.assertTrue(rootObj.has("Strength"));
         com.google.gson.JsonObject strengthObj = rootObj.getAsJsonObject("Strength");
         Assert.assertEquals(99, strengthObj.get("boosted").getAsInt());
@@ -338,8 +346,9 @@ public class AiServiceTest {
         Assert.assertEquals(200000000, strengthObj.get("xp").getAsInt());
         Assert.assertEquals(-1, strengthObj.get("nextLevelXp").getAsInt());
         Assert.assertEquals(0, strengthObj.get("xpToNextLevel").getAsInt());
+        Assert.assertFalse(strengthObj.has("xpTo99"));
 
-        // Test with filter parameter
+        // Test with filter parameter using direct skill name
         com.google.gson.JsonObject argsWithFilter = new com.google.gson.JsonObject();
         argsWithFilter.addProperty("skill", "attack");
         String jsonResultFiltered = def.executor.execute(aiService, argsWithFilter);
@@ -348,6 +357,16 @@ public class AiServiceTest {
         com.google.gson.JsonObject rootObjFiltered = new Gson().fromJson(jsonResultFiltered, com.google.gson.JsonObject.class);
         Assert.assertTrue(rootObjFiltered.has("Attack"));
         Assert.assertFalse(rootObjFiltered.has("Strength"));
+
+        // Test with abbreviation filter
+        com.google.gson.JsonObject argsWithAbbrev = new com.google.gson.JsonObject();
+        argsWithAbbrev.addProperty("skill", "att");
+        String jsonResultAbbrev = def.executor.execute(aiService, argsWithAbbrev);
+        System.out.println("Result of get_player_skills (abbrev filter): " + jsonResultAbbrev);
+        Assert.assertNotNull(jsonResultAbbrev);
+        com.google.gson.JsonObject rootObjAbbrev = new Gson().fromJson(jsonResultAbbrev, com.google.gson.JsonObject.class);
+        Assert.assertTrue(rootObjAbbrev.has("Attack"));
+        Assert.assertFalse(rootObjAbbrev.has("Strength"));
     }
 
     @Test
