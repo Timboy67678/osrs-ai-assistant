@@ -23,6 +23,8 @@ import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
+import net.runelite.api.Prayer;
+import net.runelite.api.WorldType;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
@@ -456,20 +458,21 @@ public class AiService {
             itemHaPrices.putIfAbsent(itemName, comp != null ? comp.getHaPrice() : 0);
         }
 
-        // Help sort items by value
+        // Help sort items by total stack value
         class BankItem {
             final String name;
             final long qty;
             final int gePrice;
             final int haPrice;
-            final int sortVal;
+            final long totalSortVal;
 
             BankItem(String name, long qty, int gePrice, int haPrice) {
                 this.name = name;
                 this.qty = qty;
                 this.gePrice = gePrice;
                 this.haPrice = haPrice;
-                this.sortVal = isIron ? haPrice : gePrice;
+                long unitPrice = isIron ? haPrice : gePrice;
+                this.totalSortVal = unitPrice * qty;
             }
         }
 
@@ -499,13 +502,11 @@ public class AiService {
             list.add(new BankItem(name, qty, price, haPrice));
         }
 
-        // Sort by sortVal descending
-        list.sort((a, b) -> Integer.compare(b.sortVal, a.sortVal));
+        // Sort by totalSortVal descending
+        list.sort((a, b) -> Long.compare(b.totalSortVal, a.totalSortVal));
 
-        // If there is no name filter, let's limit the bank output to a reasonable size
-        // to prevent timeout and context token bloat. If there is a filter, we return
-        // all matches.
-        int limit = (search == null) ? 200 : Integer.MAX_VALUE;
+        // Limit unfiltered container output to top 100 items to conserve tokens
+        int limit = (search == null) ? 100 : Integer.MAX_VALUE;
         int count = 0;
         for (BankItem bi : list) {
             if (count >= limit) {
@@ -617,8 +618,22 @@ public class AiService {
                 true, true, AiService::executeGetPlayerSlayerTask));
 
         registry.add(new ToolDefinition("get_player_quests",
-                "Retrieve the player's quest points, and lists of completed and in-progress quests.",
-                true, true, AiService::executeGetPlayerQuests));
+                "Retrieve the player's quest points, completed quest count, and lists of in-progress, not started, or completed quests.",
+                true, true, AiService::executeGetPlayerQuests)
+                .addParam("status", "string",
+                        "Optional quest status filter: 'IN_PROGRESS' (default), 'NOT_STARTED', 'COMPLETED', or 'ALL'.", false));
+
+        registry.add(new ToolDefinition("get_player_status",
+                "Retrieve the player's current combat and vital status, including Special Attack energy %, active prayers, poison/venom state, run energy, and HP/Prayer values.",
+                true, true, AiService::executeGetPlayerStatus));
+
+        registry.add(new ToolDefinition("get_player_currencies_and_points",
+                "Retrieve the player's minigame reward points, currencies, tickets, and tokens (e.g. NMZ points, Pest Control commends, Tithe Farm points, Golden Nuggets, Abyssal Pearls, Marks of Grace, Slayer points, Archery tickets).",
+                true, true, AiService::executeGetPlayerCurrenciesAndPoints));
+
+        registry.add(new ToolDefinition("get_player_location_details",
+                "Retrieve detailed information about the player's location, including Wilderness level, multi-combat status, instanced area status, world types (PvP, Members, High Risk), and region ID.",
+                true, true, AiService::executeGetPlayerLocationDetails));
 
         registry.add(new ToolDefinition("get_player_achievement_diaries",
                 "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).",
@@ -819,23 +834,30 @@ public class AiService {
                 ItemStats stats = (itemManager != null) ? itemManager.getItemStats(item.getId(), false) : null;
                 if (stats != null && stats.getEquipment() != null) {
                     ItemEquipmentStats eq = stats.getEquipment();
-                    JsonObject statsObj = new JsonObject();
-                    statsObj.addProperty("astab", eq.getAstab());
-                    statsObj.addProperty("aslash", eq.getAslash());
-                    statsObj.addProperty("ascrush", eq.getAcrush());
-                    statsObj.addProperty("asmagic", eq.getAmagic());
-                    statsObj.addProperty("asrange", eq.getArange());
-                    statsObj.addProperty("dstab", eq.getDstab());
-                    statsObj.addProperty("dslash", eq.getDslash());
-                    statsObj.addProperty("dcrush", eq.getDcrush());
-                    statsObj.addProperty("dmagic", eq.getDmagic());
-                    statsObj.addProperty("drange", eq.getDrange());
-                    statsObj.addProperty("str", eq.getStr());
-                    statsObj.addProperty("rstr", eq.getRstr());
-                    statsObj.addProperty("mdmg", eq.getMdmg());
-                    statsObj.addProperty("prayer", eq.getPrayer());
-                    statsObj.addProperty("aspeed", eq.getAspeed());
-                    itemDetail.add("stats", statsObj);
+                    boolean hasCombatStats = eq.getAstab() != 0 || eq.getAslash() != 0 || eq.getAcrush() != 0
+                            || eq.getAmagic() != 0 || eq.getArange() != 0 || eq.getDstab() != 0
+                            || eq.getDslash() != 0 || eq.getDcrush() != 0 || eq.getDmagic() != 0
+                            || eq.getDrange() != 0 || eq.getStr() != 0 || eq.getRstr() != 0
+                            || eq.getMdmg() != 0 || eq.getPrayer() != 0;
+                    if (hasCombatStats) {
+                        JsonObject statsObj = new JsonObject();
+                        if (eq.getAstab() != 0) statsObj.addProperty("astab", eq.getAstab());
+                        if (eq.getAslash() != 0) statsObj.addProperty("aslash", eq.getAslash());
+                        if (eq.getAcrush() != 0) statsObj.addProperty("ascrush", eq.getAcrush());
+                        if (eq.getAmagic() != 0) statsObj.addProperty("asmagic", eq.getAmagic());
+                        if (eq.getArange() != 0) statsObj.addProperty("asrange", eq.getArange());
+                        if (eq.getDstab() != 0) statsObj.addProperty("dstab", eq.getDstab());
+                        if (eq.getDslash() != 0) statsObj.addProperty("dslash", eq.getDslash());
+                        if (eq.getDcrush() != 0) statsObj.addProperty("dcrush", eq.getDcrush());
+                        if (eq.getDmagic() != 0) statsObj.addProperty("dmagic", eq.getDmagic());
+                        if (eq.getDrange() != 0) statsObj.addProperty("drange", eq.getDrange());
+                        if (eq.getStr() != 0) statsObj.addProperty("str", eq.getStr());
+                        if (eq.getRstr() != 0) statsObj.addProperty("rstr", eq.getRstr());
+                        if (eq.getMdmg() != 0) statsObj.addProperty("mdmg", eq.getMdmg());
+                        if (eq.getPrayer() != 0) statsObj.addProperty("prayer", eq.getPrayer());
+                        if (eq.getAspeed() != 0) statsObj.addProperty("aspeed", eq.getAspeed());
+                        itemDetail.add("stats", statsObj);
+                    }
                 }
                 eqSlots.add(slotName, itemDetail);
             }
@@ -892,18 +914,57 @@ public class AiService {
         JsonObject result = new JsonObject();
         int qp = client.getVarpValue(VarPlayerID.QP);
         result.addProperty("questPoints", qp);
+
+        String statusFilter = (args != null && args.has("status"))
+                ? args.get("status").getAsString().trim().toUpperCase()
+                : "DEFAULT";
+
+        int completedCount = 0;
+        int inProgressCount = 0;
+        int notStartedCount = 0;
+
         JsonArray completed = new JsonArray();
         JsonArray inProgress = new JsonArray();
+        JsonArray notStarted = new JsonArray();
+
+        boolean includeCompleted = "COMPLETED".equals(statusFilter) || "ALL".equals(statusFilter);
+        boolean includeInProgress = "DEFAULT".equals(statusFilter) || "IN_PROGRESS".equals(statusFilter) || "ALL".equals(statusFilter);
+        boolean includeNotStarted = "DEFAULT".equals(statusFilter) || "NOT_STARTED".equals(statusFilter) || "ALL".equals(statusFilter);
+
         for (Quest quest : Quest.values()) {
             QuestState state = quest.getState(client);
             if (state == QuestState.FINISHED) {
-                completed.add(quest.getName());
+                completedCount++;
+                if (includeCompleted) {
+                    completed.add(quest.getName());
+                }
             } else if (state == QuestState.IN_PROGRESS) {
-                inProgress.add(quest.getName());
+                inProgressCount++;
+                if (includeInProgress) {
+                    inProgress.add(quest.getName());
+                }
+            } else if (state == QuestState.NOT_STARTED) {
+                notStartedCount++;
+                if (includeNotStarted) {
+                    notStarted.add(quest.getName());
+                }
             }
         }
-        result.add("completedQuests", completed);
-        result.add("inProgressQuests", inProgress);
+
+        result.addProperty("completedCount", completedCount);
+        result.addProperty("inProgressCount", inProgressCount);
+        result.addProperty("notStartedCount", notStartedCount);
+
+        if (includeInProgress) {
+            result.add("inProgressQuests", inProgress);
+        }
+        if (includeNotStarted) {
+            result.add("notStartedQuests", notStarted);
+        }
+        if (includeCompleted) {
+            result.add("completedQuests", completed);
+        }
+
         return gson.toJson(result);
     }
 
@@ -1277,6 +1338,172 @@ public class AiService {
         return executeWikiSearch(query);
     }
 
+    private String executeGetPlayerStatus(JsonObject args) {
+        JsonObject result = new JsonObject();
+
+        int specPercent = client.getVarpValue(300) / 10;
+        result.addProperty("specialAttackPercent", specPercent);
+
+        result.addProperty("runEnergy", client.getEnergy() / 100);
+        result.addProperty("weightKg", client.getWeight());
+
+        JsonObject hp = new JsonObject();
+        hp.addProperty("current", client.getBoostedSkillLevel(Skill.HITPOINTS));
+        hp.addProperty("max", client.getRealSkillLevel(Skill.HITPOINTS));
+        result.add("hitpoints", hp);
+
+        JsonObject prayer = new JsonObject();
+        prayer.addProperty("current", client.getBoostedSkillLevel(Skill.PRAYER));
+        prayer.addProperty("max", client.getRealSkillLevel(Skill.PRAYER));
+        result.add("prayer", prayer);
+
+        JsonArray activePrayers = new JsonArray();
+        for (Prayer p : Prayer.values()) {
+            try {
+                if (client.isPrayerActive(p)) {
+                    activePrayers.add(p.name());
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        result.add("activePrayers", activePrayers);
+
+        int poisonVarp = client.getVarpValue(VarPlayerID.POISON);
+        String status = "Healthy";
+        if (poisonVarp > 0 && poisonVarp < 1000000) {
+            status = "Poisoned (" + poisonVarp + " dmg)";
+        } else if (poisonVarp >= 1000000) {
+            int venomDmg = (poisonVarp - 1000000) / 5 + 6;
+            status = "Venomed (" + venomDmg + " dmg)";
+        }
+        result.addProperty("poisonState", status);
+
+        JsonObject boostedSkills = new JsonObject();
+        for (Skill s : Skill.values()) {
+            if ("OVERALL".equals(s.name())) continue;
+            int real = client.getRealSkillLevel(s);
+            int boosted = client.getBoostedSkillLevel(s);
+            if (real != boosted) {
+                JsonObject bData = new JsonObject();
+                bData.addProperty("boosted", boosted);
+                bData.addProperty("real", real);
+                boostedSkills.add(s.getName(), bData);
+            }
+        }
+        result.add("boostedSkills", boostedSkills);
+
+        return gson.toJson(result);
+    }
+
+    private String executeGetPlayerCurrenciesAndPoints(JsonObject args) {
+        JsonObject result = new JsonObject();
+        JsonObject points = new JsonObject();
+
+        try {
+            int nmz = client.getVarpValue(1056);
+            points.addProperty("nightmareZonePoints", nmz);
+        } catch (Exception ignored) {}
+
+        try {
+            int pc = client.getVarpValue(261);
+            points.addProperty("pestControlCommendations", pc);
+        } catch (Exception ignored) {}
+
+        try {
+            int tithe = client.getVarbitValue(4893);
+            points.addProperty("titheFarmPoints", tithe);
+        } catch (Exception ignored) {}
+
+        try {
+            String pts = configManager.getRSProfileConfiguration("slayer", "points");
+            if (pts == null || pts.isEmpty()) pts = configManager.getConfiguration("slayer", "points");
+            if (pts != null && !pts.isEmpty()) {
+                points.addProperty("slayerPoints", Integer.parseInt(pts));
+            }
+            String strk = configManager.getRSProfileConfiguration("slayer", "streak");
+            if (strk == null || strk.isEmpty()) strk = configManager.getConfiguration("slayer", "streak");
+            if (strk != null && !strk.isEmpty()) {
+                points.addProperty("slayerStreak", Integer.parseInt(strk));
+            }
+        } catch (Exception ignored) {}
+
+        Map<String, Integer> targetItemNames = Map.of(
+            "Mark of grace", 11849,
+            "Golden nugget", 12012,
+            "Abyssal pearl", 26884,
+            "Tokkul", 6529,
+            "Stardust", 25527,
+            "Archery ticket", 1464,
+            "Mermaid's tear", 27433
+        );
+
+        JsonObject itemCurrencies = new JsonObject();
+        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+        ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+
+        for (Map.Entry<String, Integer> entry : targetItemNames.entrySet()) {
+            String name = entry.getKey();
+            int targetId = entry.getValue();
+            long total = 0;
+            if (inv != null) {
+                for (Item item : inv.getItems()) {
+                    if (item != null && item.getId() == targetId) total += item.getQuantity();
+                }
+            }
+            if (bank != null) {
+                for (Item item : bank.getItems()) {
+                    if (item != null && item.getId() == targetId) total += item.getQuantity();
+                }
+            }
+            if (total > 0) {
+                itemCurrencies.addProperty(name, total);
+            }
+        }
+        points.add("currencyItems", itemCurrencies);
+        result.add("pointsAndCurrencies", points);
+
+        return gson.toJson(result);
+    }
+
+    private String executeGetPlayerLocationDetails(JsonObject args) {
+        JsonObject result = new JsonObject();
+        Player localPlayer = client.getLocalPlayer();
+
+        int wildyLevel = 0;
+        try {
+            wildyLevel = client.getVarbitValue(5963);
+        } catch (Exception ignored) {}
+        result.addProperty("wildernessLevel", wildyLevel);
+        result.addProperty("inWilderness", wildyLevel > 0);
+
+        boolean isMulti = false;
+        try {
+            isMulti = client.getVarbitValue(Varbits.MULTICOMBAT_AREA) == 1;
+        } catch (Exception ignored) {}
+        result.addProperty("multiCombat", isMulti);
+
+        boolean inInstance = isInInstance(localPlayer);
+        result.addProperty("instancedArea", inInstance);
+
+        if (localPlayer != null) {
+            WorldPoint wp = localPlayer.getWorldLocation();
+            if (wp != null) {
+                InstanceTemplates instanceTemplate = getInstanceTemplate(localPlayer, wp);
+                result.addProperty("locationName", locationResolver.describeForAi(wp, inInstance, instanceTemplate));
+                result.addProperty("coordinates", wp.getX() + ", " + wp.getY() + ", " + wp.getPlane());
+                result.addProperty("regionId", wp.getRegionID());
+            }
+        }
+
+        JsonArray worldTypes = new JsonArray();
+        for (WorldType wt : client.getWorldType()) {
+            worldTypes.add(wt.name());
+        }
+        result.add("worldTypes", worldTypes);
+
+        return gson.toJson(result);
+    }
+
     private String buildGameContext() {
         if (!config.shareCharacterInfo()) {
             return "Player is not sharing character details with the AI (this option is disabled in the settings).";
@@ -1304,8 +1531,6 @@ public class AiService {
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
         int spellbookVar = client.getVarbitValue(4070);
         sb.append("Active Spellbook: ").append(describeSpellbook(spellbookVar)).append("\n");
-        sb.append("Run Energy: ").append(client.getEnergy()).append("%\n");
-        sb.append("Weight: ").append(client.getWeight()).append(" kg\n");
         sb.append("Hitpoints: ")
                 .append(client.getBoostedSkillLevel(Skill.HITPOINTS))
                 .append("/")
@@ -1687,33 +1912,21 @@ public class AiService {
         String compactConversation = trimToPromptBudget(recentConversation, MAX_RECENT_CONVERSATION_CHARS,
                 "...[recent conversation truncated]", true);
 
-        return "You are an OSRS RuneLite assistant. Use OSRS knowledge, and treat the GAME CONTEXT and tools as truth for the player.\n"
+        return "You are an OSRS RuneLite assistant. Use OSRS knowledge and treat GAME CONTEXT and tools as truth.\n"
                 + "\n"
-                + "INTEGRATION TOOLS:\n"
-                + "- You have tools to query skills, inventory, equipment, slayer tasks, quest progress, achievement diaries, bank (when open), and combat achievements / boss kill counts.\n"
-                + "- When asked about combat achievements (overall tier progress or individual task details) or boss kill counts (KC), you MUST call 'get_player_combat_achievements'. Use the optional filters ('tier', 'boss', 'completed', 'taskName') to narrow down individual tasks to fit within the prompt budget (do NOT request all tasks without filtering as it is too large).\n"
-                + "- Call them when the player asks about stats, items, progress, combat achievements, boss kill counts (KC), or general goals/progression advice (query skills/quests/diaries/combat achievements first for tailored advice).\n"
-                + "- When asked about travel, reaching a destination, or teleportation, you MUST call the relevant inventory/equipment/bank tools to check if the player has teleportation items (such as Book of the Dead, Chronicle, teleport tablets, jewelry, runes) equipped, in inventory, or in their bank (if open) to tailor the travel route. Do not guess or assume their items.\n"
-                + "- Do not guess player details; call the relevant tools to check.\n"
-                + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item details (recipes, uses, equipment slots/hands, stats), slayer/quest requirements, farming patch locations/types/mechanics, skilling training methods, locations of resources/resource nodes (such as specific trees, rocks/ores, fishing spots), shop locations, shop stock, or travel/teleportation options. Do not guess these facts.\n"
+                + "AVAILABLE TOOLS:\n"
+                + "- Player state: 'get_player_skills', 'get_player_inventory', 'get_player_equipment', 'get_player_bank' (when open), 'get_player_status', 'get_player_currencies_and_points', 'get_player_location_details'.\n"
+                + "- Activities & tasks: 'get_player_slayer_task', 'get_player_quests', 'get_player_achievement_diaries', 'get_player_combat_achievements', 'get_player_clues'.\n"
+                + "- Game info: 'get_item_stats', 'search_osrs_wiki'.\n"
+                + "- Call tools to inspect player state rather than guessing. Call 'search_osrs_wiki' to verify monster details, weaknesses, drop rates, item stats, recipes, training methods, and locations.\n"
                 + "\n"
                 + "GROUNDING RULES:\n"
-                + "1. Never invent stats, quests, items, locations, or NPCs for the player's character.\n"
-                + "2. If user state details (stats, inventory, etc.) are missing from GAME CONTEXT, call the correct tool. If tools return an error/disabled, explain that sharing is disabled or the player is logged out, but still provide general advice.\n"
-                + "3. Base player-specific advice on retrieved details; clarify when advice is a general recommendation.\n"
-                + "4. If location name is approximate, say so.\n"
-                + "5. For Ironman/UIM/GIM accounts, do not recommend invalid trading, Grand Exchange, or banking options.\n"
-                + "6. Respect disabled tools/errors. Keep all answers concise, practical, direct, and conversational. Never use markdown headings (such as # or ##) or bold titles that mimic headings. Avoid writing long unsolicited explanations, detailed lists, step-by-step guides, or future upgrade paths unless the user explicitly requests them.\n"
-                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, item stats/slots/hands, farming patch locations/types, skilling training methods, shop locations, shop stock, travel/teleportation options, locations of resources/resource nodes (such as specific trees, rocks/ores, fishing spots), and the locations of skilling activities/zones. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
-                + "8. Use tool result data to answer the user's original question. Do not change the conversation topic to unrelated tool outputs if they do not address the user's query.\n"
-                + "9. Never assume or state that a skilling/farming patch, dungeon, monster, NPC, shop, or resource node (e.g. specific trees like teaks/mahogany/redwood, rocks/ores, fishing spots) exists in a specific location unless you have verified it using the 'search_osrs_wiki' tool or it is explicitly mentioned in the GAME CONTEXT.\n"
-                + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item. For Ironman/UIM/GIM accounts, define the 'value' or 'expense' of items using their High Alchemy value (haPrice) rather than their Grand Exchange price (gePrice) because they cannot trade; prioritize and quote High Alchemy values for them when asked about value or the most expensive items (though you can mention the GE price as secondary info).\n"
-                + "11. When recommending travel routes, check the player's active spellbook in GAME CONTEXT. If they are on Ancients, Lunar, or Arceuus, remember they do NOT have access to standard spellbook teleports (e.g. Varrock, Falador, Lumbridge, Camelot, Ardougne teleports) unless they use teleport tablets, a portal chamber, or specific teleportation items (like Chronicle, Ring of wealth, Book of the dead). Do not recommend running massive distances across Gielinor when much closer vendors or options exist.\n"
-                + "12. Never assume or guess whether an item is one-handed or two-handed, or what equipment slot/stats it has. Always call the 'search_osrs_wiki' tool to verify an item's hands or slot details if not explicitly clear from the current game context.\n"
-                + "13. Never confidently assume or state that an item (especially unique, high-tier, or dragon/barrows/quest items) is useless or has no uses in clue scrolls, quests, or other activities. Always urge caution and advise the player to search the OSRS Wiki (or call 'search_osrs_wiki' yourself) before suggesting they alch, discard, sell, or destroy unique/rare/high-tier gear, as many obscure clue scroll steps (such as hard/elite/master emote clues or Falo the Bard) require specific items.\n"
-                + "14. If you have any doubt, lack verification from the wiki tool, or if the wiki search returns no results or lacks clear confirmation for a specific detail, state that you do not know or cannot verify the information, rather than guessing or relying on pre-trained memory. Do not make assertive statements about game features, requirements, locations, or mechanics unless they are explicitly backed up by a recent wiki tool result or the player's active GAME CONTEXT.\n"
-                + "15. Avoid mixing up RuneScape 3 (RS3) features, locations, items, or mechanics with Old School RuneScape (OSRS). They are different games with different maps and features. Verify everything using the OSRS-specific wiki tool.\n"
-                + "16. Strictly limit response length. Unless the user explicitly requests a long guide or detailed breakdown. Focus strictly on answering the immediate question asked.\n"
+                + "1. Never invent stats, quests, items, locations, or NPCs for the player.\n"
+                + "2. Keep answers concise, direct, practical, and conversational. Do not use markdown headings (# or ##).\n"
+                + "3. For Ironman/UIM/GIM accounts, value items by High Alchemy value (haPrice) rather than Grand Exchange price (gePrice), and do not suggest invalid GE trading.\n"
+                + "4. Base travel recommendations on the player's location, active spellbook, and inventory/equipment/bank teleportation items. Do not assume standard teleports if on Ancients/Lunar/Arceuus.\n"
+                + "5. Never assume obscure items are useless; advise checking wiki/clue steps before alching or destroying unique gear.\n"
+                + "6. Do not mix up RS3 features or mechanics with OSRS.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation

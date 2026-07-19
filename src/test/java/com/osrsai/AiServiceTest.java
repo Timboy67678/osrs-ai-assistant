@@ -94,14 +94,9 @@ public class AiServiceTest {
         Assert.assertTrue(prompt.contains("RECENT CONVERSATION"));
         Assert.assertTrue(prompt.contains("OSRS RuneLite assistant"));
         Assert.assertTrue(prompt.contains("Never invent stats"));
-        Assert.assertTrue(prompt.contains("farming patch"));
-        Assert.assertTrue(prompt.contains("Never assume or state that a skilling/farming patch"));
-        Assert.assertTrue(prompt.contains("Never guess, assume, or invent item prices"));
-        Assert.assertTrue(prompt.contains("High Alchemy values"));
+        Assert.assertTrue(prompt.contains("High Alchemy value"));
         Assert.assertTrue(prompt.contains("active spellbook"));
-        Assert.assertTrue(prompt.contains("travel/teleportation"));
-        Assert.assertTrue(prompt.contains("Book of the Dead"));
-        Assert.assertTrue(prompt.contains("one-handed or two-handed"));
+        Assert.assertTrue(prompt.contains("search_osrs_wiki"));
     }
 
     @Test
