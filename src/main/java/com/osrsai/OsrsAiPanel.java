@@ -20,7 +20,6 @@ import com.google.gson.reflect.TypeToken;
 
 public class OsrsAiPanel extends PluginPanel {
     private static final int MAX_PROMPT_MESSAGES = 6;
-    private static final String CONFIG_GROUP = "osrsai";
     private static final int MAX_SESSIONS = 15;
     private static final int MAX_MESSAGES_PER_SESSION = 50;
 
@@ -304,7 +303,7 @@ public class OsrsAiPanel extends PluginPanel {
 
     private void saveConfig(String key, Object value) {
         if (configManager != null) {
-            configManager.setConfiguration(CONFIG_GROUP, key, value);
+            configManager.setConfiguration(OsrsAiPlugin.CONFIG_GROUP, key, value);
         }
     }
 
@@ -313,7 +312,7 @@ public class OsrsAiPanel extends PluginPanel {
             return defaultValue;
         }
 
-        String raw = configManager.getConfiguration(CONFIG_GROUP, key);
+        String raw = configManager.getConfiguration(OsrsAiPlugin.CONFIG_GROUP, key);
         if (raw == null) {
             return defaultValue;
         }
@@ -417,7 +416,8 @@ public class OsrsAiPanel extends PluginPanel {
 
     private String formatInlineMarkdown(String text) {
         String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        html = html.replaceAll("`(.*?)`", "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
+        html = html.replaceAll("`(.*?)`",
+                "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");
         html = html.replaceAll("\\*(.*?)\\*", "<i>$1</i>");
         return html;
@@ -554,9 +554,9 @@ public class OsrsAiPanel extends PluginPanel {
                 updatingComboBox = false;
             }
             String json = gson.toJson(sessions);
-            configManager.setConfiguration(CONFIG_GROUP, "chat_sessions_v1", json);
+            configManager.setConfiguration(OsrsAiPlugin.CONFIG_GROUP, "chat_sessions_v1", json);
             if (activeSession != null) {
-                configManager.setConfiguration(CONFIG_GROUP, "active_session_id", activeSession.getId());
+                configManager.setConfiguration(OsrsAiPlugin.CONFIG_GROUP, "active_session_id", activeSession.getId());
             }
         }
     }
@@ -567,7 +567,7 @@ public class OsrsAiPanel extends PluginPanel {
             return;
         }
 
-        String json = configManager.getConfiguration(CONFIG_GROUP, "chat_sessions_v1");
+        String json = configManager.getConfiguration(OsrsAiPlugin.CONFIG_GROUP, "chat_sessions_v1");
 
         try {
             Type listType = new TypeToken<ArrayList<ChatSession>>() {
@@ -588,7 +588,7 @@ public class OsrsAiPanel extends PluginPanel {
             }
             updatingComboBox = false;
 
-            String activeId = configManager.getConfiguration(CONFIG_GROUP, "active_session_id");
+            String activeId = configManager.getConfiguration(OsrsAiPlugin.CONFIG_GROUP, "active_session_id");
             ChatSession toSelect = null;
             if (activeId != null) {
                 for (ChatSession s : sessions) {

@@ -67,7 +67,7 @@ public class AiService {
 
     // URI Constants
     private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
-    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions";
+    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
 
     private static final Map<Integer, String> CA_TIER_MAP = Map.of(
             3981, "Easy",
@@ -1589,6 +1589,7 @@ public class AiService {
         if (wikitext == null) {
             return "";
         }
+
         String clean = wikitext.replaceAll("(?s)<!--.*?-->", "");
         clean = clean.replaceAll("(?s)\\{\\|.*?\\|\\}", "");
         clean = clean.replaceAll("(?i)\\[\\[(File|Image|Category):.*?\\]\\]", "");
@@ -1622,7 +1623,7 @@ public class AiService {
                 + "- Call them when the player asks about stats, items, progress, combat achievements, boss kill counts (KC), or general goals/progression advice (query skills/quests/diaries/combat achievements first for tailored advice).\n"
                 + "- When asked about travel, reaching a destination, or teleportation, you MUST call the relevant inventory/equipment/bank tools to check if the player has teleportation items (such as Book of the Dead, Chronicle, teleport tablets, jewelry, runes) equipped, in inventory, or in their bank (if open) to tailor the travel route. Do not guess or assume their items.\n"
                 + "- Do not guess player details; call the relevant tools to check.\n"
-                + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item details (recipes, uses, equipment slots/hands, stats), slayer/quest requirements, farming patch locations/types/mechanics, skilling training methods, shop locations, shop stock, or travel/teleportation options. Do not guess these facts.\n"
+                + "- Always call the 'search_osrs_wiki' tool when asked about monster details (locations, weaknesses, drop rates), item details (recipes, uses, equipment slots/hands, stats), slayer/quest requirements, farming patch locations/types/mechanics, skilling training methods, locations of resources/resource nodes (such as specific trees, rocks/ores, fishing spots), shop locations, shop stock, or travel/teleportation options. Do not guess these facts.\n"
                 + "\n"
                 + "GROUNDING RULES:\n"
                 + "1. Never invent stats, quests, items, locations, or NPCs for the player's character.\n"
@@ -1630,14 +1631,17 @@ public class AiService {
                 + "3. Base player-specific advice on retrieved details; clarify when advice is a general recommendation.\n"
                 + "4. If location name is approximate, say so.\n"
                 + "5. For Ironman/UIM/GIM accounts, do not recommend invalid trading, Grand Exchange, or banking options.\n"
-                + "6. Respect disabled tools/errors and keep answers practical and concise. Avoid markdown headings.\n"
-                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, item stats/slots/hands, farming patch locations/types, skilling training methods, shop locations, shop stock, and travel/teleportation options. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
+                + "6. Respect disabled tools/errors. Keep all answers concise, practical, direct, and conversational. Never use markdown headings (such as # or ##) or bold titles that mimic headings. Avoid writing long unsolicited explanations, detailed lists, step-by-step guides, or future upgrade paths unless the user explicitly requests them.\n"
+                + "7. Treat OSRS WIKI REFERENCE as authoritative for mechanics, weaknesses, NPC details, requirements, item stats/slots/hands, farming patch locations/types, skilling training methods, shop locations, shop stock, travel/teleportation options, locations of resources/resource nodes (such as specific trees, rocks/ores, fishing spots), and the locations of skilling activities/zones. You MUST call the 'search_osrs_wiki' tool to verify these details rather than relying on your pre-trained memory, which may be outdated or incorrect.\n"
                 + "8. Use tool result data to answer the user's original question. Do not change the conversation topic to unrelated tool outputs if they do not address the user's query.\n"
-                + "9. Never assume or state that a skilling/farming patch, dungeon, monster, NPC, or shop exists in a specific location unless you have verified it using the 'search_osrs_wiki' tool or it is explicitly mentioned in the GAME CONTEXT.\n"
+                + "9. Never assume or state that a skilling/farming patch, dungeon, monster, NPC, shop, or resource node (e.g. specific trees like teaks/mahogany/redwood, rocks/ores, fishing spots) exists in a specific location unless you have verified it using the 'search_osrs_wiki' tool or it is explicitly mentioned in the GAME CONTEXT.\n"
                 + "10. Never guess, assume, or invent item prices or High Alchemy values (especially holiday items like partyhats or Santa hats, which are inexpensive/common in OSRS unlike RS3). Trust the prices and High Alchemy values (haPrice) provided in the tool outputs (such as bank/inventory tools), or call 'search_osrs_wiki' to find or verify the price of an item. For Ironman/UIM/GIM accounts, define the 'value' or 'expense' of items using their High Alchemy value (haPrice) rather than their Grand Exchange price (gePrice) because they cannot trade; prioritize and quote High Alchemy values for them when asked about value or the most expensive items (though you can mention the GE price as secondary info).\n"
                 + "11. When recommending travel routes, check the player's active spellbook in GAME CONTEXT. If they are on Ancients, Lunar, or Arceuus, remember they do NOT have access to standard spellbook teleports (e.g. Varrock, Falador, Lumbridge, Camelot, Ardougne teleports) unless they use teleport tablets, a portal chamber, or specific teleportation items (like Chronicle, Ring of wealth, Book of the dead). Do not recommend running massive distances across Gielinor when much closer vendors or options exist.\n"
                 + "12. Never assume or guess whether an item is one-handed or two-handed, or what equipment slot/stats it has. Always call the 'search_osrs_wiki' tool to verify an item's hands or slot details if not explicitly clear from the current game context.\n"
                 + "13. Never confidently assume or state that an item (especially unique, high-tier, or dragon/barrows/quest items) is useless or has no uses in clue scrolls, quests, or other activities. Always urge caution and advise the player to search the OSRS Wiki (or call 'search_osrs_wiki' yourself) before suggesting they alch, discard, sell, or destroy unique/rare/high-tier gear, as many obscure clue scroll steps (such as hard/elite/master emote clues or Falo the Bard) require specific items.\n"
+                + "14. If you have any doubt, lack verification from the wiki tool, or if the wiki search returns no results or lacks clear confirmation for a specific detail, state that you do not know or cannot verify the information, rather than guessing or relying on pre-trained memory. Do not make assertive statements about game features, requirements, locations, or mechanics unless they are explicitly backed up by a recent wiki tool result or the player's active GAME CONTEXT.\n"
+                + "15. Avoid mixing up RuneScape 3 (RS3) features, locations, items, or mechanics with Old School RuneScape (OSRS). They are different games with different maps and features. Verify everything using the OSRS-specific wiki tool.\n"
+                + "16. Strictly limit response length. Unless the user explicitly requests a long guide or detailed breakdown, keep your answers under 150 words. Focus strictly on answering the immediate question asked; do not offer unsolicited follow-up questions, multi-step suggestion paths, or detailed gear progress reviews.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation

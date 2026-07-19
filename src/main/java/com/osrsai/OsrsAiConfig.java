@@ -6,7 +6,7 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
 
-@ConfigGroup("osrsai")
+@ConfigGroup(OsrsAiPlugin.CONFIG_GROUP)
 public interface OsrsAiConfig extends Config {
         @ConfigSection(name = "API Settings", description = "Configure your AI provider and API keys. Note: Chat queries and selected game details are sent to external AI servers.", position = 0)
         String apiSection = "api";
@@ -19,7 +19,7 @@ public interface OsrsAiConfig extends Config {
 
         @ConfigItem(keyName = "aiProvider", name = "AI", description = "Select the AI brain to use.", position = 1, section = apiSection)
         default AiProvider aiProvider() {
-                return AiProvider.OPENAI;
+                return AiProvider.GROK_REASONING;
         }
 
         @ConfigItem(keyName = "apiKey", name = "API Key", description = "The API key for your selected provider. Kept secret, but used for external AI API communication.", position = 2, secret = true, section = apiSection)

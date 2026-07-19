@@ -5,6 +5,7 @@ public enum AiProvider {
     OPENAI("OpenAI GPT-4o", "gpt-4o"),
     CLAUDE("Anthropic Claude", "claude-3-5-sonnet-20240620"),
     GROK("Grok 4.3", "grok-4.3"),
+    GROK_REASONING("Grok 4.20 Reasoning", "grok-4.20-0309-reasoning"),
     CUSTOM("Custom", "custom");
 
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
@@ -39,6 +40,7 @@ public enum AiProvider {
             case CLAUDE:
                 return CLAUDE_HANDLER;
             case GROK:
+            case GROK_REASONING:
                 return GROK_HANDLER;
             case CUSTOM:
                 return new OpenAiProviderHandler(customEndpoint);
