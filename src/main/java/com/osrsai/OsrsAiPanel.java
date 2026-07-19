@@ -118,13 +118,19 @@ public class OsrsAiPanel extends PluginPanel {
 
         contentPanel.add(topBar, BorderLayout.NORTH);
 
-        chatArea = new JEditorPane();
+        chatArea = new JEditorPane() {
+            @Override
+            public boolean getScrollableTracksViewportWidth() {
+                return true;
+            }
+        };
         chatArea.setEditable(false);
         chatArea.setContentType("text/html");
         chatArea.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         chatArea.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, true); // Use inherited font
 
         JScrollPane scrollPane = new JScrollPane(chatArea);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         contentPanel.add(scrollPane, BorderLayout.CENTER);
 
         JPanel inputPanel = new JPanel();
@@ -416,6 +422,7 @@ public class OsrsAiPanel extends PluginPanel {
 
     private String formatInlineMarkdown(String text) {
         String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        html = html.replace("/", "/&#8203;");
         html = html.replaceAll("`(.*?)`",
                 "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");

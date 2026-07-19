@@ -338,6 +338,16 @@ public class AiServiceTest {
         Assert.assertEquals(200000000, strengthObj.get("xp").getAsInt());
         Assert.assertEquals(-1, strengthObj.get("nextLevelXp").getAsInt());
         Assert.assertEquals(0, strengthObj.get("xpToNextLevel").getAsInt());
+
+        // Test with filter parameter
+        com.google.gson.JsonObject argsWithFilter = new com.google.gson.JsonObject();
+        argsWithFilter.addProperty("skill", "attack");
+        String jsonResultFiltered = def.executor.execute(aiService, argsWithFilter);
+        System.out.println("Result of get_player_skills (filtered): " + jsonResultFiltered);
+        Assert.assertNotNull(jsonResultFiltered);
+        com.google.gson.JsonObject rootObjFiltered = new Gson().fromJson(jsonResultFiltered, com.google.gson.JsonObject.class);
+        Assert.assertTrue(rootObjFiltered.has("Attack"));
+        Assert.assertFalse(rootObjFiltered.has("Strength"));
     }
 
     @Test

@@ -600,8 +600,9 @@ public class AiService {
         List<ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new ToolDefinition("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted), experience (XP), next level threshold, and remaining experience for all skills.",
-                true, true, AiService::executeGetPlayerSkills));
+                "Retrieve the player's current levels (both real and boosted), experience (XP), next level threshold, and remaining experience for all skills or a specific filtered skill.",
+                true, true, AiService::executeGetPlayerSkills)
+                .addParam("skill", "string", "Optional skill name to filter strictly by (case-insensitive, e.g. 'Attack', 'Strength', 'Slayer'). If omitted, retrieves all skills.", false));
 
         registry.add(new ToolDefinition("get_player_inventory",
                 "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.",
@@ -668,8 +669,15 @@ public class AiService {
 
     private String executeGetPlayerSkills(JsonObject args) {
         JsonObject result = new JsonObject();
+        String filterSkill = (args != null && args.has("skill")) ? args.get("skill").getAsString().trim().toLowerCase() : null;
+
         for (Skill skill : Skill.values()) {
             if (!"OVERALL".equals(skill.name())) {
+                String skillName = skill.getName();
+                if (filterSkill != null && !skillName.toLowerCase().equals(filterSkill)) {
+                    continue;
+                }
+
                 JsonObject skillData = new JsonObject();
                 skillData.addProperty("boosted", client.getBoostedSkillLevel(skill));
                 skillData.addProperty("real", client.getRealSkillLevel(skill));
@@ -686,7 +694,7 @@ public class AiService {
                     skillData.addProperty("xpToNextLevel", 0);
                 }
 
-                result.add(skill.getName(), skillData);
+                result.add(skillName, skillData);
             }
         }
         return gson.toJson(result);
@@ -1641,7 +1649,7 @@ public class AiService {
                 + "13. Never confidently assume or state that an item (especially unique, high-tier, or dragon/barrows/quest items) is useless or has no uses in clue scrolls, quests, or other activities. Always urge caution and advise the player to search the OSRS Wiki (or call 'search_osrs_wiki' yourself) before suggesting they alch, discard, sell, or destroy unique/rare/high-tier gear, as many obscure clue scroll steps (such as hard/elite/master emote clues or Falo the Bard) require specific items.\n"
                 + "14. If you have any doubt, lack verification from the wiki tool, or if the wiki search returns no results or lacks clear confirmation for a specific detail, state that you do not know or cannot verify the information, rather than guessing or relying on pre-trained memory. Do not make assertive statements about game features, requirements, locations, or mechanics unless they are explicitly backed up by a recent wiki tool result or the player's active GAME CONTEXT.\n"
                 + "15. Avoid mixing up RuneScape 3 (RS3) features, locations, items, or mechanics with Old School RuneScape (OSRS). They are different games with different maps and features. Verify everything using the OSRS-specific wiki tool.\n"
-                + "16. Strictly limit response length. Unless the user explicitly requests a long guide or detailed breakdown, keep your answers under 150 words. Focus strictly on answering the immediate question asked; do not offer unsolicited follow-up questions, multi-step suggestion paths, or detailed gear progress reviews.\n"
+                + "16. Strictly limit response length. Unless the user explicitly requests a long guide or detailed breakdown. Focus strictly on answering the immediate question asked.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation
