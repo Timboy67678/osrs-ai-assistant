@@ -100,6 +100,18 @@ If you’re contributing or running locally for development:
 
 ---
 
+## 🤖 AI Disclosure & Development Notes
+
+This project was built entirely by **Google Antigravity AI**, an agentic coding assistant developed by the Google DeepMind team. 
+
+- **Primary Developer:** Google Antigravity AI (via autonomous execution loops)
+- **Collaboration Model:** Pair programming with @Timboy67678
+- **Core Technology:** DeepMind Gemini Models and advanced software agent toolkits
+
+Every component in this repository—including the RuneLite plugin configuration interface, the Swing UI panels, thread management, dynamic OSRS Wiki context resolvers, and the Gradle build configuration—was structured, written, and refactored by the AI assistant. 
+
+---
+
 ## 📄 License
 
 This project is licensed under the BSD 2-Clause License - see the [LICENSE](LICENSE) file for details.
