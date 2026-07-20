@@ -1399,18 +1399,22 @@ public class AiService {
         return client.getTopLevelWorldView() != null && client.getTopLevelWorldView().isInstance();
     }
 
+    @SuppressWarnings("unused")
     private String executeWikiSearch(String query) {
         return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
     }
 
+    @SuppressWarnings("unused")
     private String describeAccountType(Integer accountTypeVarbit) {
         return PromptUtils.describeAccountType(accountTypeVarbit);
     }
 
+    @SuppressWarnings("unused")
     private String describeSpellbook(int val) {
         return PromptUtils.describeSpellbook(val);
     }
 
+    @SuppressWarnings("unused")
     private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
         return ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, container, filter, minValue);
     }

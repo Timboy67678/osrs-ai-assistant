@@ -70,8 +70,6 @@ Open **RuneLite Settings (wrench icon)**, search for **OSRS AI Assistant**, then
 Installation is supported via the **RuneLite Plugin Hub** only.
 
 - **Plugin Hub listing: TBA**
-- Manual/local installation instructions have been removed.
-
 ---
 
 ## 🧪 Development
