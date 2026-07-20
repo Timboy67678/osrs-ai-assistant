@@ -1391,9 +1391,11 @@ public class AiService {
     }
 
     private boolean isInInstance(Player localPlayer) {
-        WorldView worldView = localPlayer.getWorldView();
-        if (worldView != null) {
-            return worldView.isInstance();
+        if (localPlayer != null) {
+            WorldView worldView = localPlayer.getWorldView();
+            if (worldView != null) {
+                return worldView.isInstance();
+            }
         }
 
         return client.getTopLevelWorldView() != null && client.getTopLevelWorldView().isInstance();
@@ -1420,6 +1422,9 @@ public class AiService {
     }
 
     private InstanceTemplates getInstanceTemplate(Player localPlayer, WorldPoint worldPoint) {
+        if (localPlayer == null) {
+            return null;
+        }
         WorldView worldView = localPlayer.getWorldView();
         if (worldView == null || !worldView.isInstance()) {
             return null;

@@ -127,6 +127,7 @@ public class OsrsAiPanel extends PluginPanel {
         chatArea.setEditable(false);
         chatArea.setContentType("text/html");
         chatArea.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        chatArea.setBorder(new EmptyBorder(5, 5, 5, 5));
         chatArea.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, true); // Use inherited font
 
         JScrollPane scrollPane = new JScrollPane(chatArea);
@@ -423,6 +424,7 @@ public class OsrsAiPanel extends PluginPanel {
     private String formatInlineMarkdown(String text) {
         String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
         html = html.replace("/", "/&#8203;");
+        html = html.replace("—", "—&#8203;");
         html = html.replaceAll("`(.*?)`",
                 "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");
@@ -482,7 +484,7 @@ public class OsrsAiPanel extends PluginPanel {
                 .append("</div>");
 
         SwingUtilities.invokeLater(() -> {
-            chatArea.setText("<html><body style='color:white; font-family: sans-serif; font-size: 11px; padding: 5px;'>"
+            chatArea.setText("<html><body style='color:white; font-family: sans-serif; font-size: 11px; margin: 0; padding: 0;'>"
                     + chatHistory.toString() + "</body></html>");
             chatArea.setCaretPosition(chatArea.getDocument().getLength());
         });
@@ -654,7 +656,7 @@ public class OsrsAiPanel extends PluginPanel {
         }
 
         SwingUtilities.invokeLater(() -> {
-            chatArea.setText("<html><body style='color:white; font-family: sans-serif; font-size: 11px; padding: 5px;'>"
+            chatArea.setText("<html><body style='color:white; font-family: sans-serif; font-size: 11px; margin: 0; padding: 0;'>"
                     + chatHistory.toString() + "</body></html>");
             chatArea.setCaretPosition(chatArea.getDocument().getLength());
         });
