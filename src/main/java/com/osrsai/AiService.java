@@ -44,7 +44,6 @@ import javax.swing.SwingUtilities;
 
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -53,31 +52,52 @@ import org.jetbrains.annotations.NotNull;
 
 @Slf4j
 public class AiService {
-    // User Agent String
-    private static final String OSRS_AI_USER_AGENT = "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant";
-
-    // Template Removal Constants
-    private static final int MAX_TEMPLATE_REMOVALS = 5;
+    // URI Constants
+    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
 
     // Global Constants
     static final int MAX_DEPTH_COUNT = 10;
 
-    // Token Constants
-    private static final int MAX_CONTEXT_CHARACTERS = 8000;
-    private static final int MAX_RECENT_CONVERSATION_CHARS = 1200;
-    private static final int WIKI_EXTRACT_CHARS = 2500;
+    // Game Varbits & Varplayer (Varp) IDs
+    private static final int VARBIT_SPELLBOOK = 4070;
+    private static final int VARBIT_TITHE_FARM_POINTS = 4893;
+    private static final int VARBIT_WILDERNESS_LEVEL = 5963;
+    private static final int VARP_SPECIAL_ATTACK_PERCENT = 300;
+    private static final int VARP_NMZ_REWARD_POINTS = 1056;
+    private static final int VARP_PEST_CONTROL_POINTS = 261;
+    private static final int POISON_VENOM_THRESHOLD = 1000000;
 
-    // URI Constants
-    private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
-    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
+    // Combat Achievement Enums & Struct Parameters
+    private static final int CA_BOSS_ENUM = 3971;
+    private static final int CA_TIER_EASY_ENUM = 3981;
+    private static final int CA_TIER_MEDIUM_ENUM = 3982;
+    private static final int CA_TIER_HARD_ENUM = 3983;
+    private static final int CA_TIER_ELITE_ENUM = 3984;
+    private static final int CA_TIER_MASTER_ENUM = 3985;
+    private static final int CA_TIER_GRANDMASTER_ENUM = 3986;
+
+    private static final int CA_STRUCT_PARAM_TASK_ID = 1306;
+    private static final int CA_STRUCT_PARAM_NAME = 1308;
+    private static final int CA_STRUCT_PARAM_DESCRIPTION = 1309;
+    private static final int CA_STRUCT_PARAM_TYPE = 1311;
+    private static final int CA_STRUCT_PARAM_BOSS_ID = 1312;
+
+    // Currency & Activity Item IDs
+    private static final int ITEM_ID_MARK_OF_GRACE = 11849;
+    private static final int ITEM_ID_GOLDEN_NUGGET = 12012;
+    private static final int ITEM_ID_ABYSSAL_PEARL = 26884;
+    private static final int ITEM_ID_TOKKUL = 6529;
+    private static final int ITEM_ID_STARDUST = 25527;
+    private static final int ITEM_ID_ARCHERY_TICKET = 1464;
+    private static final int ITEM_ID_MERMAIDS_TEAR = 27433;
 
     private static final Map<Integer, String> CA_TIER_MAP = Map.of(
-            3981, "Easy",
-            3982, "Medium",
-            3983, "Hard",
-            3984, "Elite",
-            3985, "Master",
-            3986, "Grandmaster");
+            CA_TIER_EASY_ENUM, "Easy",
+            CA_TIER_MEDIUM_ENUM, "Medium",
+            CA_TIER_HARD_ENUM, "Hard",
+            CA_TIER_ELITE_ENUM, "Elite",
+            CA_TIER_MASTER_ENUM, "Master",
+            CA_TIER_GRANDMASTER_ENUM, "Grandmaster");
 
     private static final Map<Integer, String> CA_TYPE_MAP = Map.of(
             1, "Stamina",
@@ -163,9 +183,6 @@ public class AiService {
 
         panel.setThinking(true);
         try {
-            // Retrieve recent conversation context on the EDT (current thread) to avoid
-            // thread-safety violations when copying/iterating over panel.recentMessages on
-            // the client thread.
             String recentConversation = panel.getRecentConversationContext(question);
 
             clientThread.invokeLater(() -> {
@@ -271,7 +288,6 @@ public class AiService {
                     log.info("Received response from AI provider {}: {}", provider, responseBody);
                     JsonObject root = gson.fromJson(responseBody, JsonObject.class);
 
-                    // Check for tool calls
                     boolean hasToolCalls = false;
                     List<ToolCall> toolCalls = new ArrayList<>();
 
@@ -292,21 +308,16 @@ public class AiService {
                                 return;
                             }
 
-                            // Update request body with tool calls and results
                             handler.updateRequestWithToolResults(requestBody, root, results);
 
-                            // If the next request will be the final depth, remove the tools object so the
-                            // model must return text
                             if (depth + 1 >= maxDepth) {
                                 requestBody.remove("tools");
                             }
 
-                            // Send updated request recursively
                             executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, depth + 1,
                                     panel);
                         });
                     } else {
-                        // Normal text response
                         String aiResponseText = handler.extractResponseText(root);
                         String cleanResponse = aiResponseText.trim();
 
@@ -319,7 +330,7 @@ public class AiService {
                             panel.setThinking(false);
                             panel.addMessage("AI", finalResponse);
                             if (config.notifyOnResponse() && !finalResponse.isEmpty()) {
-                                notifier.notify("AI Assistant: " + truncateForNotification(finalResponse));
+                                notifier.notify("AI Assistant: " + PromptUtils.truncateForNotification(finalResponse));
                                 clientThread.invokeLater(
                                         () -> client.playSoundEffect(SoundEffectID.GE_ADD_OFFER_DINGALING));
                             }
@@ -355,7 +366,6 @@ public class AiService {
 
                     String output;
                     if (def.runOnClientThread) {
-                        // Client-thread bound tools
                         final String[] clientThreadResult = new String[1];
                         final Throwable[] clientThreadError = new Throwable[1];
                         CompletableFuture<Void> clientFuture = new CompletableFuture<>();
@@ -368,13 +378,12 @@ public class AiService {
                                 clientFuture.completeExceptionally(t);
                             }
                         });
-                        clientFuture.join(); // wait for client thread to finish
+                        clientFuture.join();
                         if (clientThreadError[0] != null) {
                             throw new Exception(clientThreadError[0]);
                         }
                         output = clientThreadResult[0];
                     } else {
-                        // Background-thread/network tools
                         output = def.executor.execute(this, tc.args);
                     }
                     log.info("Tool {} returned result length: {}", tc.name, output.length());
@@ -392,164 +401,23 @@ public class AiService {
         return future;
     }
 
-    private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
-        JsonObject result = new JsonObject();
-        Map<String, Long> quantities = new LinkedHashMap<>();
-        Map<String, Integer> itemIds = new HashMap<>();
-        Map<String, Integer> itemHaPrices = new HashMap<>();
+    public static class ToolCall {
+        public final String id;
+        public final String name;
+        public final JsonObject args;
 
-        String search = (filter != null) ? filter.trim().toLowerCase() : null;
-        String[] tokens = null;
-        if (search != null) {
-            tokens = search.split("\\s+or\\s+|\\s*,\\s*|\\s*\\|\\s*");
-        }
-        boolean isIron = isIronman();
-
-        for (Item item : container.getItems()) {
-            if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
-                continue;
-            }
-            net.runelite.api.ItemComposition comp = null;
-            if (itemManager != null) {
-                try {
-                    comp = itemManager.getItemComposition(item.getId());
-                } catch (Exception ignored) {
-                }
-            }
-            if (comp != null && comp.getPlaceholderTemplateId() != -1) {
-                continue;
-            }
-            String itemName = (comp != null && comp.getName() != null && !comp.getName().trim().isEmpty())
-                    ? comp.getName()
-                    : "Item " + item.getId();
-
-            // Apply name filter if present
-            if (tokens != null && tokens.length > 0) {
-                boolean matchesAnyOrGroup = false;
-                for (String orGroup : tokens) {
-                    String cleanGroup = orGroup.trim();
-                    if (cleanGroup.isEmpty()) {
-                        continue;
-                    }
-
-                    // Split the OR group by " and " or "&" to find all AND tokens
-                    String[] andTokens = cleanGroup.split("\\s+and\\s+|\\s*&\\s*");
-                    boolean matchesAllAndTokens = true;
-                    for (String andToken : andTokens) {
-                        String cleanAndToken = andToken.trim();
-                        if (!cleanAndToken.isEmpty() && !itemName.toLowerCase().contains(cleanAndToken)) {
-                            matchesAllAndTokens = false;
-                            break;
-                        }
-                    }
-
-                    if (matchesAllAndTokens) {
-                        matchesAnyOrGroup = true;
-                        break;
-                    }
-                }
-                if (!matchesAnyOrGroup) {
-                    continue;
-                }
-            }
-
-            quantities.put(itemName, quantities.getOrDefault(itemName, 0L) + item.getQuantity());
-            itemIds.putIfAbsent(itemName, item.getId());
-            itemHaPrices.putIfAbsent(itemName, comp != null ? comp.getHaPrice() : 0);
-        }
-
-        // Help sort items by total stack value
-        class BankItem {
-            final String name;
-            final long qty;
-            final int gePrice;
-            final int haPrice;
-            final long totalSortVal;
-
-            BankItem(String name, long qty, int gePrice, int haPrice) {
-                this.name = name;
-                this.qty = qty;
-                this.gePrice = gePrice;
-                this.haPrice = haPrice;
-                long unitPrice = isIron ? haPrice : gePrice;
-                this.totalSortVal = unitPrice * qty;
-            }
-        }
-
-        List<BankItem> list = new ArrayList<>();
-        for (Map.Entry<String, Long> entry : quantities.entrySet()) {
-            String name = entry.getKey();
-            long qty = entry.getValue();
-            int itemId = itemIds.get(name);
-            int price = 0;
-            if (itemManager != null) {
-                try {
-                    price = itemManager.getItemPrice(itemId);
-                } catch (Exception e) {
-                }
-            }
-            if (price <= 0 && "Coins".equals(name)) {
-                price = 1;
-            }
-            int haPrice = itemHaPrices.getOrDefault(name, 0);
-
-            // Apply minimum value filter if present based on account type preference
-            int checkVal = isIron ? haPrice : price;
-            if (minValue > 0 && checkVal < minValue) {
-                continue;
-            }
-
-            list.add(new BankItem(name, qty, price, haPrice));
-        }
-
-        // Sort by totalSortVal descending
-        list.sort((a, b) -> Long.compare(b.totalSortVal, a.totalSortVal));
-
-        // Limit unfiltered container output to top 100 items to conserve tokens
-        int limit = (search == null) ? 100 : Integer.MAX_VALUE;
-        int count = 0;
-        for (BankItem bi : list) {
-            if (count >= limit) {
-                break;
-            }
-            JsonObject detail = new JsonObject();
-            detail.addProperty("id", itemIds.get(bi.name));
-            detail.addProperty("qty", bi.qty);
-            detail.addProperty("gePrice", bi.gePrice);
-            detail.addProperty("haPrice", bi.haPrice);
-            result.add(bi.name, detail);
-            count++;
-        }
-
-        return result;
-    }
-
-    private boolean isIronman() {
-        try {
-            int accountType = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
-            return accountType >= 1 && accountType <= 6;
-        } catch (Exception ex) {
-            return false;
-        }
-    }
-
-    static class ToolCall {
-        final String id;
-        final String name;
-        final JsonObject args;
-
-        ToolCall(String id, String name, JsonObject args) {
+        public ToolCall(String id, String name, JsonObject args) {
             this.id = id;
             this.name = name;
             this.args = args;
         }
     }
 
-    static class ToolResult {
-        final ToolCall call;
-        final String resultJson;
+    public static class ToolResult {
+        public final ToolCall call;
+        public final String resultJson;
 
-        ToolResult(ToolCall call, String resultJson) {
+        public ToolResult(ToolCall call, String resultJson) {
             this.call = call;
             this.resultJson = resultJson;
         }
@@ -557,7 +425,7 @@ public class AiService {
 
     public static class ToolParameter {
         public final String name;
-        public final String type; // "string", "integer", "array_string", "array_integer"
+        public final String type;
         public final String description;
         public final boolean required;
 
@@ -598,88 +466,7 @@ public class AiService {
     }
 
     public static List<ToolDefinition> getToolRegistry() {
-        List<ToolDefinition> registry = new ArrayList<>();
-
-        registry.add(new ToolDefinition("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted), experience (XP), next level threshold, and remaining experience for all skills or a specific filtered skill.",
-                true, true, AiService::executeGetPlayerSkills)
-                .addParam("skill", "string", "Optional skill name to filter strictly by (case-insensitive, e.g. 'Attack', 'Strength', 'Slayer'). If omitted, retrieves all skills.", false));
-
-        registry.add(new ToolDefinition("get_player_inventory",
-                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.",
-                true, true, AiService::executeGetPlayerInventory));
-
-        registry.add(new ToolDefinition("get_player_equipment",
-                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player.",
-                true, true, AiService::executeGetPlayerEquipment));
-
-        registry.add(new ToolDefinition("get_player_slayer_task",
-                "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak.",
-                true, true, AiService::executeGetPlayerSlayerTask));
-
-        registry.add(new ToolDefinition("get_player_quests",
-                "Retrieve the player's quest points, completed quest count, and lists of in-progress, not started, or completed quests.",
-                true, true, AiService::executeGetPlayerQuests)
-                .addParam("status", "string",
-                        "Optional quest status filter: 'IN_PROGRESS' (default), 'NOT_STARTED', 'COMPLETED', or 'ALL'.", false));
-
-        registry.add(new ToolDefinition("get_player_status",
-                "Retrieve the player's current combat and vital status, including Special Attack energy %, active prayers, poison/venom state, run energy, and HP/Prayer values.",
-                true, true, AiService::executeGetPlayerStatus));
-
-        registry.add(new ToolDefinition("get_player_currencies_and_points",
-                "Retrieve the player's minigame reward points, currencies, tickets, and tokens (e.g. NMZ points, Pest Control commends, Tithe Farm points, Golden Nuggets, Abyssal Pearls, Marks of Grace, Slayer points, Archery tickets).",
-                true, true, AiService::executeGetPlayerCurrenciesAndPoints));
-
-        registry.add(new ToolDefinition("get_player_location_details",
-                "Retrieve detailed information about the player's location, including Wilderness level, multi-combat status, instanced area status, world types (PvP, Members, High Risk), and region ID.",
-                true, true, AiService::executeGetPlayerLocationDetails));
-
-        registry.add(new ToolDefinition("get_player_achievement_diaries",
-                "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).",
-                true, true, AiService::executeGetPlayerAchievementDiaries));
-
-        registry.add(new ToolDefinition("get_player_bank",
-                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
-                true, true, AiService::executeGetPlayerBank)
-                .addParam("filter", "string",
-                        "Optional search query to filter bank items strictly by item name substring (case-insensitive, e.g. 'bar' or 'ore'). Do NOT filter by skill or category name (e.g. do NOT use 'crafting' as a filter).",
-                        false)
-                .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
-
-        registry.add(new ToolDefinition("get_item_stats",
-                "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.",
-                true, true, AiService::executeGetItemStats)
-                .addParam("itemIds", "array_integer", "Optional list of OSRS item IDs to retrieve stats for.", false)
-                .addParam("itemNames", "array_string",
-                        "Optional list of item names to search for in containers and retrieve stats.", false));
-
-        registry.add(new ToolDefinition("get_player_clues",
-                "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.",
-                true, true, AiService::executeGetPlayerClues));
-
-        registry.add(new ToolDefinition("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.",
-                false, false, AiService::executeSearchOsrsWiki)
-                .addParam("query", "string",
-                        "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",
-                        true));
-
-        registry.add(new ToolDefinition("get_player_combat_achievements",
-                "Retrieve the player's Combat Achievement tier completion status (Easy, Medium, Hard, Elite, Master, Grandmaster) and boss/activity kill counts (KC).",
-                true, true, AiService::executeGetPlayerCombatAchievements)
-                .addParam("tier", "string",
-                        "Optional. Filter individual tasks strictly by tier (case-insensitive: 'Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster').",
-                        false)
-                .addParam("boss", "string",
-                        "Optional. Filter individual tasks by boss/monster name substring (case-insensitive, e.g. 'barrows' or 'zulrah').",
-                        false)
-                .addParam("completed", "boolean", "Optional. Filter individual tasks by completion status.", false)
-                .addParam("taskName", "string",
-                        "Optional. Filter individual tasks strictly by task name substring (case-insensitive, e.g. 'noxious foe' or 'barrows novice').",
-                        false));
-
-        return registry;
+        return OsrsToolRegistry.getToolRegistry();
     }
 
     private String normalizeSkillName(String input) {
@@ -735,7 +522,7 @@ public class AiService {
     }
 
     private void addMilestoneXp(JsonObject skillData, int currentXp) {
-        int[] milestones = {50, 60, 70, 80, 90, 99};
+        int[] milestones = { 50, 60, 70, 80, 90, 99 };
         for (int level : milestones) {
             int targetXp = Experience.getXpForLevel(level);
             if (currentXp < targetXp) {
@@ -744,9 +531,10 @@ public class AiService {
         }
     }
 
-    private String executeGetPlayerSkills(JsonObject args) {
+    String executeGetPlayerSkills(JsonObject args) {
         JsonObject result = new JsonObject();
-        String filterSkill = (args != null && args.has("skill")) ? normalizeSkillName(args.get("skill").getAsString()) : null;
+        String filterSkill = (args != null && args.has("skill")) ? normalizeSkillName(args.get("skill").getAsString())
+                : null;
 
         for (Skill skill : Skill.values()) {
             if (!"OVERALL".equals(skill.name())) {
@@ -779,18 +567,18 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerInventory(JsonObject args) {
+    String executeGetPlayerInventory(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject invItems = new JsonObject();
         ItemContainer invContainer = client.getItemContainer(InventoryID.INVENTORY);
         if (invContainer != null) {
-            invItems = aggregateItemsWithPrices(invContainer, null, 0);
+            invItems = ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, invContainer, null, 0);
         }
         result.add("items", invItems);
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerEquipment(JsonObject args) {
+    String executeGetPlayerEquipment(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject eqSlots = new JsonObject();
         ItemContainer eqContainer = client.getItemContainer(InventoryID.EQUIPMENT);
@@ -812,7 +600,7 @@ public class AiService {
                         ? comp.getName()
                         : "Item " + item.getId();
 
-                String slotName = getSlotName(i);
+                String slotName = ItemContainerUtils.getSlotName(i);
                 JsonObject itemDetail = new JsonObject();
                 itemDetail.addProperty("id", item.getId());
                 itemDetail.addProperty("name", itemName);
@@ -841,21 +629,36 @@ public class AiService {
                             || eq.getMdmg() != 0 || eq.getPrayer() != 0;
                     if (hasCombatStats) {
                         JsonObject statsObj = new JsonObject();
-                        if (eq.getAstab() != 0) statsObj.addProperty("astab", eq.getAstab());
-                        if (eq.getAslash() != 0) statsObj.addProperty("aslash", eq.getAslash());
-                        if (eq.getAcrush() != 0) statsObj.addProperty("ascrush", eq.getAcrush());
-                        if (eq.getAmagic() != 0) statsObj.addProperty("asmagic", eq.getAmagic());
-                        if (eq.getArange() != 0) statsObj.addProperty("asrange", eq.getArange());
-                        if (eq.getDstab() != 0) statsObj.addProperty("dstab", eq.getDstab());
-                        if (eq.getDslash() != 0) statsObj.addProperty("dslash", eq.getDslash());
-                        if (eq.getDcrush() != 0) statsObj.addProperty("dcrush", eq.getDcrush());
-                        if (eq.getDmagic() != 0) statsObj.addProperty("dmagic", eq.getDmagic());
-                        if (eq.getDrange() != 0) statsObj.addProperty("drange", eq.getDrange());
-                        if (eq.getStr() != 0) statsObj.addProperty("str", eq.getStr());
-                        if (eq.getRstr() != 0) statsObj.addProperty("rstr", eq.getRstr());
-                        if (eq.getMdmg() != 0) statsObj.addProperty("mdmg", eq.getMdmg());
-                        if (eq.getPrayer() != 0) statsObj.addProperty("prayer", eq.getPrayer());
-                        if (eq.getAspeed() != 0) statsObj.addProperty("aspeed", eq.getAspeed());
+                        if (eq.getAstab() != 0)
+                            statsObj.addProperty("astab", eq.getAstab());
+                        if (eq.getAslash() != 0)
+                            statsObj.addProperty("aslash", eq.getAslash());
+                        if (eq.getAcrush() != 0)
+                            statsObj.addProperty("ascrush", eq.getAcrush());
+                        if (eq.getAmagic() != 0)
+                            statsObj.addProperty("asmagic", eq.getAmagic());
+                        if (eq.getArange() != 0)
+                            statsObj.addProperty("asrange", eq.getArange());
+                        if (eq.getDstab() != 0)
+                            statsObj.addProperty("dstab", eq.getDstab());
+                        if (eq.getDslash() != 0)
+                            statsObj.addProperty("dslash", eq.getDslash());
+                        if (eq.getDcrush() != 0)
+                            statsObj.addProperty("dcrush", eq.getDcrush());
+                        if (eq.getDmagic() != 0)
+                            statsObj.addProperty("dmagic", eq.getDmagic());
+                        if (eq.getDrange() != 0)
+                            statsObj.addProperty("drange", eq.getDrange());
+                        if (eq.getStr() != 0)
+                            statsObj.addProperty("str", eq.getStr());
+                        if (eq.getRstr() != 0)
+                            statsObj.addProperty("rstr", eq.getRstr());
+                        if (eq.getMdmg() != 0)
+                            statsObj.addProperty("mdmg", eq.getMdmg());
+                        if (eq.getPrayer() != 0)
+                            statsObj.addProperty("prayer", eq.getPrayer());
+                        if (eq.getAspeed() != 0)
+                            statsObj.addProperty("aspeed", eq.getAspeed());
                         itemDetail.add("stats", statsObj);
                     }
                 }
@@ -866,7 +669,7 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerSlayerTask(JsonObject args) {
+    String executeGetPlayerSlayerTask(JsonObject args) {
         JsonObject result = new JsonObject();
         String taskName = configManager.getRSProfileConfiguration("slayer", "taskName");
         if (taskName == null || taskName.isEmpty()) {
@@ -910,7 +713,7 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerQuests(JsonObject args) {
+    String executeGetPlayerQuests(JsonObject args) {
         JsonObject result = new JsonObject();
         int qp = client.getVarpValue(VarPlayerID.QP);
         result.addProperty("questPoints", qp);
@@ -928,8 +731,10 @@ public class AiService {
         JsonArray notStarted = new JsonArray();
 
         boolean includeCompleted = "COMPLETED".equals(statusFilter) || "ALL".equals(statusFilter);
-        boolean includeInProgress = "DEFAULT".equals(statusFilter) || "IN_PROGRESS".equals(statusFilter) || "ALL".equals(statusFilter);
-        boolean includeNotStarted = "DEFAULT".equals(statusFilter) || "NOT_STARTED".equals(statusFilter) || "ALL".equals(statusFilter);
+        boolean includeInProgress = "DEFAULT".equals(statusFilter) || "IN_PROGRESS".equals(statusFilter)
+                || "ALL".equals(statusFilter);
+        boolean includeNotStarted = "DEFAULT".equals(statusFilter) || "NOT_STARTED".equals(statusFilter)
+                || "ALL".equals(statusFilter);
 
         for (Quest quest : Quest.values()) {
             QuestState state = quest.getState(client);
@@ -968,7 +773,7 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerAchievementDiaries(JsonObject args) {
+    String executeGetPlayerAchievementDiaries(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject diaries = new JsonObject();
         diaries.add("Ardougne", createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM,
@@ -1000,7 +805,7 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerCombatAchievements(JsonObject args) {
+    String executeGetPlayerCombatAchievements(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject tiers = new JsonObject();
         tiers.addProperty("Easy", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_EASY));
@@ -1046,7 +851,7 @@ public class AiService {
 
         if (hasFilters) {
             JsonArray tasks = new JsonArray();
-            net.runelite.api.EnumComposition bossEnum = client.getEnum(3971);
+            net.runelite.api.EnumComposition bossEnum = client.getEnum(CA_BOSS_ENUM);
 
             for (Map.Entry<Integer, String> tierEntry : CA_TIER_MAP.entrySet()) {
                 int enumId = tierEntry.getKey();
@@ -1068,12 +873,12 @@ public class AiService {
                         continue;
                     }
 
-                    String name = struct.getStringValue(1308);
-                    String description = struct.getStringValue(1309);
-                    int id = struct.getIntValue(1306);
-                    int typeId = struct.getIntValue(1311);
+                    String name = struct.getStringValue(CA_STRUCT_PARAM_NAME);
+                    String description = struct.getStringValue(CA_STRUCT_PARAM_DESCRIPTION);
+                    int id = struct.getIntValue(CA_STRUCT_PARAM_TASK_ID);
+                    int typeId = struct.getIntValue(CA_STRUCT_PARAM_TYPE);
                     String type = CA_TYPE_MAP.get(typeId);
-                    int bossId = struct.getIntValue(1312);
+                    int bossId = struct.getIntValue(CA_STRUCT_PARAM_BOSS_ID);
                     String bossName = getBossName(bossEnum, bossId);
 
                     boolean completed = false;
@@ -1138,7 +943,7 @@ public class AiService {
         }
     }
 
-    private String executeGetPlayerBank(JsonObject args) {
+    String executeGetPlayerBank(JsonObject args) {
         JsonObject result = new JsonObject();
         ItemContainer bankContainer = client.getItemContainer(InventoryID.BANK);
         if (bankContainer == null || bankContainer.getItems().length == 0) {
@@ -1153,12 +958,13 @@ public class AiService {
             if (filter != null) {
                 result.addProperty("filterApplied", filter);
             }
-            result.add("items", aggregateItemsWithPrices(bankContainer, filter, minValue));
+            result.add("items",
+                    ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, bankContainer, filter, minValue));
         }
         return gson.toJson(result);
     }
 
-    private String executeGetItemStats(JsonObject args) {
+    String executeGetItemStats(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject itemsStats = new JsonObject();
         if (args != null) {
@@ -1166,16 +972,16 @@ public class AiService {
                 JsonArray ids = args.getAsJsonArray("itemIds");
                 for (int i = 0; i < ids.size(); i++) {
                     int itemId = ids.get(i).getAsInt();
-                    itemsStats.add(String.valueOf(itemId), buildItemStatsJson(itemId));
+                    itemsStats.add(String.valueOf(itemId), ItemContainerUtils.buildItemStatsJson(itemManager, itemId));
                 }
             }
             if (args.has("itemNames")) {
                 JsonArray names = args.getAsJsonArray("itemNames");
                 for (int i = 0; i < names.size(); i++) {
                     String itemName = names.get(i).getAsString();
-                    Integer itemId = findItemIdInContainers(itemName);
+                    Integer itemId = ItemContainerUtils.findItemIdInContainers(client, itemManager, itemName);
                     if (itemId != null) {
-                        itemsStats.add(itemName, buildItemStatsJson(itemId));
+                        itemsStats.add(itemName, ItemContainerUtils.buildItemStatsJson(itemManager, itemId));
                     } else {
                         JsonObject errorObj = new JsonObject();
                         errorObj.addProperty("error", "Item not found in equipment, inventory, or bank.");
@@ -1188,9 +994,8 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerClues(JsonObject args) throws Exception {
+    String executeGetPlayerClues(JsonObject args) throws Exception {
         JsonObject result = new JsonObject();
-        // 1. Scan for clue items in inventory
         JsonArray invClueItems = new JsonArray();
         ItemContainer invCont = client.getItemContainer(InventoryID.INVENTORY);
         if (invCont != null) {
@@ -1211,7 +1016,6 @@ public class AiService {
         }
         result.add("inventoryClues", invClueItems);
 
-        // 2. Scan for clue items in bank
         JsonArray bankClueItems = new JsonArray();
         ItemContainer bankCont = client.getItemContainer(InventoryID.BANK);
         if (bankCont != null) {
@@ -1232,7 +1036,6 @@ public class AiService {
         }
         result.add("bankClues", bankClueItems);
 
-        // 3. Locate ClueScrollPlugin via PluginManager
         JsonObject activeClueObj = new JsonObject();
         activeClueObj.addProperty("status", "No active clue scroll detected");
         boolean foundPlugin = false;
@@ -1250,7 +1053,6 @@ public class AiService {
                                 activeClueObj.addProperty("status", "Active clue scroll detected");
                                 activeClueObj.addProperty("type", clue.getClass().getSimpleName());
 
-                                // Render hint using PanelComponent
                                 net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
                                 try {
                                     clue.makeOverlayHint(panel, clueScrollPlugin);
@@ -1259,8 +1061,6 @@ public class AiService {
                                         if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
                                             net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
 
-                                            // Use reflection to read private left/right fields to bypass getter
-                                            // compilation issue
                                             String left = "";
                                             String right = "";
                                             try {
@@ -1289,7 +1089,6 @@ public class AiService {
                                         } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
                                             net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
 
-                                            // Use reflection to read private text field
                                             String text = "";
                                             try {
                                                 java.lang.reflect.Field textField = tc.getClass()
@@ -1333,15 +1132,23 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeSearchOsrsWiki(JsonObject args) {
+    String executeSearchOsrsWiki(JsonObject args) {
         String query = args.has("query") ? args.get("query").getAsString() : "";
-        return executeWikiSearch(query);
+        return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
     }
 
-    private String executeGetPlayerStatus(JsonObject args) {
+    static String extractSearchQuery(String question) {
+        return WikiSearchUtil.extractSearchQuery(question);
+    }
+
+    static String cleanWikitext(String wikitext) {
+        return WikiSearchUtil.cleanWikitext(wikitext);
+    }
+
+    String executeGetPlayerStatus(JsonObject args) {
         JsonObject result = new JsonObject();
 
-        int specPercent = client.getVarpValue(300) / 10;
+        int specPercent = client.getVarpValue(VARP_SPECIAL_ATTACK_PERCENT) / 10;
         result.addProperty("specialAttackPercent", specPercent);
 
         result.addProperty("runEnergy", client.getEnergy() / 100);
@@ -1370,17 +1177,18 @@ public class AiService {
 
         int poisonVarp = client.getVarpValue(VarPlayerID.POISON);
         String status = "Healthy";
-        if (poisonVarp > 0 && poisonVarp < 1000000) {
+        if (poisonVarp > 0 && poisonVarp < POISON_VENOM_THRESHOLD) {
             status = "Poisoned (" + poisonVarp + " dmg)";
-        } else if (poisonVarp >= 1000000) {
-            int venomDmg = (poisonVarp - 1000000) / 5 + 6;
+        } else if (poisonVarp >= POISON_VENOM_THRESHOLD) {
+            int venomDmg = (poisonVarp - POISON_VENOM_THRESHOLD) / 5 + 6;
             status = "Venomed (" + venomDmg + " dmg)";
         }
         result.addProperty("poisonState", status);
 
         JsonObject boostedSkills = new JsonObject();
         for (Skill s : Skill.values()) {
-            if ("OVERALL".equals(s.name())) continue;
+            if ("OVERALL".equals(s.name()))
+                continue;
             int real = client.getRealSkillLevel(s);
             int boosted = client.getBoostedSkillLevel(s);
             if (real != boosted) {
@@ -1395,47 +1203,52 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerCurrenciesAndPoints(JsonObject args) {
+    String executeGetPlayerCurrenciesAndPoints(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject points = new JsonObject();
 
         try {
-            int nmz = client.getVarpValue(1056);
+            int nmz = client.getVarpValue(VARP_NMZ_REWARD_POINTS);
             points.addProperty("nightmareZonePoints", nmz);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         try {
-            int pc = client.getVarpValue(261);
+            int pc = client.getVarpValue(VARP_PEST_CONTROL_POINTS);
             points.addProperty("pestControlCommendations", pc);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         try {
-            int tithe = client.getVarbitValue(4893);
+            int tithe = client.getVarbitValue(VARBIT_TITHE_FARM_POINTS);
             points.addProperty("titheFarmPoints", tithe);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         try {
             String pts = configManager.getRSProfileConfiguration("slayer", "points");
-            if (pts == null || pts.isEmpty()) pts = configManager.getConfiguration("slayer", "points");
+            if (pts == null || pts.isEmpty())
+                pts = configManager.getConfiguration("slayer", "points");
             if (pts != null && !pts.isEmpty()) {
                 points.addProperty("slayerPoints", Integer.parseInt(pts));
             }
             String strk = configManager.getRSProfileConfiguration("slayer", "streak");
-            if (strk == null || strk.isEmpty()) strk = configManager.getConfiguration("slayer", "streak");
+            if (strk == null || strk.isEmpty())
+                strk = configManager.getConfiguration("slayer", "streak");
             if (strk != null && !strk.isEmpty()) {
                 points.addProperty("slayerStreak", Integer.parseInt(strk));
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         Map<String, Integer> targetItemNames = Map.of(
-            "Mark of grace", 11849,
-            "Golden nugget", 12012,
-            "Abyssal pearl", 26884,
-            "Tokkul", 6529,
-            "Stardust", 25527,
-            "Archery ticket", 1464,
-            "Mermaid's tear", 27433
-        );
+                "Mark of grace", ITEM_ID_MARK_OF_GRACE,
+                "Golden nugget", ITEM_ID_GOLDEN_NUGGET,
+                "Abyssal pearl", ITEM_ID_ABYSSAL_PEARL,
+                "Tokkul", ITEM_ID_TOKKUL,
+                "Stardust", ITEM_ID_STARDUST,
+                "Archery ticket", ITEM_ID_ARCHERY_TICKET,
+                "Mermaid's tear", ITEM_ID_MERMAIDS_TEAR);
 
         JsonObject itemCurrencies = new JsonObject();
         ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
@@ -1447,12 +1260,14 @@ public class AiService {
             long total = 0;
             if (inv != null) {
                 for (Item item : inv.getItems()) {
-                    if (item != null && item.getId() == targetId) total += item.getQuantity();
+                    if (item != null && item.getId() == targetId)
+                        total += item.getQuantity();
                 }
             }
             if (bank != null) {
                 for (Item item : bank.getItems()) {
-                    if (item != null && item.getId() == targetId) total += item.getQuantity();
+                    if (item != null && item.getId() == targetId)
+                        total += item.getQuantity();
                 }
             }
             if (total > 0) {
@@ -1465,21 +1280,23 @@ public class AiService {
         return gson.toJson(result);
     }
 
-    private String executeGetPlayerLocationDetails(JsonObject args) {
+    String executeGetPlayerLocationDetails(JsonObject args) {
         JsonObject result = new JsonObject();
         Player localPlayer = client.getLocalPlayer();
 
         int wildyLevel = 0;
         try {
-            wildyLevel = client.getVarbitValue(5963);
-        } catch (Exception ignored) {}
+            wildyLevel = client.getVarbitValue(VARBIT_WILDERNESS_LEVEL);
+        } catch (Exception ignored) {
+        }
         result.addProperty("wildernessLevel", wildyLevel);
         result.addProperty("inWilderness", wildyLevel > 0);
 
         boolean isMulti = false;
         try {
             isMulti = client.getVarbitValue(Varbits.MULTICOMBAT_AREA) == 1;
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         result.addProperty("multiCombat", isMulti);
 
         boolean inInstance = isInInstance(localPlayer);
@@ -1526,11 +1343,11 @@ public class AiService {
         if (client.getLocalPlayer() != null) {
             accountTypeVarbit = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
         }
-        sb.append("Account Type: ").append(describeAccountType(accountTypeVarbit)).append("\n");
+        sb.append("Account Type: ").append(PromptUtils.describeAccountType(accountTypeVarbit)).append("\n");
         sb.append("World: ").append(client.getWorld()).append("\n");
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
-        int spellbookVar = client.getVarbitValue(4070);
-        sb.append("Active Spellbook: ").append(describeSpellbook(spellbookVar)).append("\n");
+        int spellbookVar = client.getVarbitValue(VARBIT_SPELLBOOK);
+        sb.append("Active Spellbook: ").append(PromptUtils.describeSpellbook(spellbookVar)).append("\n");
         sb.append("Hitpoints: ")
                 .append(client.getBoostedSkillLevel(Skill.HITPOINTS))
                 .append("/")
@@ -1557,381 +1374,20 @@ public class AiService {
         }
         sb.append("\n");
 
-        return trimToPromptBudget(sb.toString(), MAX_CONTEXT_CHARACTERS,
+        return trimToPromptBudget(sb.toString(), PromptUtils.MAX_CONTEXT_CHARACTERS,
                 "...[game context truncated for prompt budget]");
     }
 
-    private String safeItemName(int itemId) {
-        try {
-            String name = itemManager.getItemComposition(itemId).getName();
-            if (name == null || name.trim().isEmpty()) {
-                return "Item " + itemId;
-            }
-            return name;
-        } catch (Exception ex) {
-            return "Item " + itemId;
-        }
-    }
-
     static String trimToPromptBudget(String text, int maxChars, String truncationLabel) {
-        return trimToPromptBudget(text, maxChars, truncationLabel, false);
+        return PromptUtils.trimToPromptBudget(text, maxChars, truncationLabel);
     }
 
     static String trimToPromptBudget(String text, int maxChars, String truncationLabel, boolean keepEnd) {
-        if (maxChars <= 0) {
-            return "";
-        }
-
-        if (text == null || text.trim().isEmpty()) {
-            return "None";
-        }
-
-        String safeLabel = (truncationLabel == null || truncationLabel.isEmpty())
-                ? "...[truncated]"
-                : truncationLabel;
-
-        String normalized = text.trim();
-        if (normalized.length() <= maxChars) {
-            return normalized;
-        }
-
-        if (maxChars <= safeLabel.length()) {
-            return safeLabel.substring(0, maxChars);
-        }
-
-        int keepLength = maxChars - safeLabel.length() - 1;
-        if (keepEnd) {
-            return safeLabel + "\n" + normalized.substring(normalized.length() - keepLength);
-        } else {
-            return normalized.substring(0, keepLength) + "\n" + safeLabel;
-        }
-    }
-
-    private String executeWikiSearch(String query) {
-        String cleanedQuery = extractSearchQuery(query);
-        String title = searchWikiTopResult(cleanedQuery);
-        if (title != null) {
-            String extract = fetchWikiExtract(title);
-            if (extract != null && !extract.isEmpty()) {
-                JsonObject res = new JsonObject();
-                res.addProperty("title", title);
-                res.addProperty("extract", extract);
-                return gson.toJson(res);
-            }
-        }
-        JsonObject err = new JsonObject();
-        err.addProperty("status", "error");
-        err.addProperty("message", "No wiki article found for search query: " + query);
-        return gson.toJson(err);
-    }
-
-    static String extractSearchQuery(String question) {
-        if (question == null) {
-            return "";
-        }
-        String q = question.trim().toLowerCase();
-
-        if (q.endsWith("?")) {
-            q = q.substring(0, q.length() - 1).trim();
-        }
-
-        String[] prefixes = {
-                "what are the ingredients for",
-                "what is the drop rate of",
-                "what is the drop rate for",
-                "what is the recipe for",
-                "what are the stats for",
-                "what are the stats of",
-                "what is the stats for",
-                "what is the stats of",
-                "where can i find",
-                "where can i buy",
-                "where can i get",
-                "where do i find",
-                "where do i buy",
-                "where do i get",
-                "can you search for",
-                "can you look up",
-                "tell me about",
-                "information on",
-                "ingredients for",
-                "how do i craft",
-                "how do i make",
-                "how do i brew",
-                "how do i get",
-                "recipe for",
-                "search for",
-                "how to craft",
-                "how to make",
-                "how to brew",
-                "how to get",
-                "look up",
-                "where is",
-                "where are",
-                "what is",
-                "what are",
-                "info on",
-                "lookup",
-                "how to",
-                "how do"
-        };
-
-        boolean prefixFound;
-        do {
-            prefixFound = false;
-            for (String prefix : prefixes) {
-                if (q.startsWith(prefix)) {
-                    q = q.substring(prefix.length()).trim();
-                    prefixFound = true;
-                    break;
-                }
-            }
-        } while (prefixFound);
-
-        if (q.startsWith("the ")) {
-            q = q.substring(4).trim();
-        } else if (q.startsWith("a ")) {
-            q = q.substring(2).trim();
-        } else if (q.startsWith("an ")) {
-            q = q.substring(3).trim();
-        }
-
-        String[] suffixes = {
-                " buy shops locations",
-                " shop locations osrs",
-                " elemental weakness",
-                " shops locations",
-                " spawn locations",
-                " ingredients for",
-                " spawn location",
-                " shop locations",
-                " shop location",
-                " requirements",
-                " requirement",
-                " ingredients",
-                " drop rates",
-                " drop table",
-                " drop rate",
-                " locations",
-                " location",
-                " weakness",
-                " recipe",
-                " spawns",
-                " shops",
-                " spawn",
-                " drops",
-                " stats",
-                " guide",
-                " drop",
-                " shop",
-                " wiki",
-                " osrs",
-                " buy"
-        };
-
-        boolean suffixFound;
-        do {
-            suffixFound = false;
-            for (String suffix : suffixes) {
-                if (q.endsWith(suffix)) {
-                    String trimmed = q.substring(0, q.length() - suffix.length()).trim();
-                    if (!trimmed.isEmpty()) {
-                        q = trimmed;
-                        suffixFound = true;
-                        break;
-                    }
-                }
-            }
-        } while (suffixFound);
-
-        return q.isEmpty() ? question : q;
-    }
-
-    private String resolveTitleDirectly(String query) {
-        try {
-            HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
-                    .addQueryParameter("action", "query")
-                    .addQueryParameter("titles", query)
-                    .addQueryParameter("redirects", "1")
-                    .addQueryParameter("format", "json")
-                    .build();
-
-            OkHttpClient wikiClient = getWikiClient();
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", OSRS_AI_USER_AGENT)
-                    .build();
-
-            try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null)
-                    return null;
-                JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null)
-                    return null;
-                JsonObject pages = queryObj.getAsJsonObject("pages");
-                if (pages == null)
-                    return null;
-                for (Map.Entry<String, com.google.gson.JsonElement> entry : pages.entrySet()) {
-                    if ("-1".equals(entry.getKey()))
-                        continue;
-                    JsonObject page = entry.getValue().getAsJsonObject();
-                    if (page.has("title")) {
-                        return page.get("title").getAsString();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Direct title resolution failed for: {}", query, e);
-        }
-        return null;
-    }
-
-    private String searchWikiTopResult(String query) {
-        // Try to resolve directly first to handle exact titles or redirects correctly
-        String directTitle = resolveTitleDirectly(query);
-        if (directTitle != null) {
-            return directTitle;
-        }
-
-        try {
-            HttpUrl url = HttpUrl.parse(WIKI_API).newBuilder()
-                    .addQueryParameter("action", "query")
-                    .addQueryParameter("list", "search")
-                    .addQueryParameter("srsearch", query)
-                    .addQueryParameter("srnamespace", "0")
-                    .addQueryParameter("srlimit", "1")
-                    .addQueryParameter("format", "json")
-                    .build();
-
-            OkHttpClient wikiClient = getWikiClient();
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", OSRS_AI_USER_AGENT)
-                    .build();
-
-            try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null)
-                    return null;
-                JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null)
-                    return null;
-                JsonArray results = queryObj.getAsJsonArray("search");
-                if (results == null || results.size() == 0)
-                    return null;
-                return results.get(0).getAsJsonObject().get("title").getAsString();
-            }
-        } catch (Exception e) {
-            log.warn("Wiki search failed for: {}", query, e);
-            return null;
-        }
-    }
-
-    private String fetchWikiExtract(String title) {
-        try {
-            HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
-                    .addQueryParameter("action", "query")
-                    .addQueryParameter("titles", title)
-                    .addQueryParameter("prop", "revisions")
-                    .addQueryParameter("rvprop", "content")
-                    .addQueryParameter("rvlimit", "1")
-                    .addQueryParameter("redirects", "1")
-                    .addQueryParameter("format", "json")
-                    .build();
-
-            OkHttpClient wikiClient = getWikiClient();
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", OSRS_AI_USER_AGENT)
-                    .build();
-
-            try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null)
-                    return null;
-                JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null)
-                    return null;
-                JsonObject pages = queryObj.getAsJsonObject("pages");
-                if (pages == null)
-                    return null;
-                for (Map.Entry<String, com.google.gson.JsonElement> entry : pages.entrySet()) {
-                    if ("-1".equals(entry.getKey()))
-                        continue;
-                    JsonObject page = entry.getValue().getAsJsonObject();
-                    if (page.has("revisions")) {
-                        JsonArray revisions = page.getAsJsonArray("revisions");
-                        if (revisions != null && revisions.size() > 0) {
-                            JsonObject rev = revisions.get(0).getAsJsonObject();
-                            if (rev.has("*")) {
-                                String wikitext = rev.get("*").getAsString();
-                                String cleaned = cleanWikitext(wikitext);
-                                if (cleaned.length() > WIKI_EXTRACT_CHARS) {
-                                    cleaned = cleaned.substring(0, WIKI_EXTRACT_CHARS) + "\n...[truncated]";
-                                }
-                                return cleaned;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Wiki extract fetch failed for: {}", title, e);
-        }
-        return null;
-    }
-
-    static String cleanWikitext(String wikitext) {
-        if (wikitext == null) {
-            return "";
-        }
-
-        String clean = wikitext.replaceAll("(?s)<!--.*?-->", "");
-        clean = clean.replaceAll("(?s)\\{\\|.*?\\|\\}", "");
-        clean = clean.replaceAll("(?i)\\[\\[(File|Image|Category):.*?\\]\\]", "");
-        clean = clean.replaceAll("\\[\\[[^]]*?\\|([^]]+?)\\]\\]", "$1");
-        clean = clean.replaceAll("\\[\\[([^]]+?)\\]\\]", "$1");
-        clean = clean.replaceAll("'''(.*?)'''", "**$1**");
-        clean = clean.replaceAll("''(.*?)''", "*$1*");
-
-        for (int i = 0; i < MAX_TEMPLATE_REMOVALS; i++) {
-            String next = clean.replaceAll("\\{\\{[^{}]*?\\}\\}", "");
-            if (next.equals(clean)) {
-                break;
-            }
-            clean = next;
-        }
-
-        clean = clean.replaceAll("(?m)^[ \t]*\r?\n", "");
-
-        return clean.trim();
+        return PromptUtils.trimToPromptBudget(text, maxChars, truncationLabel, keepEnd);
     }
 
     static String buildSystemPrompt(String context, String recentConversation) {
-        String compactConversation = trimToPromptBudget(recentConversation, MAX_RECENT_CONVERSATION_CHARS,
-                "...[recent conversation truncated]", true);
-
-        return "You are an OSRS RuneLite assistant. Use OSRS knowledge and treat GAME CONTEXT and tools as truth.\n"
-                + "\n"
-                + "AVAILABLE TOOLS:\n"
-                + "- Player state: 'get_player_skills', 'get_player_inventory', 'get_player_equipment', 'get_player_bank' (when open), 'get_player_status', 'get_player_currencies_and_points', 'get_player_location_details'.\n"
-                + "- Activities & tasks: 'get_player_slayer_task', 'get_player_quests', 'get_player_achievement_diaries', 'get_player_combat_achievements', 'get_player_clues'.\n"
-                + "- Game info: 'get_item_stats', 'search_osrs_wiki'.\n"
-                + "- Call tools to inspect player state rather than guessing. Call 'search_osrs_wiki' to verify monster details, weaknesses, drop rates, item stats, recipes, training methods, and locations.\n"
-                + "\n"
-                + "GROUNDING RULES:\n"
-                + "1. Never invent stats, quests, items, locations, or NPCs for the player.\n"
-                + "2. Keep answers concise, direct, practical, and conversational. Do not use markdown headings (# or ##).\n"
-                + "3. For Ironman/UIM/GIM accounts, value items by High Alchemy value (haPrice) rather than Grand Exchange price (gePrice), and do not suggest invalid GE trading.\n"
-                + "4. Base travel recommendations on the player's location, active spellbook, and inventory/equipment/bank teleportation items. Do not assume standard teleports if on Ancients/Lunar/Arceuus.\n"
-                + "5. Never assume obscure items are useless; advise checking wiki/clue steps before alching or destroying unique gear.\n"
-                + "6. Do not mix up RS3 features or mechanics with OSRS.\n"
-                + "\n"
-                + "RECENT CONVERSATION:\n"
-                + compactConversation
-                + "\n\nGAME CONTEXT:\n"
-                + trimToPromptBudget(context, MAX_CONTEXT_CHARACTERS, "...[game context truncated for prompt budget]");
+        return PromptUtils.buildSystemPrompt(context, recentConversation);
     }
 
     private boolean isInInstance(Player localPlayer) {
@@ -1941,6 +1397,22 @@ public class AiService {
         }
 
         return client.getTopLevelWorldView() != null && client.getTopLevelWorldView().isInstance();
+    }
+
+    private String executeWikiSearch(String query) {
+        return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
+    }
+
+    private String describeAccountType(Integer accountTypeVarbit) {
+        return PromptUtils.describeAccountType(accountTypeVarbit);
+    }
+
+    private String describeSpellbook(int val) {
+        return PromptUtils.describeSpellbook(val);
+    }
+
+    private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
+        return ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, container, filter, minValue);
     }
 
     private InstanceTemplates getInstanceTemplate(Player localPlayer, WorldPoint worldPoint) {
@@ -1975,52 +1447,6 @@ public class AiService {
         return InstanceTemplates.findMatch(chunks[plane][chunkX][chunkY]);
     }
 
-    private String describeAccountType(Integer accountTypeVarbit) {
-        if (accountTypeVarbit == null) {
-            return "Unknown";
-        }
-
-        switch (accountTypeVarbit) {
-            case 1:
-                return "Ironman";
-            case 2:
-                return "Ultimate Ironman (UIM)";
-            case 3:
-                return "Hardcore Ironman (HCIM)";
-            case 4:
-                return "Group Ironman (GIM)";
-            case 5:
-                return "Hardcore Group Ironman (HGIM)";
-            case 6:
-                return "Unranked Group Ironman (UGIM)";
-            case 0:
-            default:
-                return "Normal";
-        }
-    }
-
-    private String describeSpellbook(int val) {
-        switch (val) {
-            case 0:
-                return "Standard";
-            case 1:
-                return "Ancient Magicks";
-            case 2:
-                return "Lunar";
-            case 3:
-                return "Arceuus";
-            default:
-                return "Unknown (" + val + ")";
-        }
-    }
-
-    private static String truncateForNotification(String text) {
-        if (text.length() <= 80) {
-            return text;
-        }
-        return text.substring(0, 77) + "...";
-    }
-
     private String getDiaryStatus(int varbitId) {
         int val = client.getVarbitValue(varbitId);
         switch (val) {
@@ -2044,132 +1470,4 @@ public class AiService {
         return obj;
     }
 
-    private Integer findItemIdInContainers(String name) {
-        String search = name.trim().toLowerCase();
-        Set<Integer> checkedIds = new HashSet<>();
-
-        ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
-        if (eq != null) {
-            for (Item item : eq.getItems()) {
-                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
-                    if (safeItemName(item.getId()).toLowerCase().contains(search)) {
-                        return item.getId();
-                    }
-                }
-            }
-        }
-        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
-        if (inv != null) {
-            for (Item item : inv.getItems()) {
-                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
-                    if (safeItemName(item.getId()).toLowerCase().contains(search)) {
-                        return item.getId();
-                    }
-                }
-            }
-        }
-        ItemContainer bank = client.getItemContainer(InventoryID.BANK);
-        if (bank != null) {
-            for (Item item : bank.getItems()) {
-                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
-                    if (safeItemName(item.getId()).toLowerCase().contains(search)) {
-                        return item.getId();
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private JsonObject buildItemStatsJson(int itemId) {
-        JsonObject obj = new JsonObject();
-        obj.addProperty("id", itemId);
-
-        net.runelite.api.ItemComposition comp = null;
-        if (itemManager != null) {
-            try {
-                comp = itemManager.getItemComposition(itemId);
-            } catch (Exception ignored) {
-            }
-        }
-        String itemName = (comp != null && comp.getName() != null && !comp.getName().trim().isEmpty())
-                ? comp.getName()
-                : "Item " + itemId;
-        obj.addProperty("name", itemName);
-
-        int gePrice = 0;
-        if (itemManager != null) {
-            try {
-                gePrice = itemManager.getItemPrice(itemId);
-            } catch (Exception ignored) {
-            }
-        }
-        if (gePrice <= 0 && "Coins".equals(itemName)) {
-            gePrice = 1;
-        }
-        obj.addProperty("gePrice", gePrice);
-        obj.addProperty("haPrice", comp != null ? comp.getHaPrice() : 0);
-
-        ItemStats stats = (itemManager != null) ? itemManager.getItemStats(itemId, false) : null;
-        if (stats == null) {
-            obj.addProperty("equipable", false);
-            return obj;
-        }
-
-        obj.addProperty("equipable", stats.isEquipable());
-        obj.addProperty("weight", stats.getWeight());
-        obj.addProperty("geLimit", stats.getGeLimit());
-
-        if (stats.isEquipable() && stats.getEquipment() != null) {
-            ItemEquipmentStats eq = stats.getEquipment();
-            JsonObject eqObj = new JsonObject();
-            eqObj.addProperty("astab", eq.getAstab());
-            eqObj.addProperty("aslash", eq.getAslash());
-            eqObj.addProperty("ascrush", eq.getAcrush());
-            eqObj.addProperty("asmagic", eq.getAmagic());
-            eqObj.addProperty("asrange", eq.getArange());
-            eqObj.addProperty("dstab", eq.getDstab());
-            eqObj.addProperty("dslash", eq.getDslash());
-            eqObj.addProperty("dcrush", eq.getDcrush());
-            eqObj.addProperty("dmagic", eq.getDmagic());
-            eqObj.addProperty("drange", eq.getDrange());
-            eqObj.addProperty("str", eq.getStr());
-            eqObj.addProperty("rstr", eq.getRstr());
-            eqObj.addProperty("mdmg", eq.getMdmg());
-            eqObj.addProperty("prayer", eq.getPrayer());
-            eqObj.addProperty("aspeed", eq.getAspeed());
-
-            obj.add("equipment", eqObj);
-        }
-        return obj;
-    }
-
-    private String getSlotName(int index) {
-        switch (index) {
-            case 0:
-                return "Head";
-            case 1:
-                return "Cape";
-            case 2:
-                return "Amulet";
-            case 3:
-                return "Weapon";
-            case 4:
-                return "Body";
-            case 5:
-                return "Shield";
-            case 6:
-                return "Legs";
-            case 7:
-                return "Gloves";
-            case 8:
-                return "Boots";
-            case 9:
-                return "Ring";
-            case 10:
-                return "Ammo";
-            default:
-                return "Unknown (" + index + ")";
-        }
-    }
 }
