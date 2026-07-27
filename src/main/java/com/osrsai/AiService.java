@@ -935,11 +935,10 @@ public class AiService {
             case 0:
                 return "Not Started";
             case 1:
-                return "In Progress";
             case 2:
                 return "Completed";
             default:
-                return "Unknown (" + val + ")";
+                return val > 0 ? "Completed" : "Not Started";
         }
     }
 
@@ -1462,11 +1461,10 @@ public class AiService {
             case 0:
                 return "Not Started";
             case 1:
-                return "In Progress";
             case 2:
                 return "Completed";
             default:
-                return "Unknown (" + val + ")";
+                return val > 0 ? "Completed" : "Not Started";
         }
     }
 

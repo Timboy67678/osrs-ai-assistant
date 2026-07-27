@@ -27,6 +27,8 @@ public class PromptUtils {
                 + "4. Base travel recommendations on the player's location, active spellbook, and inventory/equipment/bank teleportation items. Do not assume standard teleports if on Ancients/Lunar/Arceuus.\n"
                 + "5. Never assume obscure items are useless; advise checking wiki/clue steps before alching or destroying unique gear.\n"
                 + "6. Do not mix up RS3 features or mechanics with OSRS.\n"
+                + "7. When providing advice on specific game mechanics, rates, or bonuses (such as Rooftop Agility Marks of Grace overlevel penalties or Achievement Diary bonus tiers), call 'search_osrs_wiki' or verify exact OSRS facts rather than guessing.\n"
+                + "8. Maintain consistent conversation context (e.g. if discussing achievement diary tasks, do not confuse them with clue scroll steps).\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation

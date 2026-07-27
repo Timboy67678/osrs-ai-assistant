@@ -493,6 +493,28 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testGetPlayerAchievementDiariesTool() throws Exception {
+        // Varbit value 1 = Completed for Achievement Diaries
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_EASY)).thenReturn(1);
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_MEDIUM)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_HARD)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_ELITE)).thenReturn(0);
+
+        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+                .filter(d -> d.name.equals("get_player_achievement_diaries"))
+                .findFirst()
+                .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
+
+        String json = def.executor.execute(aiService, new com.google.gson.JsonObject());
+        com.google.gson.JsonObject root = new Gson().fromJson(json, com.google.gson.JsonObject.class);
+        Assert.assertTrue(root.has("diaries"));
+
+        com.google.gson.JsonObject kandarin = root.getAsJsonObject("diaries").getAsJsonObject("Kandarin");
+        Assert.assertEquals("Completed", kandarin.get("Easy").getAsString());
+        Assert.assertEquals("Not Started", kandarin.get("Medium").getAsString());
+    }
+
+    @Test
     public void testCleanWikitext() {
         String raw = "<!-- comment -->Hello [[World|Earth]]! This is a {{stub}} test.\n"
                 + "{| class=\"wikitable\"\n"
