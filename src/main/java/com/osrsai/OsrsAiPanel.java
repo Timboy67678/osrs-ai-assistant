@@ -123,6 +123,24 @@ public class OsrsAiPanel extends PluginPanel {
             public boolean getScrollableTracksViewportWidth() {
                 return true;
             }
+
+            @Override
+            public Dimension getPreferredSize() {
+                int w = 0;
+                Container parent = getParent();
+                if (parent != null && parent.getWidth() > 0) {
+                    w = parent.getWidth();
+                } else if (dockedHostPanel != null && dockedHostPanel.getWidth() > 0) {
+                    w = dockedHostPanel.getWidth() - 25;
+                } else {
+                    w = PluginPanel.PANEL_WIDTH - 30;
+                }
+
+                if (w > 0) {
+                    setSize(w, Short.MAX_VALUE);
+                }
+                return super.getPreferredSize();
+            }
         };
         chatArea.setEditable(false);
         chatArea.setContentType("text/html");
@@ -395,7 +413,7 @@ public class OsrsAiPanel extends PluginPanel {
 
             if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
                 if (!inList) {
-                    html.append("<ul style='margin:4px 0 6px 18px; padding:0;'>");
+                    html.append("<ul style='margin:4px 0 6px 0; padding-left:14px;'>");
                     inList = true;
                 }
                 html.append("<li>")
@@ -423,8 +441,7 @@ public class OsrsAiPanel extends PluginPanel {
 
     private String formatInlineMarkdown(String text) {
         String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        html = html.replace("/", "/&#8203;");
-        html = html.replace("—", "—&#8203;");
+        html = html.replaceAll("(/)([^\\s/])", "/ $2");
         html = html.replaceAll("`(.*?)`",
                 "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");
@@ -483,11 +500,7 @@ public class OsrsAiPanel extends PluginPanel {
                 .append(formattedMessage)
                 .append("</div>");
 
-        SwingUtilities.invokeLater(() -> {
-            chatArea.setText("<html><body style='color:white; font-family: sans-serif; font-size: 11px; margin: 0; padding: 0;'>"
-                    + chatHistory.toString() + "</body></html>");
-            chatArea.setCaretPosition(chatArea.getDocument().getLength());
-        });
+        updateChatHtml();
     }
 
     public String getRecentConversationContext(String currentQuestion) {
@@ -655,8 +668,17 @@ public class OsrsAiPanel extends PluginPanel {
                     .append("</div>");
         }
 
-        SwingUtilities.invokeLater(() -> {
-            chatArea.setText("<html><body style='color:white; font-family: sans-serif; font-size: 11px; margin: 0; padding: 0;'>"
+        updateChatHtml();
+    }
+
+    private void updateChatHtml() {
+        runOnEdt(() -> {
+            chatArea.setText("<html><head><style>"
+                    + "body { color: white; font-family: sans-serif; font-size: 11px; margin: 0; padding: 0; word-wrap: break-word; }"
+                    + "div { margin-bottom: 6px; word-wrap: break-word; }"
+                    + "ul { margin: 4px 0 6px 0; padding-left: 14px; }"
+                    + "li { margin-bottom: 2px; word-wrap: break-word; }"
+                    + "</style></head><body>"
                     + chatHistory.toString() + "</body></html>");
             chatArea.setCaretPosition(chatArea.getDocument().getLength());
         });
