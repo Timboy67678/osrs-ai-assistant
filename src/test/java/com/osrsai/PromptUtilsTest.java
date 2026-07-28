@@ -30,6 +30,9 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("active spellbook"));
         Assert.assertTrue(prompt.contains("search_osrs_wiki"));
         Assert.assertTrue(prompt.contains("Distinguish general readiness"));
+        Assert.assertTrue(prompt.contains("get_player_skills"));
+        Assert.assertTrue(prompt.contains("RS3 Bloodwood trees"));
+        Assert.assertTrue(prompt.contains("NOT present in OSRS"));
     }
 
     @Test

@@ -43,6 +43,6 @@ public class WikiSearchUtilTest {
         Gson gson = new Gson();
         String result = WikiSearchUtil.executeWikiSearch(client, gson, "Suqah teeth");
         Assert.assertNotNull(result);
-        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"error\""));
+        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"not_found\"") || result.contains("\"status\":\"error\""));
     }
 }

@@ -36,8 +36,8 @@ public class WikiSearchUtil {
             }
         }
         JsonObject err = new JsonObject();
-        err.addProperty("status", "error");
-        err.addProperty("message", "No wiki article found for search query: " + query);
+        err.addProperty("status", "not_found");
+        err.addProperty("message", "No OSRS wiki article found for query '" + query + "'. This entity, reward, or feature does NOT exist in OSRS (it may be a hallucination, RS3 content, or invalid terminology). Do NOT fabricate mechanics or quest rewards.");
         return gson.toJson(err);
     }
 

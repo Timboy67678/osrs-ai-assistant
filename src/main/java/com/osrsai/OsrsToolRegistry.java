@@ -12,7 +12,7 @@ public class OsrsToolRegistry {
         List<AiService.ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new AiService.ToolDefinition("get_player_skills",
-                "Retrieve the player's base levels, boosted levels, experience (XP), and thresholds. Use base levels to assess general account readiness for combat, bosses, quests, and content.",
+                "Retrieve the player's base levels, boosted levels, experience (XP), and thresholds. MUST be called before quoting or relying on any of the player's specific skill levels or XP progress.",
                 true, true, AiService::executeGetPlayerSkills)
                 .addParam("skill", "string",
                         "Optional skill name to filter strictly by (case-insensitive, e.g. 'Attack', 'Strength', 'Slayer'). If omitted, retrieves all skills.",
@@ -73,7 +73,7 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerClues));
 
         registry.add(new AiService.ToolDefinition("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, farming patches, training methods, and information.",
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, quest rewards, training methods, and information. MUST be called whenever answering questions about named quests, items, bosses, monsters, updates, quest rewards, or training methods to verify exact OSRS mechanics and rewards before formulating your response.",
                 false, false, AiService::executeSearchOsrsWiki)
                 .addParam("query", "string",
                         "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",

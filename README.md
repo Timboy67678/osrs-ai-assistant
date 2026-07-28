@@ -1,65 +1,99 @@
-<p align="center">
-  <img src="assets/logo.png" alt="OSRS AI Assistant Logo" width="350" />
-</p>
-
 <h1 align="center">OSRS AI Assistant</h1>
 
 <p align="center">
-  <strong>An intelligent, context-aware chatbot plugin for RuneLite</strong>
+  <strong>An intelligent, context-aware AI companion plugin for RuneLite</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/RuneLite-1.12.32-blue.svg" alt="RuneLite Version" />
   <img src="https://img.shields.io/badge/Build-Gradle-green.svg" alt="Build Status" />
   <img src="https://img.shields.io/badge/Java-11-orange.svg" alt="Java Version" />
-  <img src="https://img.shields.io/badge/AI--Powered-Gemini%20%7C%20Claude%20%7C%20GPT--4o%20%7C%20Grok-purple.svg" alt="AI Powered" />
+  <img src="https://img.shields.io/badge/AI--Powered-Grok%20%7C%20Gemini%20%7C%20Claude%20%7C%20GPT--4o%20%7C%20Custom-purple.svg" alt="AI Powered" />
 </p>
 
 ---
 
-**OSRS AI Assistant** is a RuneLite plugin that brings advanced large language models directly into your Old School RuneScape client. It’s designed to act as an in-game companion that understands your gameplay context and helps with progression, skilling, PvM, quests, and strategy.
+**OSRS AI Assistant** is a RuneLite plugin that brings state-of-the-art AI language models directly into your Old School RuneScape client. Designed as a real-time, context-aware in-game companion, it autonomously inspects your character's stats, gear, quests, slayer tasks, bank, and active location to provide accurate strategy, gearing advice, skilling guides, PvM tactics, and quest help.
 
 > [!NOTE]
-> Queries can be supplemented with OSRS Wiki context to improve response quality and keep answers aligned with current game knowledge.
+> Powered by an autonomous function-calling system, the AI dynamically inspects live player state and searches the **OSRS Wiki** in real time to guarantee answers stay grounded in current game mechanics.
 
 ---
 
 ## ✨ Features
 
-- **🎮 Real-Time Game Context:**
-  - Uses relevant player context such as combat and skill levels, run energy, location/region info, and active activities.
-  - Can include equipment/inventory/bank-related context when appropriate.
-- **🧠 Multi-Model Integration:**
-  - **Google Gemini 2.5 Flash** (default)
+- **🎮 Autonomous Game Context Integration:**
+  - Automatically analyzes player base & boosted skill levels, XP, run energy, prayer points, active prayers, and combat vitals.
+  - Detects current location, Wilderness level, multi-combat zones, instanced areas, and world types (PvP, High Risk, Members).
+  - Inspects active inventory, equipped items, and bank contents (when open) with live GE and High Alchemy prices.
+- **🛡️ Account-Type Awareness:**
+  - Full support for Main, Ironman, Ultimate Ironman (UIM), Hardcore Ironman (HCIM), Group Ironman (GIM), Hardcore GIM, and Unranked GIM accounts.
+  - Automatically tailors advice based on account restrictions (e.g. prioritizing High Alchemy values over GE prices and avoiding invalid trading suggestions for Ironmen).
+- **🧠 Multi-Model AI Support:**
+  - **xAI Grok 4.20 Reasoning** (Default)
+  - **xAI Grok 4.3**
+  - **Google Gemini 2.5 Flash**
   - **OpenAI GPT-4o**
-  - **Anthropic Claude**
-  - **xAI Grok**
-- **🗂️ Session & History Management:**
-  - Multiple chat sessions
-  - Persistent history storage
-  - Quick reset/delete flows
-- **🖥️ Flexible UI:**
-  - RuneLite sidebar panel
-  - Detachable chat window
-  - Remembers window size/position preferences
-- **📚 OSRS Wiki Augmentation:**
-  - Pulls relevant wiki snippets into prompt context when useful
-- **🔔 Response Notifications:**
-  - Optional in-client/OS notifications when responses complete
+  - **Anthropic Claude 3.5 Sonnet**
+  - **Custom / Local AI** (Connect to Ollama, LM Studio, LocalAI, vLLM, or any OpenAI-compatible API endpoint).
+- **🗂️ Multi-Session & Window Flexibility:**
+  - Create, switch, and delete multiple chat sessions with persistent local history.
+  - Usable as a standard RuneLite sidebar panel or detached as an independent floating window (remembers position and dimensions).
+- **🔔 Audio & OS Notifications:**
+  - Optional RuneScape-themed sound effects and desktop/client notifications when AI answers finish generating.
 
 ---
 
-## 🛠️ Configuration
+## 🛠️ Exposed AI Tools (Function Calling)
+
+The AI assistant is granted access to a suite of **14 custom tools** enabling it to query live game state and verify wiki data before generating answers:
+
+### 📊 Player State & Inventory Tools
+- `get_player_skills` — Retrieves base levels, boosted levels, XP, and level-up progress. Supports filtering by specific skill (e.g. Attack, Slayer).
+- `get_player_inventory` — Retrieves items, quantities, Grand Exchange market prices, and High Alchemy values currently in inventory.
+- `get_player_equipment` — Retrieves equipped gear, quantities, GE prices, and High Alchemy values across all equipment slots.
+- `get_player_bank` — Retrieves bank items, quantities, GE prices, and High Alchemy values when the bank interface is open. Supports item name search filtering and minimum value thresholds.
+- `get_player_status` — Retrieves real-time combat status (current HP, Prayer points, active prayer icons, poison/venom state, run energy, special attack %).
+- `get_player_currencies_and_points` — Retrieves minigame currencies, tokens, and reward points (e.g. NMZ points, Pest Control commendations, Tithe Farm points, Golden Nuggets, Abyssal Pearls, Marks of Grace, Slayer points, Archery tickets).
+- `get_player_location_details` — Retrieves location attributes including Wilderness level, multi-combat status, instanced area check, world types, and region ID.
+
+### 📜 Progression & Activities Tools
+- `get_player_slayer_task` — Retrieves current Slayer task assignment, target monster, remaining kill count, Slayer points, and task streak.
+- `get_player_quests` — Retrieves total quest points, completed quest count, and status lists (`IN_PROGRESS`, `NOT_STARTED`, `COMPLETED`, `ALL`).
+- `get_player_achievement_diaries` — Retrieves Achievement Diary completion progress for all 12 regions across Easy, Medium, Hard, and Elite tiers.
+- `get_player_combat_achievements` — Retrieves Combat Achievement tier progress (Easy through Grandmaster), boss/monster kill counts (KC), and task completion. Supports filtering by tier, boss name, completion status, or task name.
+- `get_player_clues` — Retrieves active clue scroll details (current step text, requirements, solution) and clue scroll items in inventory or bank.
+
+### 📚 Knowledge & Item Intelligence Tools
+- `get_item_stats` — Retrieves equipment stats, combat bonuses, weight, slot type, and market prices for specified item names or IDs.
+- `search_osrs_wiki` — Performs a live search on the Old School RuneScape Wiki for authoritative game mechanics, boss guides, drop tables, quest requirements, training methods, and recent game updates.
+
+---
+
+## ⚙️ Configuration
 
 Open **RuneLite Settings (wrench icon)**, search for **OSRS AI Assistant**, then configure:
 
 | Section | Setting | Description |
 | :--- | :--- | :--- |
-| **API Settings** | **AI Provider** | Choose Gemini, OpenAI, Claude, or Grok. |
-| **API Settings** | **API Key** | Your API key for the selected provider. |
-| **API Settings** | **Org ID** | Optional organization/client ID (provider-specific). |
-| **Data Sharing** | **Share Character Info** | Toggle sending character/game context to the model. |
-| **Data Sharing** | **Notify on Response** | Toggle notification behavior when a reply is ready. |
+| **API Settings** | **AI** | Select provider: Grok 4.20 Reasoning, Grok 4.3, Gemini 2.5 Flash, GPT-4o, Claude 3.5, or Custom. |
+| **API Settings** | **API Key** | Secret API key for your selected provider. |
+| **API Settings** | **Org ID** | Optional organization ID (if required by your provider). |
+| **API Settings** | **Max Search Depth** | Maximum recursive tool calls/wiki searches the AI can execute per query (1–10, default 5). |
+| **Custom / Local AI** | **Custom Endpoint** | API URL for custom/local OpenAI-compatible server (e.g., `http://localhost:11434/v1/chat/completions`). |
+| **Custom / Local AI** | **Custom Model ID** | Override model ID (e.g. `llama3`, `mistral`, or local model name). |
+| **Data Sharing** | **Share Character Info** | Toggle sharing player stats, location, gear, quests, and bank data with the AI provider. |
+| **Data Sharing** | **Notify on Response** | Toggle sound effect and notification when an AI response completes. |
+
+---
+
+## 🎨 UI Preview
+
+<p align="center">
+  <img src="assets/ui_preview.png" alt="OSRS AI Assistant Chat Preview" width="300" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/settings_preview.png" alt="OSRS AI Assistant Settings Preview" width="300" />
+</p>
 
 ---
 
@@ -83,18 +117,9 @@ If you’re contributing or running locally for development:
    ```
 2. Run the plugin in developer mode:
    ```bash
-   cd runelite-plugin
    ./gradlew run
    ```
    *(On Windows, use `./gradlew.bat run`)*
-
----
-
-## 🎨 UI Preview
-
-<p align="center">
-  <img src="assets/ui_preview.png" alt="OSRS AI Assistant UI Preview" width="300" />
-</p>
 
 ---
 
@@ -106,7 +131,7 @@ This project was built entirely by **Google Antigravity AI**, an agentic coding 
 - **Collaboration Model:** Pair programming with @Timboy67678
 - **Core Technology:** DeepMind Gemini Models and advanced software agent toolkits
 
-Every component in this repository—including the RuneLite plugin configuration interface, the Swing UI panels, thread management, dynamic OSRS Wiki context resolvers, and the Gradle build configuration—was structured, written, and refactored by the AI assistant. 
+Every component in this repository—including the RuneLite plugin configuration interface, the Swing UI panels, thread management, dynamic OSRS Wiki context resolvers, function-calling tool registries, and the Gradle build configuration—was structured, written, and refactored by the AI assistant. 
 
 ---
 
