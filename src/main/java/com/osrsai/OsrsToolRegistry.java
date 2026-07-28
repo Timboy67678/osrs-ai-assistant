@@ -31,7 +31,7 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerSlayerTask));
 
         registry.add(new AiService.ToolDefinition("get_player_quests",
-                "Retrieve the player's quest points, completed quest count, and lists of in-progress, not started, or completed quests.",
+                "Retrieve the player's quest points, completed quest count, and lists of in-progress (including stage/varbit value), not started, or completed quests.",
                 true, true, AiService::executeGetPlayerQuests)
                 .addParam("status", "string",
                         "Optional quest status filter: 'IN_PROGRESS' (default), 'NOT_STARTED', 'COMPLETED', or 'ALL'.",

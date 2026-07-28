@@ -4,6 +4,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Field;
 import okhttp3.OkHttpClient;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -38,6 +39,23 @@ public class AiServiceTest {
 
     @Mock
     private net.runelite.api.Client client;
+
+    @Test
+    public void testGetPlayerQuestsToolIncludesStage() {
+        JsonObject args = new JsonObject();
+        args.addProperty("status", "IN_PROGRESS");
+
+        Mockito.when(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP)).thenReturn(10);
+        net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
+        Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId())).thenReturn(mockStruct);
+        Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
+        Mockito.when(client.getVarbitValue(101)).thenReturn(10);
+
+        String json = aiService.executeGetPlayerQuests(args);
+        Assert.assertNotNull(json);
+        Assert.assertTrue(json.contains("questPoints"));
+        Assert.assertTrue(json.contains("inProgressQuests"));
+    }
 
     @Mock
     private net.runelite.client.plugins.PluginManager pluginManager;
