@@ -29,6 +29,7 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("High Alchemy value"));
         Assert.assertTrue(prompt.contains("active spellbook"));
         Assert.assertTrue(prompt.contains("search_osrs_wiki"));
+        Assert.assertTrue(prompt.contains("Distinguish general readiness"));
     }
 
     @Test

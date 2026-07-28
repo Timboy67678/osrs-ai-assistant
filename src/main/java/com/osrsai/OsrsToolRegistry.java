@@ -12,14 +12,14 @@ public class OsrsToolRegistry {
         List<AiService.ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new AiService.ToolDefinition("get_player_skills",
-                "Retrieve the player's current levels (both real and boosted), experience (XP), next level threshold, and remaining experience for all skills or a specific filtered skill.",
+                "Retrieve the player's base levels, boosted levels, experience (XP), and thresholds. Use base levels to assess general account readiness for combat, bosses, quests, and content.",
                 true, true, AiService::executeGetPlayerSkills)
                 .addParam("skill", "string",
                         "Optional skill name to filter strictly by (case-insensitive, e.g. 'Attack', 'Strength', 'Slayer'). If omitted, retrieves all skills.",
                         false));
 
         registry.add(new AiService.ToolDefinition("get_player_inventory",
-                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory.",
+                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory. Note: Inventory contents are temporary snapshot state and can be restocked at a bank before starting new activities.",
                 true, true, AiService::executeGetPlayerInventory));
 
         registry.add(new AiService.ToolDefinition("get_player_equipment",
@@ -38,7 +38,7 @@ public class OsrsToolRegistry {
                         false));
 
         registry.add(new AiService.ToolDefinition("get_player_status",
-                "Retrieve the player's current combat and vital status, including Special Attack energy %, active prayers, poison/venom state, run energy, and HP/Prayer values.",
+                "Retrieve the player's real-time combat and vital status (current HP, prayer points, active prayers, poison/venom state, run energy, special attack %). Use for immediate action/survival questions, NOT as primary criteria for general boss readiness.",
                 true, true, AiService::executeGetPlayerStatus));
 
         registry.add(new AiService.ToolDefinition("get_player_currencies_and_points",

@@ -1347,17 +1347,17 @@ public class AiService {
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
         int spellbookVar = client.getVarbitValue(VARBIT_SPELLBOOK);
         sb.append("Active Spellbook: ").append(PromptUtils.describeSpellbook(spellbookVar)).append("\n");
-        sb.append("Hitpoints: ")
+        sb.append("Hitpoints: Current ")
                 .append(client.getBoostedSkillLevel(Skill.HITPOINTS))
-                .append("/")
+                .append(" (Base Level ")
                 .append(client.getRealSkillLevel(Skill.HITPOINTS))
-                .append("\n");
-        sb.append("Prayer: ")
+                .append(")\n");
+        sb.append("Prayer Points: Current ")
                 .append(client.getBoostedSkillLevel(Skill.PRAYER))
-                .append("/")
+                .append(" (Base Level ")
                 .append(client.getRealSkillLevel(Skill.PRAYER))
-                .append("\n");
-        sb.append("\nCURRENT LOCATION:\n");
+                .append(")\n");
+        sb.append("\nTEMPORARY CURRENT LOCATION (where player is standing right now):\n");
         if (localPlayer != null) {
             WorldPoint wp = localPlayer.getWorldLocation();
             if (wp != null) {

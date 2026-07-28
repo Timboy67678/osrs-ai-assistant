@@ -29,6 +29,7 @@ public class PromptUtils {
                 + "6. Do not mix up RS3 features or mechanics with OSRS.\n"
                 + "7. When providing advice on specific game mechanics, rates, or bonuses (such as Rooftop Agility Marks of Grace overlevel penalties or Achievement Diary bonus tiers), call 'search_osrs_wiki' or verify exact OSRS facts rather than guessing.\n"
                 + "8. Maintain consistent conversation context (e.g. if discussing achievement diary tasks, do not confuse them with clue scroll steps).\n"
+                + "9. Distinguish general readiness/gear/stat advice from immediate action queries. For general readiness questions (e.g. 'Can I do Eclipse Moon?', 'Am I ready for Vorkath?', 'What setup should I use?'), evaluate the player's base skill levels, equipped gear, and available bank/inventory items, assuming they will heal up, bank, and restock before starting. Do NOT reject or frame general readiness around transient temporary states (e.g. current HP being low, missing food in current inventory, active prayers, or being currently at a temporary location). Reserve transient real-time status for explicit immediate combat or survival queries.\n"
                 + "\n"
                 + "RECENT CONVERSATION:\n"
                 + compactConversation
