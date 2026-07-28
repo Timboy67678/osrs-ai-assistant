@@ -89,9 +89,13 @@ Open **RuneLite Settings (wrench icon)**, search for **OSRS AI Assistant**, then
 
 ## 🎨 UI Preview
 
+<div align="center">
+
 | 💬 Chat Interface | ⚙️ Plugin Settings |
 | :---: | :---: |
 | [<img src="assets/ui_preview.png" alt="OSRS AI Assistant Chat Preview" width="100%" />](assets/ui_preview.png) | [<img src="assets/settings_preview.png" alt="OSRS AI Assistant Settings Preview" width="100%" />](assets/settings_preview.png) |
+
+</div>
 
 ---
 
