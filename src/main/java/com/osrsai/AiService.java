@@ -525,19 +525,29 @@ public class AiService {
         }
     }
 
-    private void addMilestoneXp(JsonObject skillData, int currentXp) {
-        int[] milestones = { 50, 60, 70, 80, 90, 99 };
+    private void addMilestoneXp(JsonObject skillData, int currentXp, Integer targetLevel) {
+        int[] milestones = { 50, 60, 65, 70, 75, 80, 85, 90, 92, 95, 99 };
         for (int level : milestones) {
             int targetXp = Experience.getXpForLevel(level);
             if (currentXp < targetXp) {
                 skillData.addProperty("xpTo" + level, targetXp - currentXp);
             }
         }
+        if (targetLevel != null && targetLevel >= 1 && targetLevel <= Experience.MAX_VIRT_LEVEL) {
+            int targetXp = Experience.getXpForLevel(targetLevel);
+            skillData.addProperty("requestedTargetLevel", targetLevel);
+            skillData.addProperty("targetLevelXp", targetXp);
+            skillData.addProperty("xpToTargetLevel", Math.max(0, targetXp - currentXp));
+        }
     }
 
     String executeGetPlayerSkills(JsonObject args) {
         JsonObject result = new JsonObject();
-        String filterSkill = (args != null && args.has("skill")) ? normalizeSkillName(args.get("skill").getAsString())
+        String filterSkill = (args != null && args.has("skill") && !args.get("skill").isJsonNull())
+                ? normalizeSkillName(args.get("skill").getAsString())
+                : null;
+        Integer targetLevel = (args != null && args.has("targetLevel") && !args.get("targetLevel").isJsonNull())
+                ? args.get("targetLevel").getAsInt()
                 : null;
 
         for (Skill skill : Skill.values()) {
@@ -563,7 +573,7 @@ public class AiService {
                     skillData.addProperty("xpToNextLevel", 0);
                 }
 
-                addMilestoneXp(skillData, xp);
+                addMilestoneXp(skillData, xp, targetLevel);
 
                 result.add(skillName, skillData);
             }
@@ -726,6 +736,10 @@ public class AiService {
                 ? args.get("status").getAsString().trim().toUpperCase()
                 : "DEFAULT";
 
+        String questFilter = (args != null && args.has("quest"))
+                ? args.get("quest").getAsString().trim().toLowerCase()
+                : null;
+
         int completedCount = 0;
         int inProgressCount = 0;
         int notStartedCount = 0;
@@ -734,11 +748,11 @@ public class AiService {
         JsonArray inProgress = new JsonArray();
         JsonArray notStarted = new JsonArray();
 
-        boolean includeCompleted = "COMPLETED".equals(statusFilter) || "ALL".equals(statusFilter);
+        boolean includeCompleted = "COMPLETED".equals(statusFilter) || "ALL".equals(statusFilter) || (questFilter != null);
         boolean includeInProgress = "DEFAULT".equals(statusFilter) || "IN_PROGRESS".equals(statusFilter)
-                || "ALL".equals(statusFilter);
+                || "ALL".equals(statusFilter) || (questFilter != null);
         boolean includeNotStarted = "DEFAULT".equals(statusFilter) || "NOT_STARTED".equals(statusFilter)
-                || "ALL".equals(statusFilter);
+                || "ALL".equals(statusFilter) || (questFilter != null);
 
         for (Quest quest : Quest.values()) {
             QuestState state = null;
@@ -752,11 +766,21 @@ public class AiService {
             }
             if (state == QuestState.FINISHED) {
                 completedCount++;
+            } else if (state == QuestState.IN_PROGRESS) {
+                inProgressCount++;
+            } else if (state == QuestState.NOT_STARTED) {
+                notStartedCount++;
+            }
+
+            if (questFilter != null && !quest.getName().toLowerCase().contains(questFilter)) {
+                continue;
+            }
+
+            if (state == QuestState.FINISHED) {
                 if (includeCompleted) {
                     completed.add(quest.getName());
                 }
             } else if (state == QuestState.IN_PROGRESS) {
-                inProgressCount++;
                 if (includeInProgress) {
                     JsonObject questObj = new JsonObject();
                     questObj.addProperty("name", quest.getName());
@@ -767,7 +791,6 @@ public class AiService {
                     inProgress.add(questObj);
                 }
             } else if (state == QuestState.NOT_STARTED) {
-                notStartedCount++;
                 if (includeNotStarted) {
                     notStarted.add(quest.getName());
                 }
@@ -856,6 +879,15 @@ public class AiService {
         tiers.addProperty("Grandmaster", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_GRANDMASTER));
         result.add("tiers", tiers);
 
+        String filterTier = (args != null && args.has("tier")) ? args.get("tier").getAsString().trim().toLowerCase()
+                : null;
+        String filterBoss = (args != null && args.has("boss")) ? args.get("boss").getAsString().trim().toLowerCase()
+                : null;
+        Boolean filterCompleted = (args != null && args.has("completed")) ? args.get("completed").getAsBoolean() : null;
+        String filterTaskName = (args != null && args.has("taskName"))
+                ? args.get("taskName").getAsString().trim().toLowerCase()
+                : null;
+
         JsonObject killCounts = new JsonObject();
         String profileKey = configManager.getRSProfileKey();
         if (profileKey != null) {
@@ -864,6 +896,9 @@ public class AiService {
                 List<String> sortedKeys = new ArrayList<>(keys);
                 Collections.sort(sortedKeys);
                 for (String key : sortedKeys) {
+                    if (filterBoss != null && !key.toLowerCase().contains(filterBoss)) {
+                        continue;
+                    }
                     String valueStr = configManager.getRSProfileConfiguration("killcount", key);
                     if (valueStr != null) {
                         try {
@@ -876,15 +911,6 @@ public class AiService {
             }
         }
         result.add("killCounts", killCounts);
-
-        String filterTier = (args != null && args.has("tier")) ? args.get("tier").getAsString().trim().toLowerCase()
-                : null;
-        String filterBoss = (args != null && args.has("boss")) ? args.get("boss").getAsString().trim().toLowerCase()
-                : null;
-        Boolean filterCompleted = (args != null && args.has("completed")) ? args.get("completed").getAsBoolean() : null;
-        String filterTaskName = (args != null && args.has("taskName"))
-                ? args.get("taskName").getAsString().trim().toLowerCase()
-                : null;
 
         boolean hasFilters = (filterTier != null || filterBoss != null || filterCompleted != null
                 || filterTaskName != null);
@@ -1290,25 +1316,28 @@ public class AiService {
                 "Mermaid's tear", ITEM_ID_MERMAIDS_TEAR);
 
         JsonObject itemCurrencies = new JsonObject();
+        Map<Integer, Long> counts = new HashMap<>();
         ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+        if (inv != null) {
+            for (Item item : inv.getItems()) {
+                if (item != null && item.getId() > 0) {
+                    counts.put(item.getId(), counts.getOrDefault(item.getId(), 0L) + item.getQuantity());
+                }
+            }
+        }
         ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+        if (bank != null) {
+            for (Item item : bank.getItems()) {
+                if (item != null && item.getId() > 0) {
+                    counts.put(item.getId(), counts.getOrDefault(item.getId(), 0L) + item.getQuantity());
+                }
+            }
+        }
 
         for (Map.Entry<String, Integer> entry : targetItemNames.entrySet()) {
             String name = entry.getKey();
             int targetId = entry.getValue();
-            long total = 0;
-            if (inv != null) {
-                for (Item item : inv.getItems()) {
-                    if (item != null && item.getId() == targetId)
-                        total += item.getQuantity();
-                }
-            }
-            if (bank != null) {
-                for (Item item : bank.getItems()) {
-                    if (item != null && item.getId() == targetId)
-                        total += item.getQuantity();
-                }
-            }
+            long total = counts.getOrDefault(targetId, 0L);
             if (total > 0) {
                 itemCurrencies.addProperty(name, total);
             }

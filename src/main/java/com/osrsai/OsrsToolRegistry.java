@@ -16,6 +16,9 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerSkills)
                 .addParam("skill", "string",
                         "Optional skill name to filter strictly by (case-insensitive, e.g. 'Attack', 'Strength', 'Slayer'). If omitted, retrieves all skills.",
+                        false)
+                .addParam("targetLevel", "integer",
+                        "Optional target level to calculate exact remaining XP for (e.g. 65, 75, 85, 92).",
                         false));
 
         registry.add(new AiService.ToolDefinition("get_player_inventory",
@@ -35,6 +38,9 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerQuests)
                 .addParam("status", "string",
                         "Optional quest status filter: 'IN_PROGRESS' (default), 'NOT_STARTED', 'COMPLETED', or 'ALL'.",
+                        false)
+                .addParam("quest", "string",
+                        "Optional quest name search term (case-insensitive substring, e.g. 'Desert Treasure') to filter the lists of quests.",
                         false));
 
         registry.add(new AiService.ToolDefinition("get_player_status",

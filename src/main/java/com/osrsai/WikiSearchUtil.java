@@ -300,6 +300,15 @@ public class WikiSearchUtil {
         }
 
         String clean = wikitext.replaceAll("(?s)<!--.*?-->", "");
+
+        // Replace HTML entities and strip magic words
+        clean = clean.replace("&nbsp;", " ")
+                     .replace("&amp;", "&")
+                     .replace("&lt;", "<")
+                     .replace("&gt;", ">")
+                     .replace("&quot;", "\"")
+                     .replaceAll("(?i)__(TOC|NOTOC|NOEDITSECTION)__", "");
+
         clean = clean.replaceAll("(?s)\\{\\|.*?\\|\\}", "");
         clean = clean.replaceAll("(?i)\\[\\[(File|Image|Category):.*?\\]\\]", "");
         clean = clean.replaceAll("\\[\\[[^]]*?\\|([^]]+?)\\]\\]", "$1");

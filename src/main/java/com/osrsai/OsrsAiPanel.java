@@ -19,7 +19,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 public class OsrsAiPanel extends PluginPanel {
-    private static final int MAX_PROMPT_MESSAGES = 6;
+    private static final int MAX_PROMPT_MESSAGES = 6; 
     private static final int MAX_SESSIONS = 15;
     private static final int MAX_MESSAGES_PER_SESSION = 50;
 

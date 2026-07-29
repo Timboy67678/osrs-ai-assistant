@@ -33,6 +33,8 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("get_player_skills"));
         Assert.assertTrue(prompt.contains("RS3 Bloodwood trees"));
         Assert.assertTrue(prompt.contains("NOT present in OSRS"));
+        Assert.assertTrue(prompt.contains("xpToTargetLevel"));
+        Assert.assertTrue(prompt.contains("multi-part question"));
     }
 
     @Test

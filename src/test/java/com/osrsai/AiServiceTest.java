@@ -51,10 +51,76 @@ public class AiServiceTest {
         Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
         Mockito.when(client.getVarbitValue(101)).thenReturn(10);
 
+        final int[] currentQuestStatus = new int[] { 1 };
+        Mockito.doAnswer(invocation -> {
+            int questId = invocation.getArgument(1);
+            if (questId == net.runelite.api.Quest.COOKS_ASSISTANT.getId()) {
+                currentQuestStatus[0] = 0; // IN_PROGRESS
+            } else {
+                currentQuestStatus[0] = 1; // NOT_STARTED
+            }
+            return null;
+        }).when(client).runScript(Mockito.anyInt(), Mockito.anyInt());
+        Mockito.when(client.getIntStack()).thenAnswer(invocation -> currentQuestStatus);
+
         String json = aiService.executeGetPlayerQuests(args);
         Assert.assertNotNull(json);
         Assert.assertTrue(json.contains("questPoints"));
         Assert.assertTrue(json.contains("inProgressQuests"));
+
+        com.google.gson.JsonObject rootObj = new Gson().fromJson(json, com.google.gson.JsonObject.class);
+        com.google.gson.JsonArray inProgress = rootObj.getAsJsonArray("inProgressQuests");
+        Assert.assertTrue(inProgress.size() > 0);
+        Assert.assertEquals("Cook's Assistant", inProgress.get(0).getAsJsonObject().get("name").getAsString());
+    }
+
+    @Test
+    public void testGetPlayerQuestsToolQuestFilter() {
+        JsonObject args = new JsonObject();
+        args.addProperty("quest", "Cook's");
+
+        Mockito.when(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP)).thenReturn(10);
+        net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
+        Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId())).thenReturn(mockStruct);
+        Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
+        Mockito.when(client.getVarbitValue(101)).thenReturn(10);
+
+        final int[] currentQuestStatus = new int[] { 1 };
+        Mockito.doAnswer(invocation -> {
+            int questId = invocation.getArgument(1);
+            if (questId == net.runelite.api.Quest.COOKS_ASSISTANT.getId()) {
+                currentQuestStatus[0] = 0; // IN_PROGRESS
+            } else {
+                currentQuestStatus[0] = 1; // NOT_STARTED
+            }
+            return null;
+        }).when(client).runScript(Mockito.anyInt(), Mockito.anyInt());
+        Mockito.when(client.getIntStack()).thenAnswer(invocation -> currentQuestStatus);
+
+        String json = aiService.executeGetPlayerQuests(args);
+        Assert.assertNotNull(json);
+        com.google.gson.JsonObject rootObj = new Gson().fromJson(json, com.google.gson.JsonObject.class);
+
+        // The inProgressQuests should have Cook's Assistant since it matches
+        Assert.assertTrue(rootObj.has("inProgressQuests"));
+        com.google.gson.JsonArray inProgress = rootObj.getAsJsonArray("inProgressQuests");
+        boolean foundCooks = false;
+        for (int i = 0; i < inProgress.size(); i++) {
+            String name = inProgress.get(i).getAsJsonObject().get("name").getAsString();
+            if (name.contains("Cook's")) {
+                foundCooks = true;
+            }
+        }
+        Assert.assertTrue(foundCooks);
+
+        // The notStartedQuests (which otherwise has all other quests) should NOT contain other quests
+        if (rootObj.has("notStartedQuests")) {
+            com.google.gson.JsonArray notStarted = rootObj.getAsJsonArray("notStartedQuests");
+            for (int i = 0; i < notStarted.size(); i++) {
+                String name = notStarted.get(i).getAsString();
+                Assert.assertTrue(name.contains("Cook's"));
+            }
+        }
     }
 
     @Mock
@@ -539,6 +605,8 @@ public class AiServiceTest {
                 + "|- \n"
                 + "| Table content\n"
                 + "|}\n"
+                + "__TOC__\n"
+                + "A&nbsp;B &amp; C &lt; D &gt; E &quot;F&quot;\n"
                 + "[[Category:Test]]\n"
                 + "[[File:Image.png]]\n"
                 + "'''bold''' and ''italic''.";
@@ -549,8 +617,42 @@ public class AiServiceTest {
         Assert.assertFalse(cleaned.contains("Category"));
         Assert.assertFalse(cleaned.contains("File"));
         Assert.assertFalse(cleaned.contains("stub"));
+        Assert.assertFalse(cleaned.contains("TOC"));
+        Assert.assertTrue(cleaned.contains("A B & C < D > E \"F\""));
         Assert.assertTrue(cleaned.contains("Earth"));
         Assert.assertTrue(cleaned.contains("**bold**"));
         Assert.assertTrue(cleaned.contains("*italic*"));
+    }
+
+    @Test
+    public void testGetPlayerCombatAchievementsToolBossFilterKc() throws Exception {
+        // Mock ConfigManager profile and keys
+        String profileKey = "rsprofile.12345";
+        Mockito.when(configManager.getRSProfileKey()).thenReturn(profileKey);
+
+        List<String> mockKeys = Arrays.asList("zulrah", "vorkath", "barrows chests");
+        Mockito.when(configManager.getRSProfileConfigurationKeys("killcount", profileKey, "")).thenReturn(mockKeys);
+
+        Mockito.when(configManager.getRSProfileConfiguration("killcount", "zulrah")).thenReturn("150");
+        Mockito.when(configManager.getRSProfileConfiguration("killcount", "vorkath")).thenReturn("320");
+        Mockito.when(configManager.getRSProfileConfiguration("killcount", "barrows chests")).thenReturn("85");
+
+        // Retrieve tool definition
+        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+                .filter(d -> d.name.equals("get_player_combat_achievements"))
+                .findFirst()
+                .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
+
+        // Run with filter boss = zulrah
+        com.google.gson.JsonObject args = new com.google.gson.JsonObject();
+        args.addProperty("boss", "zulrah");
+        String json = def.executor.execute(aiService, args);
+        com.google.gson.JsonObject root = new Gson().fromJson(json, com.google.gson.JsonObject.class);
+
+        Assert.assertTrue(root.has("killCounts"));
+        com.google.gson.JsonObject kc = root.getAsJsonObject("killCounts");
+        Assert.assertTrue(kc.has("zulrah"));
+        Assert.assertFalse(kc.has("vorkath"));
+        Assert.assertFalse(kc.has("barrows chests"));
     }
 }
