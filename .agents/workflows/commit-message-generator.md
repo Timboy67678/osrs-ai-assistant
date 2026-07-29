@@ -20,7 +20,7 @@ Use this workflow to generate a commit message that fits the project's existing 
 ## Workflow Steps
 
 1. **Analyze Changes**
-   View staged changes: `git diff --cached`
+   View all changes (staged and unstaged): `git diff HEAD`
 
 2. **Generate Message Title**
    Create a concise summary of the changes conforming to the project style.
