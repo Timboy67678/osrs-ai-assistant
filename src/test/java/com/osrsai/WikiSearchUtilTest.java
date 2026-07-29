@@ -39,10 +39,30 @@ public class WikiSearchUtilTest {
 
     @Test
     public void testWikiSearchIntegrationFallback() {
+        WikiSearchUtil.clearCache();
         OkHttpClient client = new OkHttpClient();
         Gson gson = new Gson();
         String result = WikiSearchUtil.executeWikiSearch(client, gson, "Suqah teeth");
         Assert.assertNotNull(result);
         Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"not_found\"") || result.contains("\"status\":\"error\""));
+    }
+
+    @Test
+    public void testWikiSearchCacheHits() {
+        WikiSearchUtil.clearCache();
+        OkHttpClient client = new OkHttpClient();
+        Gson gson = new Gson();
+        
+        long start1 = System.currentTimeMillis();
+        String res1 = WikiSearchUtil.executeWikiSearch(client, gson, "Abyssal whip");
+        long duration1 = System.currentTimeMillis() - start1;
+
+        long start2 = System.currentTimeMillis();
+        String res2 = WikiSearchUtil.executeWikiSearch(client, gson, "Abyssal whip");
+        long duration2 = System.currentTimeMillis() - start2;
+
+        Assert.assertEquals(res1, res2);
+        // The second call must return almost instantaneously from cache (< 50ms)
+        Assert.assertTrue("Cached search should be under 50ms (uncached: " + duration1 + "ms, cached: " + duration2 + "ms)", duration2 < 50);
     }
 }
