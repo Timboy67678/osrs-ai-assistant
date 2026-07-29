@@ -99,6 +99,11 @@ public class OsrsToolRegistry {
                         "Optional. Filter individual tasks strictly by task name substring (case-insensitive, e.g. 'noxious foe' or 'barrows novice').",
                         false));
 
+        registry.add(new AiService.ToolDefinition("get_player_transportation",
+                "Retrieve the player's unlocked travel networks, teleportation unlocks (e.g. Fairy Rings, Spirit Trees, Gnome Gliders, Balloons, Ectophial, Drakkan's Medallion, Royal Seed Pod), current spellbook teleports, Construction POH portal access, and teleportation items in inventory/equipment/bank. Call whenever formulating travel routes, teleport suggestions, or item gathering directions.",
+                true, true, AiService::executeGetPlayerTransportation));
+
         return registry;
     }
 }
+

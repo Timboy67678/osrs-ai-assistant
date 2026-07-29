@@ -1390,6 +1390,205 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    String executeGetPlayerTransportation(JsonObject args) {
+        JsonObject result = new JsonObject();
+
+        // 1. Unlocked Transportation Networks & Quests
+        JsonObject networks = new JsonObject();
+
+        QuestState fairytale2 = getQuestStateSafe(Quest.FAIRYTALE_II__CURE_A_QUEEN);
+        boolean fairyRingsUnlocked = (fairytale2 == QuestState.IN_PROGRESS || fairytale2 == QuestState.FINISHED);
+        networks.addProperty("fairyRings", fairyRingsUnlocked ? "UNLOCKED" : "LOCKED");
+
+        boolean stafflessFairyRings = false;
+        try {
+            int lumbridgeElite = client.getVarbitValue(Varbits.DIARY_LUMBRIDGE_ELITE);
+            stafflessFairyRings = (lumbridgeElite == 1);
+        } catch (Exception ignored) {
+        }
+        networks.addProperty("stafflessFairyRings", stafflessFairyRings);
+
+        QuestState treeGnomeVillage = getQuestStateSafe(Quest.TREE_GNOME_VILLAGE);
+        networks.addProperty("spiritTrees", (treeGnomeVillage == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState grandTree = getQuestStateSafe(Quest.THE_GRAND_TREE);
+        networks.addProperty("gnomeGliders", (grandTree == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState enlightenedJourney = getQuestStateSafe(Quest.ENLIGHTENED_JOURNEY);
+        networks.addProperty("hotAirBalloons", (enlightenedJourney == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState ghostsAhoy = getQuestStateSafe(Quest.GHOSTS_AHOY);
+        networks.addProperty("ectophial", (ghostsAhoy == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState tasteOfHope = getQuestStateSafe(Quest.A_TASTE_OF_HOPE);
+        networks.addProperty("drakkansMedallion", (tasteOfHope == QuestState.IN_PROGRESS || tasteOfHope == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState mm2 = getQuestStateSafe(Quest.MONKEY_MADNESS_II);
+        networks.addProperty("royalSeedPod", (mm2 == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState clientOfKourend = getQuestStateSafe(Quest.CLIENT_OF_KOUREND);
+        networks.addProperty("kharedstsMemoirs", (clientOfKourend == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        QuestState kingdomDivided = getQuestStateSafe(Quest.A_KINGDOM_DIVIDED);
+        networks.addProperty("bookOfTheDead", (kingdomDivided == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+
+        result.add("unlockedNetworks", networks);
+
+        // 2. Magic & Spellbook Teleports
+        JsonObject magicObj = new JsonObject();
+        int spellbookVal = 0;
+        try {
+            spellbookVal = client.getVarbitValue(VARBIT_SPELLBOOK);
+        } catch (Exception ignored) {
+        }
+        String spellbookName = PromptUtils.describeSpellbook(spellbookVal);
+        magicObj.addProperty("currentSpellbook", spellbookName);
+
+        int magicLevel = client.getRealSkillLevel(Skill.MAGIC);
+        int magicBoosted = client.getBoostedSkillLevel(Skill.MAGIC);
+        magicObj.addProperty("magicLevelBase", magicLevel);
+        magicObj.addProperty("magicLevelBoosted", magicBoosted);
+
+        JsonArray unlockedTeleports = new JsonArray();
+        int effectiveMagic = Math.max(magicLevel, magicBoosted);
+        if ("Standard".equals(spellbookName)) {
+            unlockedTeleports.add("Home Teleport (Lumbridge)");
+            if (effectiveMagic >= 25) unlockedTeleports.add("Varrock Teleport (25)");
+            if (effectiveMagic >= 31) unlockedTeleports.add("Lumbridge Teleport (31)");
+            if (effectiveMagic >= 37) unlockedTeleports.add("Falador Teleport (37)");
+            if (effectiveMagic >= 40) unlockedTeleports.add("Teleport to House (40)");
+            if (effectiveMagic >= 45) unlockedTeleports.add("Camelot Teleport (45)");
+            if (effectiveMagic >= 51) unlockedTeleports.add("Ardougne Teleport (51)");
+            if (effectiveMagic >= 58) unlockedTeleports.add("Watchtower Teleport (58)");
+            if (effectiveMagic >= 61) unlockedTeleports.add("Trollheim Teleport (61)");
+            if (effectiveMagic >= 64) unlockedTeleports.add("Ape Atoll Teleport (64)");
+            if (effectiveMagic >= 69) unlockedTeleports.add("Kourend Castle Teleport (69)");
+        } else if ("Ancient Magicks".equals(spellbookName)) {
+            unlockedTeleports.add("Edgeville Home Teleport");
+            if (effectiveMagic >= 54) unlockedTeleports.add("Paddewwa Teleport (54)");
+            if (effectiveMagic >= 60) unlockedTeleports.add("Senntisten Teleport (60)");
+            if (effectiveMagic >= 66) unlockedTeleports.add("Kharyrll Teleport (66)");
+            if (effectiveMagic >= 72) unlockedTeleports.add("Lassar Teleport (72)");
+            if (effectiveMagic >= 78) unlockedTeleports.add("Dareeyak Teleport (78)");
+            if (effectiveMagic >= 84) unlockedTeleports.add("Carrallangar Teleport (84)");
+            if (effectiveMagic >= 90) unlockedTeleports.add("Annakarl Teleport (90)");
+            if (effectiveMagic >= 96) unlockedTeleports.add("Ghorrock Teleport (96)");
+        } else if ("Lunar".equals(spellbookName)) {
+            unlockedTeleports.add("Lunar Home Teleport");
+            if (effectiveMagic >= 69) unlockedTeleports.add("Moonclan Teleport (69)");
+            if (effectiveMagic >= 71) unlockedTeleports.add("Ourania Teleport (71)");
+            if (effectiveMagic >= 72) unlockedTeleports.add("Waterbirth Teleport (72)");
+            if (effectiveMagic >= 75) unlockedTeleports.add("Barbarian Teleport (75)");
+            if (effectiveMagic >= 78) unlockedTeleports.add("Khazard Teleport (78)");
+            if (effectiveMagic >= 85) unlockedTeleports.add("Fishing Guild Teleport (85)");
+            if (effectiveMagic >= 87) unlockedTeleports.add("Catherby Teleport (87)");
+            if (effectiveMagic >= 89) unlockedTeleports.add("Ice Plateau Teleport (89)");
+        } else if ("Arceuus".equals(spellbookName)) {
+            unlockedTeleports.add("Arceuus Home Teleport");
+            if (effectiveMagic >= 38) unlockedTeleports.add("Arceuus Library Teleport (38)");
+            if (effectiveMagic >= 40) unlockedTeleports.add("Draynor Manor Teleport (40)");
+            if (effectiveMagic >= 40) unlockedTeleports.add("Salve Graveyard Teleport (40)");
+            if (effectiveMagic >= 48) unlockedTeleports.add("Fenkenstrain's Castle Teleport (48)");
+            if (effectiveMagic >= 61) unlockedTeleports.add("West Ardougne Teleport (61)");
+            if (effectiveMagic >= 65) unlockedTeleports.add("Harmony Island Teleport (65)");
+            if (effectiveMagic >= 71) unlockedTeleports.add("Cemetery Teleport (71)");
+            if (effectiveMagic >= 83) unlockedTeleports.add("Barrows Teleport (83)");
+            if (effectiveMagic >= 90) unlockedTeleports.add("Ape Atoll Teleport (90)");
+        }
+        magicObj.add("unlockedSpellTeleports", unlockedTeleports);
+        result.add("magicAndSpellbook", magicObj);
+
+        // 3. Construction & POH Features
+        JsonObject pohObj = new JsonObject();
+        int conLevel = client.getRealSkillLevel(Skill.CONSTRUCTION);
+        pohObj.addProperty("constructionLevel", conLevel);
+        pohObj.addProperty("portalChamberUnlocked", conLevel >= 50);
+        pohObj.addProperty("portalNexusUnlocked", conLevel >= 72);
+        pohObj.addProperty("basicJewelleryBoxUnlocked", conLevel >= 81);
+        pohObj.addProperty("ornateJewelleryBoxUnlocked", conLevel >= 91);
+        pohObj.addProperty("pohFairyRingUnlocked", conLevel >= 85);
+        pohObj.addProperty("pohSpiritTreeUnlocked", conLevel >= 95);
+        result.add("constructionAndPoh", pohObj);
+
+        // 4. Available Teleport Items in Inventory, Equipment, and Bank
+        JsonArray teleportItems = scanTeleportItems();
+        result.add("availableTeleportItems", teleportItems);
+
+        return gson.toJson(result);
+    }
+
+    private QuestState getQuestStateSafe(Quest quest) {
+        if (quest == null) return QuestState.NOT_STARTED;
+        try {
+            QuestState state = quest.getState(client);
+            return state != null ? state : QuestState.NOT_STARTED;
+        } catch (Exception e) {
+            return QuestState.NOT_STARTED;
+        }
+    }
+
+    private JsonArray scanTeleportItems() {
+        JsonArray found = new JsonArray();
+        Set<String> uniqueFoundNames = new HashSet<>();
+
+        List<InventoryID> containersToScan = Arrays.asList(
+                InventoryID.INVENTORY,
+                InventoryID.EQUIPMENT,
+                InventoryID.BANK
+        );
+
+        String[] keywords = new String[] {
+            "ring of dueling", "games necklace", "combat bracelet", "skills necklace",
+            "necklace of passage", "digsite pendant", "xeric's talisman", "slayer ring",
+            "rada's blessing", "pharaoh's sceptre", "royal seed pod", "ectophial",
+            "drakkan's medallion", "teleport crystal", "ring of the elements",
+            "teleport scroll", "master scroll book", "ardougne cloak", "kandarin headgear",
+            "explorer's ring", "desert amulet", "morytania legs", "karamja gloves",
+            "western banner", "fremennik boots", "dramen staff", "lunar staff",
+            "book of the dead", "kharedst's memoirs", "teleport to house", "varrock teleport",
+            "lumbridge teleport", "falador teleport", "camelot teleport", "ardougne teleport",
+            "mythical cape"
+        };
+
+        for (InventoryID invId : containersToScan) {
+            ItemContainer container = client.getItemContainer(invId);
+            if (container == null) continue;
+
+            Item[] items = container.getItems();
+            if (items == null) continue;
+
+            for (Item item : items) {
+                if (item == null || item.getId() <= 0) continue;
+
+                String name = null;
+                if (itemManager != null) {
+                    try {
+                        net.runelite.api.ItemComposition comp = itemManager.getItemComposition(item.getId());
+                        if (comp != null && comp.getName() != null) {
+                            name = comp.getName();
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (name == null) continue;
+
+                String lowerName = name.toLowerCase();
+                for (String kw : keywords) {
+                    if (lowerName.contains(kw) && !uniqueFoundNames.contains(name)) {
+                        uniqueFoundNames.add(name);
+                        JsonObject itemObj = new JsonObject();
+                        itemObj.addProperty("name", name);
+                        itemObj.addProperty("location", invId.name().toLowerCase());
+                        found.add(itemObj);
+                        break;
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
+
     private String buildGameContext() {
         if (!config.shareCharacterInfo()) {
             return "Player is not sharing character details with the AI (this option is disabled in the settings).";

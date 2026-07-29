@@ -34,8 +34,10 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("RS3 Bloodwood trees"));
         Assert.assertTrue(prompt.contains("NOT present in OSRS"));
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
-        Assert.assertTrue(prompt.contains("multi-part question"));
+        Assert.assertTrue(prompt.contains("get_player_transportation"));
+        Assert.assertTrue(prompt.contains("SPATIAL & ROUTING VERIFICATION"));
     }
+
 
     @Test
     public void testTrimToPromptBudgetCapsLongText() {

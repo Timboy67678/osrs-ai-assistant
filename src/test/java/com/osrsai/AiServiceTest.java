@@ -655,4 +655,32 @@ public class AiServiceTest {
         Assert.assertFalse(kc.has("vorkath"));
         Assert.assertFalse(kc.has("barrows chests"));
     }
+
+    @Test
+    public void testGetPlayerTransportationReturnsExpectedJson() throws Exception {
+        Mockito.when(client.getRealSkillLevel(net.runelite.api.Skill.MAGIC)).thenReturn(75);
+        Mockito.when(client.getBoostedSkillLevel(net.runelite.api.Skill.MAGIC)).thenReturn(75);
+        Mockito.when(client.getRealSkillLevel(net.runelite.api.Skill.CONSTRUCTION)).thenReturn(83);
+        Mockito.when(client.getVarbitValue(4070)).thenReturn(0); // Standard spellbook
+
+        String json = aiService.executeGetPlayerTransportation(new JsonObject());
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertTrue(root.has("unlockedNetworks"));
+        Assert.assertTrue(root.has("magicAndSpellbook"));
+        Assert.assertTrue(root.has("constructionAndPoh"));
+        Assert.assertTrue(root.has("availableTeleportItems"));
+
+        JsonObject magic = root.getAsJsonObject("magicAndSpellbook");
+        Assert.assertEquals("Standard", magic.get("currentSpellbook").getAsString());
+        Assert.assertEquals(75, magic.get("magicLevelBase").getAsInt());
+
+        JsonObject poh = root.getAsJsonObject("constructionAndPoh");
+        Assert.assertEquals(83, poh.get("constructionLevel").getAsInt());
+        Assert.assertTrue(poh.get("portalChamberUnlocked").getAsBoolean());
+        Assert.assertTrue(poh.get("portalNexusUnlocked").getAsBoolean());
+        Assert.assertTrue(poh.get("basicJewelleryBoxUnlocked").getAsBoolean());
+    }
 }
+
