@@ -748,7 +748,8 @@ public class AiService {
         JsonArray inProgress = new JsonArray();
         JsonArray notStarted = new JsonArray();
 
-        boolean includeCompleted = "COMPLETED".equals(statusFilter) || "ALL".equals(statusFilter) || (questFilter != null);
+        boolean includeCompleted = "COMPLETED".equals(statusFilter) || "ALL".equals(statusFilter)
+                || (questFilter != null);
         boolean includeInProgress = "DEFAULT".equals(statusFilter) || "IN_PROGRESS".equals(statusFilter)
                 || "ALL".equals(statusFilter) || (questFilter != null);
         boolean includeNotStarted = "DEFAULT".equals(statusFilter) || "NOT_STARTED".equals(statusFilter)
@@ -1414,6 +1415,15 @@ public class AiService {
         sb.append("Account Type: ").append(PromptUtils.describeAccountType(accountTypeVarbit)).append("\n");
         sb.append("World: ").append(client.getWorld()).append("\n");
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
+        sb.append("Combat & Key Skills: ")
+                .append("Attack ").append(client.getRealSkillLevel(Skill.ATTACK)).append(", ")
+                .append("Strength ").append(client.getRealSkillLevel(Skill.STRENGTH)).append(", ")
+                .append("Defence ").append(client.getRealSkillLevel(Skill.DEFENCE)).append(", ")
+                .append("Ranged ").append(client.getRealSkillLevel(Skill.RANGED)).append(", ")
+                .append("Prayer ").append(client.getRealSkillLevel(Skill.PRAYER)).append(", ")
+                .append("Magic ").append(client.getRealSkillLevel(Skill.MAGIC)).append(", ")
+                .append("Hitpoints ").append(client.getRealSkillLevel(Skill.HITPOINTS)).append(", ")
+                .append("Slayer ").append(client.getRealSkillLevel(Skill.SLAYER)).append("\n");
         int spellbookVar = client.getVarbitValue(VARBIT_SPELLBOOK);
         sb.append("Active Spellbook: ").append(PromptUtils.describeSpellbook(spellbookVar)).append("\n");
         sb.append("Hitpoints: Current ")
