@@ -35,7 +35,7 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("NOT present in OSRS"));
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
         Assert.assertTrue(prompt.contains("get_player_transportation"));
-        Assert.assertTrue(prompt.contains("SPATIAL & ROUTING VERIFICATION"));
+        Assert.assertTrue(prompt.contains("ITEM SPAWNS & SPATIAL VERIFICATION"));
     }
 
 

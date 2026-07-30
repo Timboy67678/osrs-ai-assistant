@@ -33,7 +33,8 @@ public class WikiSearchUtilTest {
         String cleaned = WikiSearchUtil.cleanWikitext(input);
         Assert.assertTrue(cleaned.contains("**Dragon dagger**"));
         Assert.assertTrue(cleaned.contains("weapon"));
-        Assert.assertFalse(cleaned.contains("Infobox Item"));
+        Assert.assertTrue(cleaned.contains("Infobox Item"));
+        Assert.assertTrue(cleaned.contains("id=1234"));
         Assert.assertFalse(cleaned.contains("comment"));
     }
 

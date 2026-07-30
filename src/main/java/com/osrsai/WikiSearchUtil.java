@@ -39,7 +39,6 @@ public class WikiSearchUtil {
     private static final Pattern PATTERN_SIMPLE_LINKS = Pattern.compile("\\[\\[([^]]+?)\\]\\]");
     private static final Pattern PATTERN_BOLD = Pattern.compile("'''(.*?)'''");
     private static final Pattern PATTERN_ITALIC = Pattern.compile("''(.*?)''");
-    private static final Pattern PATTERN_TEMPLATES = Pattern.compile("\\{\\{[^{}]*?\\}\\}");
     private static final Pattern PATTERN_EMPTY_LINES = Pattern.compile("(?m)^[ \t]*\r?\n");
     private static final Pattern PATTERN_TABLE_START = Pattern.compile("(?s)\\{\\|[^\n]*\n");
     private static final Pattern PATTERN_TABLE_END = Pattern.compile("\\|\\}");
@@ -480,13 +479,13 @@ public class WikiSearchUtil {
         clean = PATTERN_BOLD.matcher(clean).replaceAll("**$1**");
         clean = PATTERN_ITALIC.matcher(clean).replaceAll("*$1*");
 
-        for (int i = 0; i < MAX_TEMPLATE_REMOVALS; i++) {
-            String next = PATTERN_TEMPLATES.matcher(clean).replaceAll("");
-            if (next.equals(clean)) {
-                break;
-            }
-            clean = next;
-        }
+        // Remove common useless/empty wiki markup templates
+        clean = clean.replaceAll("(?i)\\{\\{(stub|clear|sic|!)\\}\\}", "");
+
+        // Preserve template parameters by converting curly braces to readable brackets.
+        // This ensures the AI receives critical metadata like item spawns, drops, and stats
+        // which are normally contained inside Infobox and DropTable templates.
+        clean = clean.replace("{{", "[ ").replace("}}", " ]");
 
         clean = PATTERN_EMPTY_LINES.matcher(clean).replaceAll("");
 
