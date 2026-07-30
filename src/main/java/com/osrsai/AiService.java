@@ -941,21 +941,36 @@ public class AiService {
                     }
 
                     String name = struct.getStringValue(CA_STRUCT_PARAM_NAME);
+                    if (name == null) {
+                        name = "Unknown";
+                    }
                     String description = struct.getStringValue(CA_STRUCT_PARAM_DESCRIPTION);
+                    if (description == null) {
+                        description = "";
+                    }
                     int id = struct.getIntValue(CA_STRUCT_PARAM_TASK_ID);
                     int typeId = struct.getIntValue(CA_STRUCT_PARAM_TYPE);
                     String type = CA_TYPE_MAP.get(typeId);
+                    if (type == null) {
+                        type = "Unknown";
+                    }
                     int bossId = struct.getIntValue(CA_STRUCT_PARAM_BOSS_ID);
                     String bossName = getBossName(bossEnum, bossId);
+                    if (bossName == null) {
+                        bossName = "Unknown";
+                    }
 
                     boolean completed = false;
-                    if (id >= 0 && id < CA_VARP_IDS.length * 32) {
-                        int varpIndex = id / 32;
-                        int bitIndex = id % 32;
-                        if (varpIndex < CA_VARP_IDS.length) {
-                            int varpValue = client.getVarpValue(CA_VARP_IDS[varpIndex]);
-                            completed = (varpValue & (1 << bitIndex)) != 0;
+                    try {
+                        if (id >= 0 && id < CA_VARP_IDS.length * 32) {
+                            int varpIndex = id / 32;
+                            int bitIndex = id % 32;
+                            if (varpIndex < CA_VARP_IDS.length) {
+                                int varpValue = client.getVarpValue(CA_VARP_IDS[varpIndex]);
+                                completed = (varpValue & (1 << bitIndex)) != 0;
+                            }
                         }
+                    } catch (Exception ignored) {
                     }
 
                     if (filterCompleted != null && completed != filterCompleted) {
@@ -1421,7 +1436,8 @@ public class AiService {
         networks.addProperty("ectophial", (ghostsAhoy == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
 
         QuestState tasteOfHope = getQuestStateSafe(Quest.A_TASTE_OF_HOPE);
-        networks.addProperty("drakkansMedallion", (tasteOfHope == QuestState.IN_PROGRESS || tasteOfHope == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
+        networks.addProperty("drakkansMedallion",
+                (tasteOfHope == QuestState.IN_PROGRESS || tasteOfHope == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
 
         QuestState mm2 = getQuestStateSafe(Quest.MONKEY_MADNESS_II);
         networks.addProperty("royalSeedPod", (mm2 == QuestState.FINISHED) ? "UNLOCKED" : "LOCKED");
@@ -1453,47 +1469,82 @@ public class AiService {
         int effectiveMagic = Math.max(magicLevel, magicBoosted);
         if ("Standard".equals(spellbookName)) {
             unlockedTeleports.add("Home Teleport (Lumbridge)");
-            if (effectiveMagic >= 25) unlockedTeleports.add("Varrock Teleport (25)");
-            if (effectiveMagic >= 31) unlockedTeleports.add("Lumbridge Teleport (31)");
-            if (effectiveMagic >= 37) unlockedTeleports.add("Falador Teleport (37)");
-            if (effectiveMagic >= 40) unlockedTeleports.add("Teleport to House (40)");
-            if (effectiveMagic >= 45) unlockedTeleports.add("Camelot Teleport (45)");
-            if (effectiveMagic >= 51) unlockedTeleports.add("Ardougne Teleport (51)");
-            if (effectiveMagic >= 58) unlockedTeleports.add("Watchtower Teleport (58)");
-            if (effectiveMagic >= 61) unlockedTeleports.add("Trollheim Teleport (61)");
-            if (effectiveMagic >= 64) unlockedTeleports.add("Ape Atoll Teleport (64)");
-            if (effectiveMagic >= 69) unlockedTeleports.add("Kourend Castle Teleport (69)");
+            if (effectiveMagic >= 25)
+                unlockedTeleports.add("Varrock Teleport (25)");
+            if (effectiveMagic >= 31)
+                unlockedTeleports.add("Lumbridge Teleport (31)");
+            if (effectiveMagic >= 37)
+                unlockedTeleports.add("Falador Teleport (37)");
+            if (effectiveMagic >= 40)
+                unlockedTeleports.add("Teleport to House (40)");
+            if (effectiveMagic >= 45)
+                unlockedTeleports.add("Camelot Teleport (45)");
+            if (effectiveMagic >= 51)
+                unlockedTeleports.add("Ardougne Teleport (51)");
+            if (effectiveMagic >= 58)
+                unlockedTeleports.add("Watchtower Teleport (58)");
+            if (effectiveMagic >= 61)
+                unlockedTeleports.add("Trollheim Teleport (61)");
+            if (effectiveMagic >= 64)
+                unlockedTeleports.add("Ape Atoll Teleport (64)");
+            if (effectiveMagic >= 69)
+                unlockedTeleports.add("Kourend Castle Teleport (69)");
         } else if ("Ancient Magicks".equals(spellbookName)) {
             unlockedTeleports.add("Edgeville Home Teleport");
-            if (effectiveMagic >= 54) unlockedTeleports.add("Paddewwa Teleport (54)");
-            if (effectiveMagic >= 60) unlockedTeleports.add("Senntisten Teleport (60)");
-            if (effectiveMagic >= 66) unlockedTeleports.add("Kharyrll Teleport (66)");
-            if (effectiveMagic >= 72) unlockedTeleports.add("Lassar Teleport (72)");
-            if (effectiveMagic >= 78) unlockedTeleports.add("Dareeyak Teleport (78)");
-            if (effectiveMagic >= 84) unlockedTeleports.add("Carrallangar Teleport (84)");
-            if (effectiveMagic >= 90) unlockedTeleports.add("Annakarl Teleport (90)");
-            if (effectiveMagic >= 96) unlockedTeleports.add("Ghorrock Teleport (96)");
+            if (effectiveMagic >= 54)
+                unlockedTeleports.add("Paddewwa Teleport (54)");
+            if (effectiveMagic >= 60)
+                unlockedTeleports.add("Senntisten Teleport (60)");
+            if (effectiveMagic >= 66)
+                unlockedTeleports.add("Kharyrll Teleport (66)");
+            if (effectiveMagic >= 72)
+                unlockedTeleports.add("Lassar Teleport (72)");
+            if (effectiveMagic >= 78)
+                unlockedTeleports.add("Dareeyak Teleport (78)");
+            if (effectiveMagic >= 84)
+                unlockedTeleports.add("Carrallangar Teleport (84)");
+            if (effectiveMagic >= 90)
+                unlockedTeleports.add("Annakarl Teleport (90)");
+            if (effectiveMagic >= 96)
+                unlockedTeleports.add("Ghorrock Teleport (96)");
         } else if ("Lunar".equals(spellbookName)) {
             unlockedTeleports.add("Lunar Home Teleport");
-            if (effectiveMagic >= 69) unlockedTeleports.add("Moonclan Teleport (69)");
-            if (effectiveMagic >= 71) unlockedTeleports.add("Ourania Teleport (71)");
-            if (effectiveMagic >= 72) unlockedTeleports.add("Waterbirth Teleport (72)");
-            if (effectiveMagic >= 75) unlockedTeleports.add("Barbarian Teleport (75)");
-            if (effectiveMagic >= 78) unlockedTeleports.add("Khazard Teleport (78)");
-            if (effectiveMagic >= 85) unlockedTeleports.add("Fishing Guild Teleport (85)");
-            if (effectiveMagic >= 87) unlockedTeleports.add("Catherby Teleport (87)");
-            if (effectiveMagic >= 89) unlockedTeleports.add("Ice Plateau Teleport (89)");
+            if (effectiveMagic >= 69)
+                unlockedTeleports.add("Moonclan Teleport (69)");
+            if (effectiveMagic >= 71)
+                unlockedTeleports.add("Ourania Teleport (71)");
+            if (effectiveMagic >= 72)
+                unlockedTeleports.add("Waterbirth Teleport (72)");
+            if (effectiveMagic >= 75)
+                unlockedTeleports.add("Barbarian Teleport (75)");
+            if (effectiveMagic >= 78)
+                unlockedTeleports.add("Khazard Teleport (78)");
+            if (effectiveMagic >= 85)
+                unlockedTeleports.add("Fishing Guild Teleport (85)");
+            if (effectiveMagic >= 87)
+                unlockedTeleports.add("Catherby Teleport (87)");
+            if (effectiveMagic >= 89)
+                unlockedTeleports.add("Ice Plateau Teleport (89)");
         } else if ("Arceuus".equals(spellbookName)) {
             unlockedTeleports.add("Arceuus Home Teleport");
-            if (effectiveMagic >= 38) unlockedTeleports.add("Arceuus Library Teleport (38)");
-            if (effectiveMagic >= 40) unlockedTeleports.add("Draynor Manor Teleport (40)");
-            if (effectiveMagic >= 40) unlockedTeleports.add("Salve Graveyard Teleport (40)");
-            if (effectiveMagic >= 48) unlockedTeleports.add("Fenkenstrain's Castle Teleport (48)");
-            if (effectiveMagic >= 61) unlockedTeleports.add("West Ardougne Teleport (61)");
-            if (effectiveMagic >= 65) unlockedTeleports.add("Harmony Island Teleport (65)");
-            if (effectiveMagic >= 71) unlockedTeleports.add("Cemetery Teleport (71)");
-            if (effectiveMagic >= 83) unlockedTeleports.add("Barrows Teleport (83)");
-            if (effectiveMagic >= 90) unlockedTeleports.add("Ape Atoll Teleport (90)");
+            if (effectiveMagic >= 38)
+                unlockedTeleports.add("Arceuus Library Teleport (38)");
+            if (effectiveMagic >= 40)
+                unlockedTeleports.add("Draynor Manor Teleport (40)");
+            if (effectiveMagic >= 40)
+                unlockedTeleports.add("Salve Graveyard Teleport (40)");
+            if (effectiveMagic >= 48)
+                unlockedTeleports.add("Fenkenstrain's Castle Teleport (48)");
+            if (effectiveMagic >= 61)
+                unlockedTeleports.add("West Ardougne Teleport (61)");
+            if (effectiveMagic >= 65)
+                unlockedTeleports.add("Harmony Island Teleport (65)");
+            if (effectiveMagic >= 71)
+                unlockedTeleports.add("Cemetery Teleport (71)");
+            if (effectiveMagic >= 83)
+                unlockedTeleports.add("Barrows Teleport (83)");
+            if (effectiveMagic >= 90)
+                unlockedTeleports.add("Ape Atoll Teleport (90)");
         }
         magicObj.add("unlockedSpellTeleports", unlockedTeleports);
         result.add("magicAndSpellbook", magicObj);
@@ -1518,7 +1569,8 @@ public class AiService {
     }
 
     private QuestState getQuestStateSafe(Quest quest) {
-        if (quest == null) return QuestState.NOT_STARTED;
+        if (quest == null)
+            return QuestState.NOT_STARTED;
         try {
             QuestState state = quest.getState(client);
             return state != null ? state : QuestState.NOT_STARTED;
@@ -1534,31 +1586,33 @@ public class AiService {
         List<InventoryID> containersToScan = Arrays.asList(
                 InventoryID.INVENTORY,
                 InventoryID.EQUIPMENT,
-                InventoryID.BANK
-        );
+                InventoryID.BANK);
 
         String[] keywords = new String[] {
-            "ring of dueling", "games necklace", "combat bracelet", "skills necklace",
-            "necklace of passage", "digsite pendant", "xeric's talisman", "slayer ring",
-            "rada's blessing", "pharaoh's sceptre", "royal seed pod", "ectophial",
-            "drakkan's medallion", "teleport crystal", "ring of the elements",
-            "teleport scroll", "master scroll book", "ardougne cloak", "kandarin headgear",
-            "explorer's ring", "desert amulet", "morytania legs", "karamja gloves",
-            "western banner", "fremennik boots", "dramen staff", "lunar staff",
-            "book of the dead", "kharedst's memoirs", "teleport to house", "varrock teleport",
-            "lumbridge teleport", "falador teleport", "camelot teleport", "ardougne teleport",
-            "mythical cape"
+                "ring of dueling", "games necklace", "combat bracelet", "skills necklace",
+                "necklace of passage", "digsite pendant", "xeric's talisman", "slayer ring",
+                "rada's blessing", "pharaoh's sceptre", "royal seed pod", "ectophial",
+                "drakkan's medallion", "teleport crystal", "ring of the elements",
+                "teleport scroll", "master scroll book", "ardougne cloak", "kandarin headgear",
+                "explorer's ring", "desert amulet", "morytania legs", "karamja gloves",
+                "western banner", "fremennik boots", "dramen staff", "lunar staff",
+                "book of the dead", "kharedst's memoirs", "teleport to house", "varrock teleport",
+                "lumbridge teleport", "falador teleport", "camelot teleport", "ardougne teleport",
+                "mythical cape"
         };
 
         for (InventoryID invId : containersToScan) {
             ItemContainer container = client.getItemContainer(invId);
-            if (container == null) continue;
+            if (container == null)
+                continue;
 
             Item[] items = container.getItems();
-            if (items == null) continue;
+            if (items == null)
+                continue;
 
             for (Item item : items) {
-                if (item == null || item.getId() <= 0) continue;
+                if (item == null || item.getId() <= 0)
+                    continue;
 
                 String name = null;
                 if (itemManager != null) {
@@ -1570,7 +1624,8 @@ public class AiService {
                     } catch (Exception ignored) {
                     }
                 }
-                if (name == null) continue;
+                if (name == null)
+                    continue;
 
                 String lowerName = name.toLowerCase();
                 for (String kw : keywords) {
@@ -1587,7 +1642,6 @@ public class AiService {
         }
         return found;
     }
-
 
     private String buildGameContext() {
         if (!config.shareCharacterInfo()) {
@@ -1678,26 +1732,6 @@ public class AiService {
         return client.getTopLevelWorldView() != null && client.getTopLevelWorldView().isInstance();
     }
 
-    @SuppressWarnings("unused")
-    private String executeWikiSearch(String query) {
-        return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
-    }
-
-    @SuppressWarnings("unused")
-    private String describeAccountType(Integer accountTypeVarbit) {
-        return PromptUtils.describeAccountType(accountTypeVarbit);
-    }
-
-    @SuppressWarnings("unused")
-    private String describeSpellbook(int val) {
-        return PromptUtils.describeSpellbook(val);
-    }
-
-    @SuppressWarnings("unused")
-    private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
-        return ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, container, filter, minValue);
-    }
-
     private InstanceTemplates getInstanceTemplate(Player localPlayer, WorldPoint worldPoint) {
         if (localPlayer == null) {
             return null;
@@ -1755,4 +1789,25 @@ public class AiService {
         return obj;
     }
 
+    @SuppressWarnings("unused")
+    private String executeWikiSearch(String query) {
+        return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
+    }
+
+    @SuppressWarnings("unused")
+    private String describeAccountType(Integer accountTypeVarbit) {
+        return PromptUtils.describeAccountType(accountTypeVarbit);
+    }
+
+    @SuppressWarnings("unused")
+    private String describeSpellbook(int val) {
+        return PromptUtils.describeSpellbook(val);
+    }
+
+    @SuppressWarnings("unused")
+    private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
+        return ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, container, filter, minValue);
+    }
+
 }
+
