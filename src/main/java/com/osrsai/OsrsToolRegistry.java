@@ -103,6 +103,14 @@ public class OsrsToolRegistry {
                 "Retrieve the player's unlocked travel networks, teleportation unlocks (e.g. Fairy Rings, Spirit Trees, Gnome Gliders, Balloons, Ectophial, Drakkan's Medallion, Royal Seed Pod), current spellbook teleports, Construction POH portal access, and teleportation items in inventory/equipment/bank. Call whenever formulating travel routes, teleport suggestions, or item gathering directions.",
                 true, true, AiService::executeGetPlayerTransportation));
 
+        registry.add(new AiService.ToolDefinition("set_shortest_path_target",
+                "Set a destination coordinate (X, Y, Plane) in the player's Shortest Path plugin to draw a route overlay on their game screen. Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
+                true, true, AiService::executeSetShortestPathTarget)
+                .addParam("x", "integer", "The target X coordinate (WorldPoint x, e.g. 3200).", true)
+                .addParam("y", "integer", "The target Y coordinate (WorldPoint y, e.g. 3400).", true)
+                .addParam("plane", "integer", "The target plane (0 for ground level, 1 for first floor, etc. Default is 0).", false)
+                .addParam("locationName", "string", "A human-readable name of the location being targeted (e.g. 'Varrock West Bank' or 'Grand Exchange') to show the player in the chat response.", false));
+
         return registry;
     }
 }

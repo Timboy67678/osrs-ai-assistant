@@ -3,6 +3,7 @@ package com.osrsai;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
 import java.util.*;
@@ -177,11 +178,43 @@ public class AiService {
         return wikiClient;
     }
 
+    public AiProfile getActiveProfile() {
+        String activeId = config.activeProfileId();
+        if (activeId == null || activeId.isEmpty()) {
+            return null;
+        }
+        String json = config.aiProfilesJson();
+        if (json == null || json.isEmpty()) {
+            return null;
+        }
+        try {
+            List<AiProfile> profiles = gson.fromJson(json, new TypeToken<ArrayList<AiProfile>>() {}.getType());
+            if (profiles != null) {
+                for (AiProfile p : profiles) {
+                    if (p.getId().equals(activeId)) {
+                        return p;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse AI profiles JSON", e);
+        }
+        return null;
+    }
+
     public void sendQuestion(String question, OsrsAiPanel panel) {
-        final String apiKey = config.apiKey();
-        final AiProvider provider = config.aiProvider();
+        final AiProfile activeProfile = getActiveProfile();
+        if (activeProfile == null) {
+            panel.addMessage("System", "Please configure and activate an AI profile in the Profiles settings tab first.");
+            panel.setThinking(false);
+            return;
+        }
+
+        final String apiKey = activeProfile.getApiKey();
+        final AiProvider provider = activeProfile.getProvider();
         if (provider != AiProvider.CUSTOM && (apiKey == null || apiKey.isEmpty())) {
-            panel.addMessage("System", "Please set an API key in the plugin config.");
+            panel.addMessage("System", "Please set an API key for your active profile in the Profiles settings.");
+            panel.setThinking(false);
             return;
         }
 
@@ -192,12 +225,12 @@ public class AiService {
             clientThread.invokeLater(() -> {
                 try {
                     final String gameContext = buildGameContext();
-                    final String clientId = config.clientId();
-                    final String customModel = config.customModel();
+                    final String clientId = activeProfile.getClientId();
+                    final String customModel = activeProfile.getCustomModel();
                     final String modelId = (customModel != null && !customModel.trim().isEmpty())
                             ? customModel.trim()
                             : provider.getModelId();
-                    final String customEndpoint = config.customEndpoint();
+                    final String customEndpoint = activeProfile.getCustomEndpoint();
                     final String endpoint = (customEndpoint != null && !customEndpoint.trim().isEmpty())
                             ? customEndpoint.trim()
                             : DEFAULT_CUSTOM_ENDPOINT;
@@ -539,6 +572,80 @@ public class AiService {
             skillData.addProperty("targetLevelXp", targetXp);
             skillData.addProperty("xpToTargetLevel", Math.max(0, targetXp - currentXp));
         }
+    }
+
+    boolean setShortestPathTarget(WorldPoint targetPoint) {
+        try {
+            for (net.runelite.client.plugins.Plugin p : pluginManager.getPlugins()) {
+                if (p.getClass().getName().equals("net.runelite.client.plugins.shortestpath.ShortestPathPlugin")) {
+                    for (java.lang.reflect.Method m : p.getClass().getDeclaredMethods()) {
+                        if (m.getParameterCount() == 1 && m.getParameterTypes()[0].equals(WorldPoint.class)) {
+                            m.setAccessible(true);
+                            m.invoke(p, targetPoint);
+                            log.info("Set Shortest Path destination to {}", targetPoint);
+                            return true;
+                        }
+                    }
+
+                    for (java.lang.reflect.Field f : p.getClass().getDeclaredFields()) {
+                        if (f.getType().equals(WorldPoint.class)) {
+                            f.setAccessible(true);
+                            f.set(p, targetPoint);
+                            log.info("Set Shortest Path target field to {}", targetPoint);
+
+                            for (java.lang.reflect.Method m : p.getClass().getDeclaredMethods()) {
+                                if (m.getName().toLowerCase().contains("recalculate") || m.getName().toLowerCase().contains("path")) {
+                                    if (m.getParameterCount() == 0) {
+                                        m.setAccessible(true);
+                                        m.invoke(p);
+                                        break;
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to set Shortest Path target via reflection", e);
+        }
+        return false;
+    }
+
+    String executeSetShortestPathTarget(JsonObject args) {
+        JsonObject result = new JsonObject();
+        if (args == null || !args.has("x") || !args.has("y")) {
+            result.addProperty("status", "error");
+            result.addProperty("message", "Missing required parameters: x and y.");
+            return result.toString();
+        }
+
+        try {
+            int x = args.get("x").getAsInt();
+            int y = args.get("y").getAsInt();
+            int plane = (args.has("plane") && !args.get("plane").isJsonNull()) ? args.get("plane").getAsInt() : 0;
+            String locationName = (args.has("locationName") && !args.get("locationName").isJsonNull()) 
+                    ? args.get("locationName").getAsString() 
+                    : "Destination";
+
+            WorldPoint targetPoint = new WorldPoint(x, y, plane);
+            boolean success = setShortestPathTarget(targetPoint);
+
+            if (success) {
+                result.addProperty("status", "success");
+                result.addProperty("message", "Successfully set Shortest Path target to " + locationName + " at " + targetPoint.toString());
+            } else {
+                result.addProperty("status", "error");
+                result.addProperty("message", "Shortest Path plugin is not installed or enabled in RuneLite.");
+            }
+        } catch (Exception e) {
+            log.error("Failed to execute set_shortest_path_target tool", e);
+            result.addProperty("status", "error");
+            result.addProperty("message", "Exception: " + e.getMessage());
+        }
+
+        return result.toString();
     }
 
     String executeGetPlayerSkills(JsonObject args) {

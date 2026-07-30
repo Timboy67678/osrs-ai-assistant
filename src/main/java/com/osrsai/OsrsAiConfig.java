@@ -8,43 +8,25 @@ import net.runelite.client.config.Range;
 
 @ConfigGroup(OsrsAiPlugin.CONFIG_GROUP)
 public interface OsrsAiConfig extends Config {
-        @ConfigSection(name = "API Settings", description = "Configure your AI provider and API keys. Note: Chat queries and selected game details are sent to external AI servers.", position = 0)
-        String apiSection = "api";
-
-        @ConfigSection(name = "Custom / Local AI Settings", description = "Configure settings for custom or local AI models.", position = 5, closedByDefault = true)
-        String customSection = "customApi";
+        @ConfigSection(name = "General Settings", description = "General configuration for the AI assistant", position = 0)
+        String generalSection = "general";
 
         @ConfigSection(name = "Data Sharing", description = "Configure what game context is sent to the AI", position = 10)
         String sharingSection = "sharing";
 
-        @ConfigItem(keyName = "aiProvider", name = "AI", description = "Select the AI brain to use.", position = 1, section = apiSection)
-        default AiProvider aiProvider() {
-                return AiProvider.GROK_REASONING;
-        }
-
-        @ConfigItem(keyName = "apiKey", name = "API Key", description = "The API key for your selected provider. Kept secret, but used for external AI API communication.", position = 2, secret = true, section = apiSection)
-        default String apiKey() {
-                return "";
-        }
-
-        @ConfigItem(keyName = "clientId", name = "Org ID", description = "Optional client ID (Required if provider specifies it).", position = 3, secret = true, section = apiSection)
-        default String clientId() {
-                return "";
-        }
-
         @Range(min = 1, max = AiService.MAX_DEPTH_COUNT)
-        @ConfigItem(keyName = "maxSearchDepth", name = "Max Search Depth", description = "The maximum number of recursive tool calls/wiki searches the AI can perform for a single question.", position = 4, section = apiSection)
+        @ConfigItem(keyName = "maxSearchDepth", name = "Max Search Depth", description = "The maximum number of recursive tool calls/wiki searches the AI can perform for a single question.", position = 1, section = generalSection)
         default int maxSearchDepth() {
                 return AiService.MAX_DEPTH_COUNT / 2;
         }
 
-        @ConfigItem(keyName = "customEndpoint", name = "Custom Endpoint", description = "The endpoint URL for a custom or local OpenAI-compatible API (e.g. http://localhost:11434/v1/chat/completions). Only used when Provider is Custom.", position = 6, section = customSection)
-        default String customEndpoint() {
-                return "";
+        @ConfigItem(keyName = "ai_profiles_v1", name = "", description = "", hidden = true, secret = true)
+        default String aiProfilesJson() {
+                return "[]";
         }
 
-        @ConfigItem(keyName = "customModel", name = "Custom Model ID", description = "Override the AI model name/ID (e.g., gpt-4-turbo, gemini-1.5-pro, or your local model name). Leave blank to use default.", position = 7, section = customSection)
-        default String customModel() {
+        @ConfigItem(keyName = "active_profile_id", name = "", description = "", hidden = true)
+        default String activeProfileId() {
                 return "";
         }
 

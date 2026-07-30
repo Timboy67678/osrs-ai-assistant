@@ -39,7 +39,7 @@ tasks.register('run', JavaExec) {
     group = 'runelite'
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.osrsai.OsrsAiPluginTest'
-    args = ['--developer-mode']
+    //args = ['--developer-mode']
     jvmArgs = [
             '-ea',
             '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',

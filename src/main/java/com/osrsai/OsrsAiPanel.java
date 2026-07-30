@@ -6,7 +6,11 @@ import net.runelite.client.config.ConfigManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.util.ArrayDeque;
@@ -19,13 +23,14 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 public class OsrsAiPanel extends PluginPanel {
-    private static final int MAX_PROMPT_MESSAGES = 6; 
+    private static final int MAX_PROMPT_MESSAGES = 6;
     private static final int MAX_SESSIONS = 15;
     private static final int MAX_MESSAGES_PER_SESSION = 50;
 
     private final OsrsAiPlugin plugin;
     private final ConfigManager configManager;
     private final JPanel dockedHostPanel;
+    private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel;
     private final JEditorPane chatArea;
     private final JTextField inputField;
@@ -44,9 +49,19 @@ public class OsrsAiPanel extends PluginPanel {
     private ChatSession activeSession;
     private boolean updatingComboBox = false;
 
-    public OsrsAiPanel(OsrsAiPlugin plugin) {
-        this(plugin, null);
-    }
+    // AI Profiles fields
+    private final List<AiProfile> profiles = new ArrayList<>();
+    private AiProfile activeProfile;
+    private JComboBox<AiProfile> profileSelectComboBox;
+    private JTextField profileNameField;
+    private JComboBox<AiProvider> profileProviderComboBox;
+    private JPasswordField profileApiKeyField;
+    private JTextField profileClientIdField;
+    private JTextField profileCustomModelField;
+    private JTextField profileCustomEndpointField;
+    private JButton setProfileActiveButton;
+    private JButton deleteProfileButton;
+    private boolean isUpdatingFields = false;
 
     public OsrsAiPanel(OsrsAiPlugin plugin, ConfigManager configManager) {
         super(false);
@@ -60,8 +75,13 @@ public class OsrsAiPanel extends PluginPanel {
         dockedHostPanel.setOpaque(false);
         add(dockedHostPanel, BorderLayout.CENTER);
 
-        contentPanel = new JPanel(new BorderLayout());
+        loadProfiles();
+
+        contentPanel = new JPanel(cardLayout);
         contentPanel.setOpaque(false);
+
+        JPanel chatViewPanel = new JPanel(new BorderLayout());
+        chatViewPanel.setOpaque(false);
 
         JPanel topBar = new JPanel(new GridBagLayout());
         topBar.setOpaque(false);
@@ -73,13 +93,16 @@ public class OsrsAiPanel extends PluginPanel {
         newChatButton = new JButton("+ New");
         newChatButton.setFocusable(false);
         newChatButton.setToolTipText("Create a new chat session");
+        newChatButton.setMargin(new Insets(2, 2, 2, 2));
 
         deleteChatButton = new JButton("Delete");
         deleteChatButton.setFocusable(false);
         deleteChatButton.setToolTipText("Delete the current chat history");
+        deleteChatButton.setMargin(new Insets(2, 2, 2, 2));
 
         detachButton = new JButton("Detach");
         detachButton.setFocusable(false);
+        detachButton.setMargin(new Insets(2, 2, 2, 2));
 
         chatSessionComboBox = new JComboBox<>();
         chatSessionComboBox.setFocusable(false);
@@ -98,12 +121,21 @@ public class OsrsAiPanel extends PluginPanel {
         c.gridx = 2;
         topBar.add(detachButton, c);
 
-        // Row 1: Dropdown
+        // Row 1: Dropdown & Profiles Button
         c.gridy = 1;
         c.gridx = 0;
-        c.gridwidth = 3;
-        c.weightx = 1.0;
+        c.gridwidth = 2;
+        c.weightx = 0.85;
         topBar.add(chatSessionComboBox, c);
+
+        JButton profilesBtn = new JButton("⚙️");
+        profilesBtn.setToolTipText("Configure AI Profiles");
+        profilesBtn.setFocusable(false);
+        profilesBtn.addActionListener(e -> switchToProfilesView());
+        c.gridx = 2;
+        c.gridwidth = 1;
+        c.weightx = 0.15;
+        topBar.add(profilesBtn, c);
 
         // Row 2: Warning Label
         this.warningLabel = new JLabel();
@@ -114,9 +146,10 @@ public class OsrsAiPanel extends PluginPanel {
         c.gridy = 2;
         c.gridx = 0;
         c.gridwidth = 3;
+        c.weightx = 1.0;
         topBar.add(warningLabel, c);
 
-        contentPanel.add(topBar, BorderLayout.NORTH);
+        chatViewPanel.add(topBar, BorderLayout.NORTH);
 
         chatArea = new JEditorPane() {
             @Override
@@ -150,7 +183,7 @@ public class OsrsAiPanel extends PluginPanel {
 
         JScrollPane scrollPane = new JScrollPane(chatArea);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        contentPanel.add(scrollPane, BorderLayout.CENTER);
+        chatViewPanel.add(scrollPane, BorderLayout.CENTER);
 
         JPanel inputPanel = new JPanel();
         inputPanel.setLayout(new BorderLayout());
@@ -160,8 +193,15 @@ public class OsrsAiPanel extends PluginPanel {
         inputPanel.add(inputField, BorderLayout.CENTER);
         inputPanel.add(sendButton, BorderLayout.EAST);
 
-        contentPanel.add(inputPanel, BorderLayout.SOUTH);
+        chatViewPanel.add(inputPanel, BorderLayout.SOUTH);
+
+        contentPanel.add(chatViewPanel, "CHAT");
+
+        JPanel profilesPanel = createProfilesPanel();
+        contentPanel.add(profilesPanel, "PROFILES");
+
         dockedHostPanel.add(contentPanel, BorderLayout.CENTER);
+        cardLayout.show(contentPanel, "CHAT");
 
         // Add action listener
         java.awt.event.ActionListener sendAction = e -> {
@@ -192,6 +232,34 @@ public class OsrsAiPanel extends PluginPanel {
         });
 
         loadSessions();
+
+        // Initialize dynamic profiles UI elements
+        isUpdatingFields = true;
+        profileSelectComboBox.removeAllItems();
+        for (AiProfile p : profiles) {
+            profileSelectComboBox.addItem(p);
+        }
+        if (activeProfile != null) {
+            profileSelectComboBox.setSelectedItem(activeProfile);
+            populateFormFields(activeProfile);
+        } else if (!profiles.isEmpty()) {
+            profileSelectComboBox.setSelectedIndex(0);
+            populateFormFields(profiles.get(0));
+        }
+        isUpdatingFields = false;
+
+        addFieldListeners();
+
+        // Add hyperlink listener to chatArea for empty state links
+        chatArea.addHyperlinkListener(e -> {
+            if (e.getEventType() == javax.swing.event.HyperlinkEvent.EventType.ACTIVATED) {
+                if ("configure".equals(e.getDescription())) {
+                    switchToProfilesView();
+                }
+            }
+        });
+
+        updateUiState();
     }
 
     public void closeDetachedWindow() {
@@ -802,5 +870,441 @@ public class OsrsAiPanel extends PluginPanel {
         public String toString() {
             return title;
         }
+    }
+
+    private void switchToProfilesView() {
+        cardLayout.show(contentPanel, "PROFILES");
+    }
+
+    private JPanel createProfilesPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
+
+        // Header Panel
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+        headerPanel.setBorder(new EmptyBorder(0, 0, 10, 0));
+
+        JLabel titleLabel = new JLabel("AI Profiles");
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        headerPanel.add(titleLabel, BorderLayout.WEST);
+
+        JButton backBtn = new JButton("Back");
+        backBtn.setFocusable(false);
+        backBtn.addActionListener(e -> cardLayout.show(contentPanel, "CHAT"));
+        headerPanel.add(backBtn, BorderLayout.EAST);
+
+        panel.add(headerPanel, BorderLayout.NORTH);
+
+        // Scrollable content panel with GridBagLayout
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setOpaque(false);
+        formPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(4, 2, 4, 2);
+        gbc.weightx = 1.0;
+
+        int row = 0;
+
+        // Profile Selector Header
+        JLabel selectLabel = new JLabel("Select Profile:");
+        selectLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        selectLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+        gbc.gridx = 0;
+        gbc.gridy = row++;
+        gbc.gridwidth = 2;
+        formPanel.add(selectLabel, gbc);
+
+        // Dropdown
+        profileSelectComboBox = new JComboBox<>();
+        profileSelectComboBox.setFocusable(false);
+        profileSelectComboBox.setPreferredSize(new Dimension(0, 28));
+        gbc.gridy = row++;
+        gbc.gridwidth = 2;
+        formPanel.add(profileSelectComboBox, gbc);
+
+        // Set Active button (Full width)
+        setProfileActiveButton = new JButton("Set Active");
+        setProfileActiveButton.setFocusable(false);
+        setProfileActiveButton.setPreferredSize(new Dimension(0, 28));
+        setProfileActiveButton.addActionListener(e -> activateSelectedProfile());
+        gbc.gridy = row++;
+        gbc.gridwidth = 2;
+        formPanel.add(setProfileActiveButton, gbc);
+
+        // New and Delete buttons side by side
+        JButton newProfileBtn = new JButton("+ New");
+        newProfileBtn.setFocusable(false);
+        newProfileBtn.setPreferredSize(new Dimension(0, 28));
+        newProfileBtn.addActionListener(e -> createNewProfile());
+        gbc.gridy = row;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.5;
+        formPanel.add(newProfileBtn, gbc);
+
+        deleteProfileButton = new JButton("Delete");
+        deleteProfileButton.setFocusable(false);
+        deleteProfileButton.setPreferredSize(new Dimension(0, 28));
+        deleteProfileButton.addActionListener(e -> deleteSelectedProfile());
+        gbc.gridx = 1;
+        gbc.weightx = 0.5;
+        formPanel.add(deleteProfileButton, gbc);
+
+        row++;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0; // Reset
+
+        // Visual Separator
+        JSeparator separator = new JSeparator();
+        separator.setForeground(ColorScheme.DARKER_GRAY_COLOR);
+        gbc.gridy = row++;
+        gbc.insets = new Insets(10, 2, 10, 2);
+        formPanel.add(separator, gbc);
+        gbc.insets = new Insets(4, 2, 4, 2); // Reset
+
+        // Form Fields Header
+        JLabel detailsLabel = new JLabel("Profile Details:");
+        detailsLabel.setForeground(Color.WHITE);
+        detailsLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+        gbc.gridy = row++;
+        formPanel.add(detailsLabel, gbc);
+
+        // Profile Name
+        JLabel nameLabel = new JLabel("Profile Name:");
+        nameLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        gbc.gridy = row++;
+        formPanel.add(nameLabel, gbc);
+
+        profileNameField = new JTextField();
+        profileNameField.setPreferredSize(new Dimension(0, 26));
+        gbc.gridy = row++;
+        formPanel.add(profileNameField, gbc);
+
+        // AI Provider
+        JLabel providerLabel = new JLabel("AI Provider:");
+        providerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        gbc.gridy = row++;
+        formPanel.add(providerLabel, gbc);
+
+        profileProviderComboBox = new JComboBox<>(AiProvider.values());
+        profileProviderComboBox.setFocusable(false);
+        profileProviderComboBox.setPreferredSize(new Dimension(0, 28));
+        gbc.gridy = row++;
+        formPanel.add(profileProviderComboBox, gbc);
+
+        // API Key
+        JLabel apiKeyLabel = new JLabel("API Key:");
+        apiKeyLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        gbc.gridy = row++;
+        formPanel.add(apiKeyLabel, gbc);
+
+        profileApiKeyField = new JPasswordField();
+        profileApiKeyField.setPreferredSize(new Dimension(0, 26));
+        gbc.gridy = row++;
+        formPanel.add(profileApiKeyField, gbc);
+
+        // Custom Model Override
+        JLabel modelLabel = new JLabel("Model Override (Optional):");
+        modelLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        gbc.gridy = row++;
+        formPanel.add(modelLabel, gbc);
+
+        profileCustomModelField = new JTextField();
+        profileCustomModelField.setPreferredSize(new Dimension(0, 26));
+        gbc.gridy = row++;
+        formPanel.add(profileCustomModelField, gbc);
+
+        // Custom Endpoint
+        JLabel endpointLabel = new JLabel("Endpoint URL (Custom only):");
+        endpointLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        gbc.gridy = row++;
+        formPanel.add(endpointLabel, gbc);
+
+        profileCustomEndpointField = new JTextField();
+        profileCustomEndpointField.setPreferredSize(new Dimension(0, 26));
+        gbc.gridy = row++;
+        formPanel.add(profileCustomEndpointField, gbc);
+
+        // Client / Org ID
+        JLabel clientLabel = new JLabel("Org ID / Client ID (Optional):");
+        clientLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        gbc.gridy = row++;
+        formPanel.add(clientLabel, gbc);
+
+        profileClientIdField = new JTextField();
+        profileClientIdField.setPreferredSize(new Dimension(0, 26));
+        gbc.gridy = row++;
+        formPanel.add(profileClientIdField, gbc);
+
+        // Vertical Spacer/Filler at the bottom
+        gbc.gridy = row++;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        formPanel.add(new JPanel() {
+            {
+                setOpaque(false);
+            }
+        }, gbc);
+
+        JScrollPane scrollPane = new JScrollPane(formPanel);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(null);
+
+        panel.add(scrollPane, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void populateFormFields(AiProfile profile) {
+        isUpdatingFields = true;
+        profileNameField.setText(profile.getName());
+        profileProviderComboBox.setSelectedItem(profile.getProvider());
+        profileApiKeyField.setText(profile.getApiKey());
+        profileCustomModelField.setText(profile.getCustomModel());
+        profileCustomEndpointField.setText(profile.getCustomEndpoint());
+        profileClientIdField.setText(profile.getClientId());
+
+        // Update active button state
+        if (activeProfile != null && activeProfile.getId().equals(profile.getId())) {
+            setProfileActiveButton.setText("Active");
+            setProfileActiveButton.setEnabled(false);
+        } else {
+            setProfileActiveButton.setText("Set Active");
+            setProfileActiveButton.setEnabled(true);
+        }
+        isUpdatingFields = false;
+    }
+
+    private void addFieldListeners() {
+        DocumentListener textChangeListener = new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                update();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                update();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                update();
+            }
+
+            private void update() {
+                if (isUpdatingFields)
+                    return;
+                AiProfile selected = (AiProfile) profileSelectComboBox.getSelectedItem();
+                if (selected != null) {
+                    selected.setName(profileNameField.getText().trim());
+                    selected.setApiKey(new String(profileApiKeyField.getPassword()).trim());
+                    selected.setCustomModel(profileCustomModelField.getText().trim());
+                    selected.setCustomEndpoint(profileCustomEndpointField.getText().trim());
+                    selected.setClientId(profileClientIdField.getText().trim());
+                    saveProfiles();
+                }
+            }
+        };
+
+        profileNameField.getDocument().addDocumentListener(textChangeListener);
+        profileApiKeyField.getDocument().addDocumentListener(textChangeListener);
+        profileCustomModelField.getDocument().addDocumentListener(textChangeListener);
+        profileCustomEndpointField.getDocument().addDocumentListener(textChangeListener);
+        profileClientIdField.getDocument().addDocumentListener(textChangeListener);
+
+        // Update combobox items display name on name field focus lost
+        profileNameField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (isUpdatingFields)
+                    return;
+                AiProfile selected = (AiProfile) profileSelectComboBox.getSelectedItem();
+                if (selected != null) {
+                    isUpdatingFields = true;
+                    int idx = profileSelectComboBox.getSelectedIndex();
+                    if (idx >= 0) {
+                        profileSelectComboBox.removeItemAt(idx);
+                        profileSelectComboBox.insertItemAt(selected, idx);
+                        profileSelectComboBox.setSelectedIndex(idx);
+                    }
+                    isUpdatingFields = false;
+                }
+            }
+        });
+
+        profileProviderComboBox.addActionListener(e -> {
+            if (isUpdatingFields)
+                return;
+            AiProfile selected = (AiProfile) profileSelectComboBox.getSelectedItem();
+            if (selected != null) {
+                selected.setProvider((AiProvider) profileProviderComboBox.getSelectedItem());
+                saveProfiles();
+            }
+        });
+
+        profileSelectComboBox.addActionListener(e -> {
+            if (isUpdatingFields)
+                return;
+            AiProfile selected = (AiProfile) profileSelectComboBox.getSelectedItem();
+            if (selected != null) {
+                populateFormFields(selected);
+            }
+        });
+    }
+
+    private void saveProfiles() {
+        if (configManager != null) {
+            String json = gson.toJson(profiles);
+            configManager.setConfiguration(OsrsAiPlugin.CONFIG_GROUP, "ai_profiles_v1", json);
+            if (activeProfile != null) {
+                configManager.setConfiguration(OsrsAiPlugin.CONFIG_GROUP, "active_profile_id", activeProfile.getId());
+            } else {
+                configManager.setConfiguration(OsrsAiPlugin.CONFIG_GROUP, "active_profile_id", "");
+            }
+        }
+    }
+
+    private void loadProfiles() {
+        profiles.clear();
+        if (configManager == null) {
+            return;
+        }
+        String json = configManager.getConfiguration(OsrsAiPlugin.CONFIG_GROUP, "ai_profiles_v1");
+        String activeId = configManager.getConfiguration(OsrsAiPlugin.CONFIG_GROUP, "active_profile_id");
+
+        try {
+            if (json != null && !json.isEmpty()) {
+                Type listType = new TypeToken<ArrayList<AiProfile>>() {
+                }.getType();
+                List<AiProfile> loaded = gson.fromJson(json, listType);
+                if (loaded != null) {
+                    profiles.addAll(loaded);
+                }
+            }
+        } catch (Exception e) {
+            // handle parse error
+        }
+
+        activeProfile = null;
+        if (activeId != null && !activeId.isEmpty()) {
+            for (AiProfile p : profiles) {
+                if (p.getId().equals(activeId)) {
+                    activeProfile = p;
+                    break;
+                }
+            }
+        }
+        if (activeProfile == null && !profiles.isEmpty()) {
+            activeProfile = profiles.get(0);
+        }
+    }
+
+    private void createNewProfile() {
+        AiProfile newProfile = new AiProfile();
+        profiles.add(newProfile);
+
+        isUpdatingFields = true;
+        profileSelectComboBox.addItem(newProfile);
+        profileSelectComboBox.setSelectedItem(newProfile);
+        isUpdatingFields = false;
+
+        populateFormFields(newProfile);
+        saveProfiles();
+        updateUiState();
+    }
+
+    private void deleteSelectedProfile() {
+        AiProfile selected = (AiProfile) profileSelectComboBox.getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to delete profile \"" + selected.getName() + "\"?",
+                "Delete Profile",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        profiles.remove(selected);
+        isUpdatingFields = true;
+        profileSelectComboBox.removeItem(selected);
+        isUpdatingFields = false;
+
+        if (activeProfile == selected) {
+            activeProfile = profiles.isEmpty() ? null : profiles.get(0);
+        }
+
+        saveProfiles();
+        updateUiState();
+
+        AiProfile nextSelected = (AiProfile) profileSelectComboBox.getSelectedItem();
+        if (nextSelected != null) {
+            populateFormFields(nextSelected);
+        } else {
+            isUpdatingFields = true;
+            profileNameField.setText("");
+            profileProviderComboBox.setSelectedIndex(-1);
+            profileApiKeyField.setText("");
+            profileCustomModelField.setText("");
+            profileCustomEndpointField.setText("");
+            profileClientIdField.setText("");
+            setProfileActiveButton.setText("Set Active");
+            setProfileActiveButton.setEnabled(false);
+            isUpdatingFields = false;
+        }
+    }
+
+    private void activateSelectedProfile() {
+        AiProfile selected = (AiProfile) profileSelectComboBox.getSelectedItem();
+        if (selected != null) {
+            activeProfile = selected;
+            saveProfiles();
+            updateUiState();
+            populateFormFields(selected);
+        }
+    }
+
+    private void updateUiState() {
+        runOnEdt(() -> {
+            boolean hasProfiles = !profiles.isEmpty();
+            boolean hasActiveProfile = activeProfile != null;
+
+            inputField.setEnabled(hasProfiles && hasActiveProfile);
+            sendButton.setEnabled(hasProfiles && hasActiveProfile);
+
+            if (!hasProfiles) {
+                chatHistory.setLength(0);
+                chatArea.setText(
+                        "<html><body style='color:#aaaaaa; font-family:sans-serif; font-size:11px; text-align:center;'>"
+                                + "<div style='margin-top:50px;'><h3>Welcome to OSRS AI Assistant!</h3>"
+                                + "<p>To start chatting, you must configure and activate an AI profile first.</p>"
+                                + "<p><a href='configure' style='color:#00ffff;'>Click here to configure profiles</a></p></div>"
+                                + "</body></html>");
+            } else if (!hasActiveProfile) {
+                chatHistory.setLength(0);
+                chatArea.setText(
+                        "<html><body style='color:#aaaaaa; font-family:sans-serif; font-size:11px; text-align:center;'>"
+                                + "<div style='margin-top:50px;'><h3>No Active Profile</h3>"
+                                + "<p>Please select and activate an AI profile to start chatting.</p>"
+                                + "<p><a href='configure' style='color:#00ffff;'>Click here to manage profiles</a></p></div>"
+                                + "</body></html>");
+            } else {
+                if (activeSession != null) {
+                    selectSession(activeSession);
+                }
+            }
+        });
     }
 }

@@ -7,7 +7,7 @@ import org.junit.Test;
 public class OsrsAiPanelTest {
     @Test
     public void formatsHeadingsListsAndEscaping() throws Exception {
-        OsrsAiPanel panel = new OsrsAiPanel(null);
+        OsrsAiPanel panel = new OsrsAiPanel(null, null);
         Method formatter = OsrsAiPanel.class.getDeclaredMethod("formatMarkdownToHtml", String.class);
         formatter.setAccessible(true);
 
