@@ -76,7 +76,10 @@ public class GrokProviderHandler extends OpenAiProviderHandler {
             String baseSystemPrompt = AiService.buildSystemPrompt(context, recentConversation);
             String cleanSystemPrompt = baseSystemPrompt.replaceAll("(?s)AVAILABLE TOOLS:.*?GROUNDING RULES:",
                     "GROUNDING RULES:");
-            cleanSystemPrompt += "\n\nNATIVE SEARCH RULES:\n- Answer directly using search snippets. Do NOT call browse_page to load full web articles.\n- Keep response concise: 1-2 short paragraphs max. Avoid long lists of extra advice unless explicitly asked.";
+            cleanSystemPrompt += "\n\nNATIVE SEARCH RULES:\n"
+                    + "- Answer directly using search snippets. Do NOT call browse_page to load full web articles.\n"
+                    + "- Keep response concise: 1-2 short paragraphs max.\n"
+                    + "- Speak directly in second person ('you/your'). NEVER write third-person evaluation notes.";
             JsonArray input = new JsonArray();
             JsonObject systemMsg = new JsonObject();
             systemMsg.addProperty("role", "system");
