@@ -24,7 +24,14 @@ public class OpenAiProviderHandler implements ProviderHandler {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("temperature", LOW_TEMPERATURE);
-        bodyObj.addProperty("max_completion_tokens", 2048);
+
+        boolean isOModel = modelId != null && (modelId.startsWith("o1") || modelId.startsWith("o3"));
+        if (isOModel) {
+            bodyObj.addProperty("max_completion_tokens", 4096);
+        } else {
+            bodyObj.addProperty("max_tokens", 4096);
+            bodyObj.addProperty("max_completion_tokens", 4096);
+        }
 
         JsonArray messages = new JsonArray();
         JsonObject systemMessage = new JsonObject();
@@ -91,31 +98,58 @@ public class OpenAiProviderHandler implements ProviderHandler {
         return tools;
     }
 
+    private JsonObject getAssistantMessage(JsonObject responseRoot) {
+        if (responseRoot == null) {
+            return null;
+        }
+        if (responseRoot.has("choices")) {
+            JsonArray choices = responseRoot.getAsJsonArray("choices");
+            if (choices.size() > 0 && choices.get(0).isJsonObject()) {
+                JsonObject choice = choices.get(0).getAsJsonObject();
+                if (choice.has("message")) {
+                    return choice.getAsJsonObject("message");
+                }
+            }
+        }
+        if (responseRoot.has("outputs")) {
+            JsonArray outputs = responseRoot.getAsJsonArray("outputs");
+            if (outputs.size() > 0 && outputs.get(0).isJsonObject()) {
+                JsonObject output = outputs.get(0).getAsJsonObject();
+                if (output.has("message")) {
+                    JsonObject msg = output.getAsJsonObject("message");
+                    if (msg.has("toolCalls") && !msg.has("tool_calls")) {
+                        msg.add("tool_calls", msg.get("toolCalls"));
+                    }
+                    return msg;
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public boolean hasToolCalls(JsonObject responseRoot) {
-        if (!responseRoot.has("choices")) {
-            return false;
-        }
-        JsonArray choices = responseRoot.getAsJsonArray("choices");
-        if (choices.size() == 0) {
-            return false;
-        }
-        JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
+        JsonObject message = getAssistantMessage(responseRoot);
         return message != null && message.has("tool_calls") && message.getAsJsonArray("tool_calls").size() > 0;
     }
 
     @Override
     public List<AiService.ToolCall> extractToolCalls(JsonObject responseRoot) {
         List<AiService.ToolCall> toolCalls = new ArrayList<>();
-        JsonObject assistantMessage = responseRoot.getAsJsonArray("choices").get(0)
-                .getAsJsonObject().getAsJsonObject("message");
+        JsonObject assistantMessage = getAssistantMessage(responseRoot);
+        if (assistantMessage == null || !assistantMessage.has("tool_calls")) {
+            return toolCalls;
+        }
         JsonArray tcArray = assistantMessage.getAsJsonArray("tool_calls");
         for (int i = 0; i < tcArray.size(); i++) {
             JsonObject tc = tcArray.get(i).getAsJsonObject();
-            String id = tc.get("id").getAsString();
+            String id = tc.has("id") && !tc.get("id").isJsonNull() ? tc.get("id").getAsString() : "call_" + i;
             JsonObject func = tc.getAsJsonObject("function");
             String name = func.get("name").getAsString();
-            JsonObject args = gson.fromJson(func.get("arguments").getAsString(), JsonObject.class);
+            String argsStr = func.get("arguments").isJsonObject()
+                    ? gson.toJson(func.getAsJsonObject("arguments"))
+                    : func.get("arguments").getAsString();
+            JsonObject args = gson.fromJson(argsStr, JsonObject.class);
             toolCalls.add(new AiService.ToolCall(id, name, args));
         }
         return toolCalls;
@@ -127,11 +161,17 @@ public class OpenAiProviderHandler implements ProviderHandler {
         JsonArray messages = requestBody.getAsJsonArray("messages");
 
         // Add assistant message (which contains the tool calls)
-        JsonObject assistantMessage = responseRoot.getAsJsonArray("choices").get(0)
-                .getAsJsonObject().getAsJsonObject("message");
+        JsonObject assistantMessage = getAssistantMessage(responseRoot);
         JsonObject msg = new JsonObject();
         msg.addProperty("role", "assistant");
-        msg.add("tool_calls", assistantMessage.getAsJsonArray("tool_calls"));
+        if (assistantMessage != null && assistantMessage.has("content") && !assistantMessage.get("content").isJsonNull()) {
+            msg.add("content", assistantMessage.get("content"));
+        } else {
+            msg.addProperty("content", "");
+        }
+        if (assistantMessage != null && assistantMessage.has("tool_calls")) {
+            msg.add("tool_calls", assistantMessage.getAsJsonArray("tool_calls"));
+        }
         messages.add(msg);
 
         // Add a message for each tool result
@@ -146,28 +186,31 @@ public class OpenAiProviderHandler implements ProviderHandler {
 
     @Override
     public String extractResponseText(JsonObject responseRoot) {
-        if (responseRoot != null && responseRoot.has("choices")) {
-            JsonArray choices = responseRoot.getAsJsonArray("choices");
-            if (choices.size() > 0) {
-                JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
-                if (message != null) {
-                    if (message.has("content") && !message.get("content").isJsonNull()) {
-                        String content = message.get("content").getAsString();
-                        if (content != null && !content.trim().isEmpty()) {
-                            return content;
-                        }
+        if (responseRoot != null) {
+            JsonObject message = getAssistantMessage(responseRoot);
+            if (message != null) {
+                if (message.has("content") && !message.get("content").isJsonNull()) {
+                    String content = message.get("content").getAsString();
+                    if (content != null && !content.trim().isEmpty()) {
+                        return content;
                     }
-                    if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
-                        String reasoning = message.get("reasoning_content").getAsString();
-                        if (reasoning != null && !reasoning.trim().isEmpty()) {
-                            return reasoning;
-                        }
+                }
+                if (message.has("text") && !message.get("text").isJsonNull()) {
+                    String text = message.get("text").getAsString();
+                    if (text != null && !text.trim().isEmpty()) {
+                        return text;
                     }
-                    if (message.has("reasoning") && !message.get("reasoning").isJsonNull()) {
-                        String reasoning = message.get("reasoning").getAsString();
-                        if (reasoning != null && !reasoning.trim().isEmpty()) {
-                            return reasoning;
-                        }
+                }
+                if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
+                    String reasoning = message.get("reasoning_content").getAsString();
+                    if (reasoning != null && !reasoning.trim().isEmpty()) {
+                        return reasoning;
+                    }
+                }
+                if (message.has("reasoning") && !message.get("reasoning").isJsonNull()) {
+                    String reasoning = message.get("reasoning").getAsString();
+                    if (reasoning != null && !reasoning.trim().isEmpty()) {
+                        return reasoning;
                     }
                 }
             }

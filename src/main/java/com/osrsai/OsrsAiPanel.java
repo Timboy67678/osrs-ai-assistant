@@ -509,7 +509,6 @@ public class OsrsAiPanel extends PluginPanel {
 
     private String formatInlineMarkdown(String text) {
         String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        html = html.replaceAll("(/)([^\\s/])", "/ $2");
         html = html.replaceAll("`(.*?)`",
                 "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");

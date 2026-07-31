@@ -19,7 +19,7 @@ public class ClaudeProviderHandler implements ProviderHandler {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("system", AiService.buildSystemPrompt(context, recentConversation));
-        bodyObj.addProperty("max_tokens", 1024);
+        bodyObj.addProperty("max_tokens", 4096);
         bodyObj.addProperty("temperature", LOW_TEMPERATURE);
 
         JsonArray messages = new JsonArray();

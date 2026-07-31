@@ -39,6 +39,17 @@ public class WikiSearchUtilTest {
     }
 
     @Test
+    public void testCleanWikitextStripsUselessSections() {
+        String input = "A rune pouch stores runes.\n==Obtaining==\nBuy from Slayer master.\n==Changes==\nDate: 15 July 2026\n[ div col|colwidth=20em ]\nAdded Maggot King.\n[ div col end ]";
+        String cleaned = WikiSearchUtil.cleanWikitext(input);
+        Assert.assertTrue(cleaned.contains("A rune pouch stores runes"));
+        Assert.assertTrue(cleaned.contains("Buy from Slayer master"));
+        Assert.assertFalse(cleaned.contains("==Changes=="));
+        Assert.assertFalse(cleaned.contains("Added Maggot King"));
+        Assert.assertFalse(cleaned.contains("div col"));
+    }
+
+    @Test
     public void testWikiSearchIntegrationFallback() {
         WikiSearchUtil.clearCache();
         OkHttpClient client = new OkHttpClient();

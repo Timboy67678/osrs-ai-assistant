@@ -48,6 +48,12 @@ public class WikiSearchUtil {
     private static final Pattern PATTERN_TABLE_DELIM = Pattern.compile("!|\\|\\|");
     private static final Pattern PATTERN_TABLE_CELL = Pattern.compile("(?m)^\\|");
     private static final Pattern PATTERN_TABLE_HEADER = Pattern.compile("(?m)^!");
+    private static final Pattern PATTERN_USELESS_SECTIONS = Pattern.compile(
+            "(?ims)^==\\s*(Changes|Update history|History|Gallery|References|External links|Navigation)\\s*==.*?(?=(^==|\\z))"
+    );
+    private static final Pattern PATTERN_DIV_COL_MARKUP = Pattern.compile(
+            "(?im)^\\[\\s*(div col|div col end|uses material list|store locations list|subject changes|subject changes header).*?\\]\\s*$"
+    );
 
     private WikiSearchUtil() {
         // Utility class
@@ -461,6 +467,7 @@ public class WikiSearchUtil {
         }
 
         String clean = PATTERN_COMMENTS.matcher(wikitext).replaceAll("");
+        clean = PATTERN_USELESS_SECTIONS.matcher(clean).replaceAll("");
 
         // Replace HTML entities and strip magic words
         clean = PATTERN_MAGIC.matcher(
@@ -486,6 +493,7 @@ public class WikiSearchUtil {
         // This ensures the AI receives critical metadata like item spawns, drops, and stats
         // which are normally contained inside Infobox and DropTable templates.
         clean = clean.replace("{{", "[ ").replace("}}", " ]");
+        clean = PATTERN_DIV_COL_MARKUP.matcher(clean).replaceAll("");
 
         clean = PATTERN_EMPTY_LINES.matcher(clean).replaceAll("");
 

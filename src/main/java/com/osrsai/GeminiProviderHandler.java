@@ -37,6 +37,7 @@ public class GeminiProviderHandler implements ProviderHandler {
 
         JsonObject generationConfig = new JsonObject();
         generationConfig.addProperty("temperature", LOW_TEMPERATURE);
+        generationConfig.addProperty("maxOutputTokens", 4096);
         bodyObj.add("generationConfig", generationConfig);
 
         bodyObj.add("tools", buildGeminiTools(shareCharInfo));
