@@ -60,10 +60,10 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerAchievementDiaries));
 
         registry.add(new AiService.ToolDefinition("get_player_bank",
-                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's bank. Only works if the bank interface is open.",
+                "Retrieve items in the player's bank when open. Always pass a 'filter' parameter (e.g. 'dragon', 'potion', 'rune', 'bolt', 'bar') to search for specific items.",
                 true, true, AiService::executeGetPlayerBank)
                 .addParam("filter", "string",
-                        "Optional search query to filter bank items strictly by item name substring (case-insensitive, e.g. 'bar' or 'ore'). Do NOT filter by skill or category name (e.g. do NOT use 'crafting' as a filter).",
+                        "Optional search query to filter bank items strictly by item name substring (case-insensitive, e.g. 'bar', 'dragon', 'potion').",
                         false)
                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 

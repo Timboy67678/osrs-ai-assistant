@@ -14,7 +14,7 @@ import net.runelite.http.api.item.ItemStats;
 import java.util.*;
 
 public class ItemContainerUtils {
-    public static final int UNFILTERED_BANK_LIMIT = 900;
+    public static final int UNFILTERED_BANK_LIMIT = 50;
 
     private ItemContainerUtils() {
         // Utility class
