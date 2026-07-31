@@ -3,17 +3,17 @@ package com.osrsai;
 public enum AiProvider {
     GEMINI("Gemini 2.5 Flash", "gemini-2.5-flash"),
     OPENAI("OpenAI GPT-4o", "gpt-4o"),
-    CLAUDE("Anthropic Claude", "claude-3-5-sonnet-20240620"),
+    CLAUDE("Claude Sonnet 3.5", "claude-3-5-sonnet-20240620"),
     GROK("Grok 4.3", "grok-4.3"),
     GROK_REASONING("Grok 4.20 Reasoning", "grok-4.20-0309-reasoning"),
     CUSTOM("Custom", "custom");
 
+    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
-    private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler(
-            "https://api.openai.com/v1/chat/completions");
+    private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler(OPENAI_API_URL);
     private static final ProviderHandler CLAUDE_HANDLER = new ClaudeProviderHandler();
-    private static final ProviderHandler GROK_HANDLER = new OpenAiProviderHandler(
-            "https://api.x.ai/v1/chat/completions");
+    private static final ProviderHandler GROK_HANDLER = new GrokProviderHandler();
 
     private final String name;
     private final String modelId;

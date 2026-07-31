@@ -49,6 +49,7 @@ final class LocationResolver {
             new NamedArea("Mining Guild", new WorldArea(2996, 9720, 44, 40, 0)),
             new NamedArea("Taverley", new WorldArea(2870, 3400, 74, 96, 0)),
             new NamedArea("Burthorpe", new WorldArea(2860, 3520, 76, 56, 0)),
+            new NamedArea("Trollheim", new WorldArea(2850, 3640, 90, 90, 0)),
             new NamedArea("Heroes' Guild", new WorldArea(2870, 3490, 44, 40, 0)),
             new NamedArea("Taverley Dungeon", new WorldArea(2848, 9728, 96, 130, 0)),
             new NamedArea("Entrana Dungeon", new WorldArea(2816, 9792, 32, 64, 0)),

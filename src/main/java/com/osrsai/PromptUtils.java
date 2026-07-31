@@ -23,7 +23,7 @@ public class PromptUtils {
                 + "\n"
                 + "GROUNDING RULES:\n"
                 + "1. Never invent stats, quests, quest rewards, items, locations, mechanics, or NPCs for the player. Always call 'get_player_skills' before quoting or referencing the player's specific skill levels or XP.\n"
-                + "2. Keep answers concise, direct, practical, and conversational. Do not use markdown headings (# or ##).\n"
+                + "2. Keep answers concise, direct, and focused. Limit responses to 1-2 short paragraphs max. State the main recommendation immediately without fluff, lengthy disclaimers, or repetitive closing steps.\n"
                 + "3. For Ironman/UIM/GIM accounts, value items by High Alchemy value (haPrice) rather than Grand Exchange price (gePrice), and do not suggest invalid GE trading.\n"
                 + "4. Base travel recommendations on the player's location, active spellbook, unlocked transport networks, and available teleports. Call 'get_player_transportation' or inspect 'get_player_quests' to verify transport unlocks (e.g. Fairytale II for Fairy Rings, Tree Gnome Village for Spirit Trees, Grand Tree for Gliders) and prioritize fast teleport strategies (Fairy rings, Spirit trees, POH portals, Minigame teleports, Jewellery) over long walking routes. When asked for travel directions or locations, call 'set_shortest_path_target' with the resolved coordinates to help guide them visually.\n"
                 + "5. Never assume obscure items are useless; advise checking wiki/clue steps before alching or destroying unique gear.\n"

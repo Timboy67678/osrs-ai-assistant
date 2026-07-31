@@ -702,6 +702,12 @@ public class AiService {
         }
 
         try {
+            if (!config.useShortestPath()) {
+                result.addProperty("status", "error");
+                result.addProperty("message", "Shortest Path target setting is disabled in the OSRS AI Assistant plugin config.");
+                return result.toString();
+            }
+
             int x = args.get("x").getAsInt();
             int y = args.get("y").getAsInt();
             int plane = (args.has("plane") && !args.get("plane").isJsonNull()) ? args.get("plane").getAsInt() : 0;
@@ -940,7 +946,7 @@ public class AiService {
                 || (questFilter != null);
         boolean includeInProgress = "DEFAULT".equals(statusFilter) || "IN_PROGRESS".equals(statusFilter)
                 || "ALL".equals(statusFilter) || (questFilter != null);
-        boolean includeNotStarted = "DEFAULT".equals(statusFilter) || "NOT_STARTED".equals(statusFilter)
+        boolean includeNotStarted = "NOT_STARTED".equals(statusFilter)
                 || "ALL".equals(statusFilter) || (questFilter != null);
 
         for (Quest quest : Quest.values()) {

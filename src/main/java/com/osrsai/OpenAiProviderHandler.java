@@ -24,6 +24,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("temperature", LOW_TEMPERATURE);
+        bodyObj.addProperty("max_completion_tokens", 2048);
 
         JsonArray messages = new JsonArray();
         JsonObject systemMessage = new JsonObject();
@@ -43,7 +44,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
         return bodyObj;
     }
 
-    private JsonArray buildOpenAiTools(boolean shareCharInfo) {
+    protected JsonArray buildOpenAiTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
         for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
             if (def.requiresCharacterInfo && !shareCharInfo) {
