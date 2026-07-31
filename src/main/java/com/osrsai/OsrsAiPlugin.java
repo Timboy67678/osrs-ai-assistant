@@ -41,7 +41,6 @@ public class OsrsAiPlugin extends Plugin {
     @Override
     protected void startUp() throws Exception {
         log.info("OSRS AI Assistant started!");
-        GrokProviderHandler.setConfigManager(configManager);
         panel = new OsrsAiPanel(this, configManager);
 
         BufferedImage rawIcon = ImageUtil.loadImageResource(getClass(), "/com/osrsai/icon.png");

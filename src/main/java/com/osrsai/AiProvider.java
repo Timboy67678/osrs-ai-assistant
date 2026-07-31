@@ -9,11 +9,12 @@ public enum AiProvider {
     CUSTOM("Custom", "custom");
 
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 
     private static final ProviderHandler GEMINI_HANDLER = new GeminiProviderHandler();
     private static final ProviderHandler OPENAI_HANDLER = new OpenAiProviderHandler(OPENAI_API_URL);
     private static final ProviderHandler CLAUDE_HANDLER = new ClaudeProviderHandler();
-    private static final ProviderHandler GROK_HANDLER = new GrokProviderHandler();
+    private static final ProviderHandler GROK_HANDLER = new OpenAiProviderHandler(GROK_API_URL);
 
     private final String name;
     private final String modelId;

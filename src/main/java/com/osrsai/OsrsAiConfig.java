@@ -20,12 +20,7 @@ public interface OsrsAiConfig extends Config {
                 return AiService.MAX_DEPTH_COUNT / 2;
         }
 
-        @ConfigItem(keyName = "enableNativeWebSearch", name = "Enable Native AI Web Search", description = "When enabled, providers that support native server-side web search (e.g. Grok) will search the OSRS Wiki directly. Other providers will fall back to using the local wiki search tool.", position = 2, section = generalSection)
-        default boolean enableNativeWebSearch() {
-                return false;
-        }
-
-        @ConfigItem(keyName = "useShortestPath", name = "Use Shortest Path Plugin", description = "Allow the AI to set path destinations using the Shortest Path plugin if it is installed and enabled.", position = 3, section = generalSection)
+        @ConfigItem(keyName = "useShortestPath", name = "Use Shortest Path Plugin", description = "Allow the AI to set path destinations using the Shortest Path plugin if it is installed and enabled.", position = 2, section = generalSection)
         default boolean useShortestPath() {
                 return true;
         }
