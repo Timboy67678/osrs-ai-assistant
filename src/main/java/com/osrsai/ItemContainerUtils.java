@@ -13,7 +13,6 @@ import net.runelite.http.api.item.ItemStats;
 
 import java.util.*;
 
-@SuppressWarnings("deprecation")
 public class ItemContainerUtils {
     public static final int UNFILTERED_BANK_LIMIT = 50;
 

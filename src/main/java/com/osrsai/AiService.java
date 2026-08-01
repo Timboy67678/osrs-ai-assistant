@@ -55,7 +55,6 @@ import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 
 @Slf4j
-@SuppressWarnings("deprecation")
 public class AiService {
     // URI Constants
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama

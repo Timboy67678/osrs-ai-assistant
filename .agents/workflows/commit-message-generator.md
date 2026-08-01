@@ -29,3 +29,6 @@ Use this workflow to generate a commit message that fits the project's existing 
 
 3. **Generate Message Description**
    Create concise bullet point list of changes. Only if some change is a complicated or breaking API change write 1-2 paragraphs about the changed code.
+
+4. **Ask User Confirmation**
+   Present the proposed commit title and description to the user, and ask if they would like you to execute the commit with this message. Only proceed with `git commit` if the user confirms.
