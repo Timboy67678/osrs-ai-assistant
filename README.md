@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/RuneLite-1.12.32-blue.svg" alt="RuneLite Version" />
+  <img src="https://img.shields.io/badge/RuneLite-Latest-blue.svg" alt="RuneLite Version" />
   <img src="https://img.shields.io/badge/Build-Gradle-green.svg" alt="Build Status" />
   <img src="https://img.shields.io/badge/Java-11-orange.svg" alt="Java Version" />
   <img src="https://img.shields.io/badge/AI--Powered-Grok%20%7C%20Gemini%20%7C%20Claude%20%7C%20GPT--4o%20%7C%20Custom-purple.svg" alt="AI Powered" />

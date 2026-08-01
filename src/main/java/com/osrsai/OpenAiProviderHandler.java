@@ -25,12 +25,16 @@ public class OpenAiProviderHandler implements ProviderHandler {
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("temperature", LOW_TEMPERATURE);
 
-        boolean isOModel = modelId != null && (modelId.startsWith("o1") || modelId.startsWith("o3"));
-        if (isOModel) {
-            bodyObj.addProperty("max_completion_tokens", 4096);
+        String lowerModel = modelId != null ? modelId.toLowerCase() : "";
+        boolean isReasoningModel = lowerModel.startsWith("o1")
+                || lowerModel.startsWith("o3")
+                || lowerModel.contains("reasoning")
+                || lowerModel.contains("r1");
+        if (isReasoningModel) {
+            bodyObj.addProperty("max_completion_tokens", 16384);
         } else {
-            bodyObj.addProperty("max_tokens", 4096);
-            bodyObj.addProperty("max_completion_tokens", 4096);
+            bodyObj.addProperty("max_tokens", 8192);
+            bodyObj.addProperty("max_completion_tokens", 8192);
         }
 
         JsonArray messages = new JsonArray();

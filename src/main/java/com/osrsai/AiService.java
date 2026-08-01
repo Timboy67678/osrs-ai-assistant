@@ -55,6 +55,7 @@ import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 
 @Slf4j
+@SuppressWarnings("deprecation")
 public class AiService {
     // URI Constants
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
@@ -712,7 +713,8 @@ public class AiService {
         try {
             if (!config.useShortestPath()) {
                 result.addProperty("status", "error");
-                result.addProperty("message", "Shortest Path target setting is disabled in the OSRS AI Assistant plugin config.");
+                result.addProperty("message",
+                        "Shortest Path target setting is disabled in the OSRS AI Assistant plugin config.");
                 return result.toString();
             }
 
@@ -1450,7 +1452,7 @@ public class AiService {
         JsonArray activePrayers = new JsonArray();
         for (Prayer p : Prayer.values()) {
             try {
-                if (client.isPrayerActive(p)) {
+                if (client.getVarbitValue(p.getVarbit()) == 1) {
                     activePrayers.add(p.name());
                 }
             } catch (Exception ignored) {
@@ -1485,28 +1487,44 @@ public class AiService {
 
         JsonArray activeInfoBoxes = new JsonArray();
         if (infoBoxManager != null) {
+            int count = 0;
             for (InfoBox box : infoBoxManager.getInfoBoxes()) {
+                if (count >= 30) {
+                    break;
+                }
                 try {
+                    String text = box.getText();
+                    if (text == null) {
+                        text = "";
+                    } else {
+                        text = text.trim();
+                    }
+
+                    // Skip zero/empty/dormant infoboxes
+                    if (text.isEmpty() || text.equals("0") || text.equals("0/0") || text.equals("0%")) {
+                        continue;
+                    }
+
                     JsonObject boxObj = new JsonObject();
                     String name = box.getName();
                     if (name == null || name.trim().isEmpty()) {
                         name = box.getClass().getSimpleName();
                     }
                     boxObj.addProperty("name", name);
-
-                    String text = box.getText();
-                    if (text != null && !text.trim().isEmpty()) {
-                        boxObj.addProperty("text", text.trim());
-                    }
+                    boxObj.addProperty("text", text);
 
                     String tooltip = box.getTooltip();
                     if (tooltip != null && !tooltip.trim().isEmpty()) {
                         String noHtml = PATTERN_HTML_TAGS.matcher(tooltip).replaceAll(" ");
                         String cleanTooltip = PATTERN_WHITESPACE.matcher(noHtml).replaceAll(" ").trim();
+                        if (cleanTooltip.length() > 150) {
+                            cleanTooltip = cleanTooltip.substring(0, 147) + "...";
+                        }
                         boxObj.addProperty("tooltip", cleanTooltip);
                     }
 
                     activeInfoBoxes.add(boxObj);
+                    count++;
                 } catch (Exception ignored) {
                 }
             }

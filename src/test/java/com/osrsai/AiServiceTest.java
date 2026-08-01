@@ -40,6 +40,9 @@ public class AiServiceTest {
     @Mock
     private net.runelite.api.Client client;
 
+    @Mock
+    private net.runelite.client.ui.overlay.infobox.InfoBoxManager infoBoxManager;
+
     @Test
     public void testGetPlayerQuestsToolIncludesStage() {
         JsonObject args = new JsonObject();
@@ -681,6 +684,37 @@ public class AiServiceTest {
         Assert.assertTrue(poh.get("portalChamberUnlocked").getAsBoolean());
         Assert.assertTrue(poh.get("portalNexusUnlocked").getAsBoolean());
         Assert.assertTrue(poh.get("basicJewelleryBoxUnlocked").getAsBoolean());
+    }
+
+    @Test
+    public void testGetPlayerStatusFiltersDormantInfoBoxes() {
+        net.runelite.client.ui.overlay.infobox.InfoBox activeBox = Mockito.mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
+        Mockito.when(activeBox.getName()).thenReturn("Boost Attack");
+        Mockito.when(activeBox.getText()).thenReturn("+12");
+        Mockito.when(activeBox.getTooltip()).thenReturn("Attack boost");
+
+        net.runelite.client.ui.overlay.infobox.InfoBox dormantBox = Mockito.mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
+        Mockito.when(dormantBox.getName()).thenReturn("Potion Agility");
+        Mockito.when(dormantBox.getText()).thenReturn("0");
+        Mockito.when(dormantBox.getTooltip()).thenReturn("Agility potion: 0");
+
+        net.runelite.client.ui.overlay.infobox.InfoBox emptyBox = Mockito.mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
+        Mockito.when(emptyBox.getName()).thenReturn("Empty Box");
+        Mockito.when(emptyBox.getText()).thenReturn("");
+
+        Mockito.when(infoBoxManager.getInfoBoxes()).thenReturn(Arrays.asList(activeBox, dormantBox, emptyBox));
+
+        String json = aiService.executeGetPlayerStatus(new JsonObject());
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertTrue(root.has("activeInfoBoxes"));
+        com.google.gson.JsonArray boxes = root.getAsJsonArray("activeInfoBoxes");
+
+        Assert.assertEquals(1, boxes.size());
+        JsonObject box0 = boxes.get(0).getAsJsonObject();
+        Assert.assertEquals("Boost Attack", box0.get("name").getAsString());
+        Assert.assertEquals("+12", box0.get("text").getAsString());
     }
 }
 
