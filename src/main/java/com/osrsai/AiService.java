@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import javax.inject.Inject;
 
@@ -38,6 +39,8 @@ import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.overlay.infobox.InfoBox;
+import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.http.api.item.ItemStats;
 import net.runelite.http.api.item.ItemEquipmentStats;
 
@@ -58,6 +61,8 @@ public class AiService {
 
     // Global Constants
     static final int MAX_DEPTH_COUNT = 10;
+    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]*>");
+    private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
 
     // Game Varbits & Varplayer (Varp) IDs
     private static final int VARBIT_SPELLBOOK = 4070;
@@ -151,6 +156,9 @@ public class AiService {
 
     @Inject
     private PluginManager pluginManager;
+
+    @Inject
+    private InfoBoxManager infoBoxManager;
 
     private final LocationResolver locationResolver = new LocationResolver();
 
@@ -1474,6 +1482,36 @@ public class AiService {
             }
         }
         result.add("boostedSkills", boostedSkills);
+
+        JsonArray activeInfoBoxes = new JsonArray();
+        if (infoBoxManager != null) {
+            for (InfoBox box : infoBoxManager.getInfoBoxes()) {
+                try {
+                    JsonObject boxObj = new JsonObject();
+                    String name = box.getName();
+                    if (name == null || name.trim().isEmpty()) {
+                        name = box.getClass().getSimpleName();
+                    }
+                    boxObj.addProperty("name", name);
+
+                    String text = box.getText();
+                    if (text != null && !text.trim().isEmpty()) {
+                        boxObj.addProperty("text", text.trim());
+                    }
+
+                    String tooltip = box.getTooltip();
+                    if (tooltip != null && !tooltip.trim().isEmpty()) {
+                        String noHtml = PATTERN_HTML_TAGS.matcher(tooltip).replaceAll(" ");
+                        String cleanTooltip = PATTERN_WHITESPACE.matcher(noHtml).replaceAll(" ").trim();
+                        boxObj.addProperty("tooltip", cleanTooltip);
+                    }
+
+                    activeInfoBoxes.add(boxObj);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        result.add("activeInfoBoxes", activeInfoBoxes);
 
         return gson.toJson(result);
     }

@@ -594,7 +594,12 @@ public class OsrsAiPanel extends PluginPanel {
                 sb.append('\n');
             }
 
-            sb.append(turn.sender).append(": ").append(turn.message);
+            String msg = turn.message;
+            if ("Assistant".equals(turn.sender) && msg.length() > 350) {
+                msg = msg.substring(0, 347) + "...";
+            }
+
+            sb.append(turn.sender).append(": ").append(msg);
         }
 
         return sb.length() == 0 ? "None" : sb.toString();

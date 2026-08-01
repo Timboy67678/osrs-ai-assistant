@@ -164,13 +164,21 @@ public class OpenAiProviderHandler implements ProviderHandler {
         JsonObject assistantMessage = getAssistantMessage(responseRoot);
         JsonObject msg = new JsonObject();
         msg.addProperty("role", "assistant");
-        if (assistantMessage != null && assistantMessage.has("content") && !assistantMessage.get("content").isJsonNull()) {
-            msg.add("content", assistantMessage.get("content"));
-        } else {
-            msg.addProperty("content", "");
-        }
-        if (assistantMessage != null && assistantMessage.has("tool_calls")) {
-            msg.add("tool_calls", assistantMessage.getAsJsonArray("tool_calls"));
+        if (assistantMessage != null) {
+            if (assistantMessage.has("content") && !assistantMessage.get("content").isJsonNull()) {
+                msg.add("content", assistantMessage.get("content"));
+            } else {
+                msg.addProperty("content", "");
+            }
+            if (assistantMessage.has("reasoning_content") && !assistantMessage.get("reasoning_content").isJsonNull()) {
+                msg.add("reasoning_content", assistantMessage.get("reasoning_content"));
+            }
+            if (assistantMessage.has("reasoning") && !assistantMessage.get("reasoning").isJsonNull()) {
+                msg.add("reasoning", assistantMessage.get("reasoning"));
+            }
+            if (assistantMessage.has("tool_calls")) {
+                msg.add("tool_calls", assistantMessage.getAsJsonArray("tool_calls"));
+            }
         }
         messages.add(msg);
 

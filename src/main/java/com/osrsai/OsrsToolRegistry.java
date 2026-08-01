@@ -44,7 +44,7 @@ public class OsrsToolRegistry {
                         false));
 
         registry.add(new AiService.ToolDefinition("get_player_status",
-                "Retrieve the player's real-time combat and vital status (current HP, prayer points, active prayers, poison/venom state, run energy, special attack %). Use for immediate action/survival questions, NOT as primary criteria for general boss readiness.",
+                "Retrieve the player's real-time combat and vital status (current HP, prayer points, active prayers, poison/venom state, run energy, special attack %, active RuneLite infobox timers & status effects). Use for immediate action/survival questions, NOT as primary criteria for general boss readiness.",
                 true, true, AiService::executeGetPlayerStatus));
 
         registry.add(new AiService.ToolDefinition("get_player_currencies_and_points",

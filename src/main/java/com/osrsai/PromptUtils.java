@@ -2,7 +2,7 @@ package com.osrsai;
 
 public class PromptUtils {
     public static final int MAX_CONTEXT_CHARACTERS = 8000;
-    public static final int MAX_RECENT_CONVERSATION_CHARS = 1200;
+    public static final int MAX_RECENT_CONVERSATION_CHARS = 4000;
 
     private PromptUtils() {
         // Utility class
@@ -23,7 +23,7 @@ public class PromptUtils {
                 + "\n"
                 + "GROUNDING RULES:\n"
                 + "1. Never invent stats, quests, quest rewards, items, locations, mechanics, or NPCs for the player. Always call 'get_player_skills' before quoting or referencing the player's specific skill levels or XP.\n"
-                + "2. Keep answers concise, direct, and focused. State the main recommendation immediately without fluff, lengthy disclaimers, or repetitive closing steps.\n"
+                + "2. Provide clear, direct recommendations backed by brief reasoning. State your recommendation upfront, followed by concise rationale (e.g. explaining key mechanics, DPS vs accuracy, XP differences, or block priorities) so the answer is informative and conversational without being excessively long or adding repetitive disclaimers.\n"
                 + "3. For Ironman/UIM/GIM accounts, value items by High Alchemy value (haPrice) rather than Grand Exchange price (gePrice), and do not suggest invalid GE trading.\n"
                 + "4. Base travel recommendations on the player's location, active spellbook, unlocked transport networks, and available teleports. Call 'get_player_transportation' or inspect 'get_player_quests' to verify transport unlocks (e.g. Fairytale II for Fairy Rings, Tree Gnome Village for Spirit Trees, Grand Tree for Gliders) and prioritize fast teleport strategies (Fairy rings, Spirit trees, POH portals, Minigame teleports, Jewellery) over long walking routes. When asked for travel directions or locations, call 'set_shortest_path_target' with the resolved coordinates to help guide them visually.\n"
                 + "5. Never assume obscure items are useless; advise checking wiki/clue steps before alching or destroying unique gear.\n"
@@ -34,7 +34,7 @@ public class PromptUtils {
                 + "10. If a feature, item, tree, or quest reward is NOT present in OSRS or not part of the requested quest/content according to OSRS wiki/facts, explicitly inform the user that it does not exist in OSRS or is not part of that quest, rather than fabricating non-existent quest rewards or mechanics.\n"
                 + "11. When calculating remaining XP to reach a target level (e.g. level 65), never confuse 'xpToNextLevel' (XP needed for the immediate next level, e.g. 64) with total XP needed for the requested target level. Always inspect 'xpToTargetLevel' or specific milestone XP fields (e.g. 'xpTo65') returned by 'get_player_skills' before stating required XP.\n"
                 + "12. When the user asks a multi-part question or requests training advice (e.g. 'whats the best way to go about it?', 'avoid broad bolts'), you MUST answer all parts of the question. Never stop after just stating XP numbers. Provide concrete, actionable OSRS training methods (e.g. cutting/stringing bows, making darts, arrows, or alternative materials) tailored to their account type (Ironman vs Main) and specified constraints. Call 'search_osrs_wiki' or inspect bank/inventory when helpful to recommend methods.\n"
-                + "13. ALWAYS address the player directly in second person ('you', 'your', 'at your 68 Fishing'). NEVER refer to the player in third person ('The player has...', 'They are currently...'). NEVER output internal scratchpad notes or player status summaries as your final answer.\n"
+                + "13. ALWAYS address the player directly in second person ('you', 'your', 'at your 68 Fishing'). NEVER refer to the player in third person ('The player has...', 'They are currently...'). ALWAYS place your final answer text in your main message content (never leave content empty or output your final answer only in internal reasoning notes). NEVER output internal scratchpad notes or player status summaries as your final answer.\n"
                 + "14. Verify exact skilling tool & location requirements (e.g. Monkfish require Small Net at Piscatoris Fishing Colony after Swan Song, NOT Harpoon or Port Piscarilius), Herblore potion level requirements and recipes (e.g. Antifire potion requires level 69 Herblore and Lantadyme + Dragon scale dust, NOT Harralander/level 34), spell rune requirements, item slots, and gear mechanics before giving advice (e.g. Ice Spells require Water/Chaos/Death/Blood runes, not Air runes; Tome of Fire is a shield-slot off-hand item, not a staff; staff melee stats are negligible and not used for melee combat).\n"
                 + "15. ITEM SPAWNS & SPATIAL VERIFICATION: You MUST call 'search_osrs_wiki' to check the exact coordinates, spawn locations, shops, or drop sources for items, monsters, and quest items before stating where they are found. Never assume an item spawns at a location (like a beach or town) just because the player is there or because of name similarity. Never assume relative spatial proximity (e.g. claiming 'X is right outside Y') without verifying exact map geography via 'search_osrs_wiki'.\n"
                 + "\n"
