@@ -174,12 +174,6 @@ public class OpenAiProviderHandler implements ProviderHandler {
             } else {
                 msg.addProperty("content", "");
             }
-            if (assistantMessage.has("reasoning_content") && !assistantMessage.get("reasoning_content").isJsonNull()) {
-                msg.add("reasoning_content", assistantMessage.get("reasoning_content"));
-            }
-            if (assistantMessage.has("reasoning") && !assistantMessage.get("reasoning").isJsonNull()) {
-                msg.add("reasoning", assistantMessage.get("reasoning"));
-            }
             if (assistantMessage.has("tool_calls")) {
                 msg.add("tool_calls", assistantMessage.getAsJsonArray("tool_calls"));
             }
@@ -211,18 +205,6 @@ public class OpenAiProviderHandler implements ProviderHandler {
                     String text = message.get("text").getAsString();
                     if (text != null && !text.trim().isEmpty()) {
                         return text;
-                    }
-                }
-                if (message.has("reasoning_content") && !message.get("reasoning_content").isJsonNull()) {
-                    String reasoning = message.get("reasoning_content").getAsString();
-                    if (reasoning != null && !reasoning.trim().isEmpty()) {
-                        return reasoning;
-                    }
-                }
-                if (message.has("reasoning") && !message.get("reasoning").isJsonNull()) {
-                    String reasoning = message.get("reasoning").getAsString();
-                    if (reasoning != null && !reasoning.trim().isEmpty()) {
-                        return reasoning;
                     }
                 }
             }

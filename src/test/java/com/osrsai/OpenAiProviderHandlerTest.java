@@ -43,4 +43,13 @@ public class OpenAiProviderHandlerTest {
         JsonObject outputsObj = gson.fromJson(outputsJson, JsonObject.class);
         Assert.assertEquals("Gateway output response", handler.extractResponseText(outputsObj));
     }
+
+    @Test
+    public void testExtractResponseTextIgnoresReasoningContent() {
+        OpenAiProviderHandler handler = new OpenAiProviderHandler("http://localhost:11434/v1/chat/completions");
+
+        String reasoningOnlyJson = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"reasoning_content\":\"Internal scratchpad thinking\"}}]}";
+        JsonObject reasoningObj = gson.fromJson(reasoningOnlyJson, JsonObject.class);
+        Assert.assertEquals("No content returned by the AI.", handler.extractResponseText(reasoningObj));
+    }
 }
