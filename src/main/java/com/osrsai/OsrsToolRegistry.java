@@ -1,14 +1,13 @@
 package com.osrsai;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class OsrsToolRegistry {
-    private OsrsToolRegistry() {
-        // Utility class
-    }
+    private static final List<AiService.ToolDefinition> TOOL_REGISTRY;
 
-    public static List<AiService.ToolDefinition> getToolRegistry() {
+    static {
         List<AiService.ToolDefinition> registry = new ArrayList<>();
 
         registry.add(new AiService.ToolDefinition("get_player_skills",
@@ -111,7 +110,15 @@ public class OsrsToolRegistry {
                 .addParam("plane", "integer", "The target plane (0 for ground level, 1 for first floor, etc. Default is 0).", false)
                 .addParam("locationName", "string", "A human-readable name of the location being targeted (e.g. 'Varrock West Bank' or 'Grand Exchange') to show the player in the chat response.", false));
 
-        return registry;
+        TOOL_REGISTRY = Collections.unmodifiableList(registry);
+    }
+
+    private OsrsToolRegistry() {
+        // Utility class
+    }
+
+    public static List<AiService.ToolDefinition> getToolRegistry() {
+        return TOOL_REGISTRY;
     }
 }
 

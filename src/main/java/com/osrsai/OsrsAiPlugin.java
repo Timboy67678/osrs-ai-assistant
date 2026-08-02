@@ -88,7 +88,7 @@ public class OsrsAiPlugin extends Plugin {
         if (CONFIG_GROUP.equals(event.getGroup())) {
             if ("shareCharacterInfo".equals(event.getKey())) {
                 if (panel != null) {
-                    panel.updateWarningLabel();
+                    SwingUtilities.invokeLater(panel::updateWarningLabel);
                 }
             }
         }

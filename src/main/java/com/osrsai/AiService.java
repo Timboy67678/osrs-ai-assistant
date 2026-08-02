@@ -8,6 +8,7 @@ import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -152,6 +153,9 @@ public class AiService {
     private ClientThread clientThread;
 
     @Inject
+    private ScheduledExecutorService executorService;
+
+    @Inject
     private ConfigManager configManager;
 
     @Inject
@@ -263,7 +267,7 @@ public class AiService {
                                 panel.addMessage("System", "Error preparing request: " + t.getMessage());
                             });
                         }
-                    }).exceptionally(ex -> {
+                    }, executorService).exceptionally(ex -> {
                         log.error("Error in async pipeline", ex);
                         SwingUtilities.invokeLater(() -> {
                             panel.setThinking(false);
@@ -314,14 +318,14 @@ public class AiService {
 
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-                try {
-                    if (!response.isSuccessful()) {
+                try (Response resp = response) {
+                    if (!resp.isSuccessful()) {
                         String errBody = "";
-                        if (response.body() != null) {
-                            errBody = response.body().string();
+                        if (resp.body() != null) {
+                            errBody = resp.body().string();
                         }
-                        log.error("API returned error (code {}): {}", response.code(), errBody);
-                        final String errText = "AI returned an error code " + response.code()
+                        log.error("API returned error (code {}): {}", resp.code(), errBody);
+                        final String errText = "AI returned an error code " + resp.code()
                                 + (errBody.isEmpty() ? "" : ": " + errBody);
                         SwingUtilities.invokeLater(() -> {
                             panel.setThinking(false);
@@ -330,8 +334,14 @@ public class AiService {
                         return;
                     }
 
-                    assert response.body() != null;
-                    String responseBody = response.body().string();
+                    if (resp.body() == null) {
+                        SwingUtilities.invokeLater(() -> {
+                            panel.setThinking(false);
+                            panel.addMessage("System", "Empty response body from AI provider.");
+                        });
+                        return;
+                    }
+                    String responseBody = resp.body().string();
                     log.info("Received response from AI provider {}: {}", provider, responseBody);
                     JsonObject root = gson.fromJson(responseBody, JsonObject.class);
 
@@ -444,7 +454,7 @@ public class AiService {
                 }
             }
             future.complete(results);
-        });
+        }, executorService);
         return future;
     }
 
@@ -569,7 +579,7 @@ public class AiService {
     }
 
     private void addMilestoneXp(JsonObject skillData, int currentXp, Integer targetLevel) {
-        int[] milestones = { 50, 60, 65, 70, 75, 80, 85, 90, 92, 95, 99 };
+        int[] milestones = { 60, 65, 70, 75, 80, 85, 90, 92, 95, 99 };
         for (int level : milestones) {
             int targetXp = Experience.getXpForLevel(level);
             if (currentXp < targetXp) {
