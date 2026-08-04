@@ -33,6 +33,7 @@ public class OsrsAiPanel extends PluginPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel;
     private final JEditorPane chatArea;
+    private JScrollPane chatScrollPane;
     private final JTextField inputField;
     private final JButton sendButton;
     private final JButton detachButton;
@@ -159,18 +160,9 @@ public class OsrsAiPanel extends PluginPanel {
 
             @Override
             public Dimension getPreferredSize() {
-                int w = 0;
                 Container parent = getParent();
-                if (parent != null && parent.getWidth() > 0) {
-                    w = parent.getWidth();
-                } else if (dockedHostPanel != null && dockedHostPanel.getWidth() > 0) {
-                    w = dockedHostPanel.getWidth() - 25;
-                } else {
-                    w = PluginPanel.PANEL_WIDTH - 30;
-                }
-
-                if (w > 0) {
-                    setSize(w, Short.MAX_VALUE);
+                if (parent instanceof JViewport && parent.getWidth() > 0) {
+                    setSize(parent.getWidth(), Short.MAX_VALUE);
                 }
                 return super.getPreferredSize();
             }
@@ -178,12 +170,13 @@ public class OsrsAiPanel extends PluginPanel {
         chatArea.setEditable(false);
         chatArea.setContentType("text/html");
         chatArea.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-        chatArea.setBorder(new EmptyBorder(5, 5, 5, 5));
+        chatArea.setBorder(null);
         chatArea.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, true); // Use inherited font
 
-        JScrollPane scrollPane = new JScrollPane(chatArea);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        chatViewPanel.add(scrollPane, BorderLayout.CENTER);
+        chatScrollPane = new JScrollPane(chatArea);
+        chatScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        chatScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        chatViewPanel.add(chatScrollPane, BorderLayout.CENTER);
 
         JPanel inputPanel = new JPanel();
         inputPanel.setLayout(new BorderLayout());
@@ -346,6 +339,7 @@ public class OsrsAiPanel extends PluginPanel {
         detachedFrame.setVisible(true);
         detachButton.setText("Attach");
         saveConfig("windowDetached", true);
+        SwingUtilities.invokeLater(this::scrollToBottom);
     }
 
     private void attachToSidebar() {
@@ -358,10 +352,11 @@ public class OsrsAiPanel extends PluginPanel {
 
         dockedHostPanel.removeAll();
         dockedHostPanel.add(contentPanel, BorderLayout.CENTER);
-        revalidate();
-        repaint();
+        dockedHostPanel.revalidate();
+        dockedHostPanel.repaint();
         detachButton.setText("Detach");
         saveConfig("windowDetached", false);
+        SwingUtilities.invokeLater(this::scrollToBottom);
     }
 
     private void saveWindowBounds() {
@@ -746,13 +741,32 @@ public class OsrsAiPanel extends PluginPanel {
     private void updateChatHtml() {
         runOnEdt(() -> {
             chatArea.setText("<html><head><style>"
-                    + "body { color: white; font-family: sans-serif; font-size: 11px; margin: 0; padding: 0; word-wrap: break-word; }"
+                    + "body { color: white; font-family: sans-serif; font-size: 11px; margin: 4px 8px 4px 4px; padding: 0; }"
                     + "div { margin-bottom: 6px; word-wrap: break-word; }"
                     + "ul { margin: 4px 0 6px 0; padding-left: 14px; }"
                     + "li { margin-bottom: 2px; word-wrap: break-word; }"
                     + "</style></head><body>"
                     + chatHistory.toString() + "</body></html>");
-            chatArea.setCaretPosition(chatArea.getDocument().getLength());
+            scrollToBottom();
+        });
+    }
+
+    public void scrollToBottom() {
+        runOnEdt(() -> {
+            SwingUtilities.invokeLater(() -> {
+                if (chatArea != null) {
+                    try {
+                        chatArea.setCaretPosition(chatArea.getDocument().getLength());
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (chatScrollPane != null) {
+                    JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
+                    if (vertical != null) {
+                        vertical.setValue(vertical.getMaximum());
+                    }
+                }
+            });
         });
     }
 

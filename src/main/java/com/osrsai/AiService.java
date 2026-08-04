@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import javax.inject.Inject;
@@ -423,23 +424,23 @@ public class AiService {
 
                     String output;
                     if (def.runOnClientThread) {
-                        final String[] clientThreadResult = new String[1];
-                        final Throwable[] clientThreadError = new Throwable[1];
+                        final AtomicReference<String> clientThreadResult = new AtomicReference<>();
+                        final AtomicReference<Throwable> clientThreadError = new AtomicReference<>();
                         CompletableFuture<Void> clientFuture = new CompletableFuture<>();
                         clientThread.invokeLater(() -> {
                             try {
-                                clientThreadResult[0] = def.executor.execute(this, tc.args);
+                                clientThreadResult.set(def.executor.execute(this, tc.args));
                                 clientFuture.complete(null);
                             } catch (Throwable t) {
-                                clientThreadError[0] = t;
+                                clientThreadError.set(t);
                                 clientFuture.completeExceptionally(t);
                             }
                         });
                         clientFuture.join();
-                        if (clientThreadError[0] != null) {
-                            throw new Exception(clientThreadError[0]);
+                        if (clientThreadError.get() != null) {
+                            throw new Exception(clientThreadError.get());
                         }
-                        output = clientThreadResult[0];
+                        output = clientThreadResult.get();
                     } else {
                         output = def.executor.execute(this, tc.args);
                     }
