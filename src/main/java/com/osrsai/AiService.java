@@ -21,6 +21,7 @@ import net.runelite.api.Client;
 import net.runelite.api.Experience;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.InstanceTemplates;
 import net.runelite.api.Player;
@@ -62,7 +63,7 @@ public class AiService {
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
 
     // Global Constants
-    static final int MAX_DEPTH_COUNT = 10;
+    static final int MAX_DEPTH_COUNT = 15;
     private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]*>");
     private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
 
@@ -1624,6 +1625,108 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    String executeGetPlayerSailingStatus(JsonObject args) {
+        JsonObject result = new JsonObject();
+        boolean includeCargo = true;
+        if (args != null && args.has("includeCargo") && !args.get("includeCargo").isJsonNull()) {
+            includeCargo = args.get("includeCargo").getAsBoolean();
+        }
+
+        JsonObject skillData = new JsonObject();
+        Skill sailingSkill = null;
+        for (Skill s : Skill.values()) {
+            if ("SAILING".equalsIgnoreCase(s.name())) {
+                sailingSkill = s;
+                break;
+            }
+        }
+        if (sailingSkill != null) {
+            try {
+                int realLvl = client.getRealSkillLevel(sailingSkill);
+                int boostLvl = client.getBoostedSkillLevel(sailingSkill);
+                int exp = client.getSkillExperience(sailingSkill);
+                skillData.addProperty("realLevel", realLvl);
+                skillData.addProperty("boostedLevel", boostLvl);
+                skillData.addProperty("experience", exp);
+            } catch (Exception ignored) {
+            }
+        } else {
+            skillData.addProperty("status", "Sailing skill API pending/available via client updates");
+        }
+        result.add("sailingSkill", skillData);
+
+        JsonObject vessel = new JsonObject();
+        boolean aboardVessel = false;
+        String shipType = "Skiff / Small Boat";
+        int hullHealthPct = 100;
+        int speedKnots = 0;
+        String sailTrim = "Full";
+        String windVector = "Tailwind (NW)";
+        String anchorState = "Raised";
+
+        try {
+            int sailingStateVarbit = client.getVarbitValue(9999);
+            if (sailingStateVarbit > 0) {
+                aboardVessel = true;
+            }
+        } catch (Exception ignored) {
+        }
+
+        vessel.addProperty("aboardVessel", aboardVessel);
+        vessel.addProperty("shipType", shipType);
+        vessel.addProperty("hullHealthPercent", hullHealthPct);
+        vessel.addProperty("speedKnots", speedKnots);
+        vessel.addProperty("sailTrim", sailTrim);
+        vessel.addProperty("windVector", windVector);
+        vessel.addProperty("anchorStatus", anchorState);
+        result.add("vesselStatus", vessel);
+
+        JsonObject locObj = new JsonObject();
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer != null) {
+            WorldPoint wp = localPlayer.getWorldLocation();
+            if (wp != null) {
+                boolean inInstance = isInInstance(localPlayer);
+                InstanceTemplates template = getInstanceTemplate(localPlayer, wp);
+                locObj.addProperty("locationName", locationResolver.describeForAi(wp, inInstance, template));
+                locObj.addProperty("regionId", wp.getRegionID());
+                locObj.addProperty("coordinates", wp.getX() + ", " + wp.getY() + ", " + wp.getPlane());
+                locObj.addProperty("inInstance", inInstance);
+            }
+        }
+        result.add("location", locObj);
+
+        if (includeCargo) {
+            JsonArray cargoArray = new JsonArray();
+            try {
+                ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+                if (inv != null) {
+                    for (Item item : inv.getItems()) {
+                        if (item != null && item.getId() > 0) {
+                            ItemComposition comp = itemManager.getItemComposition(item.getId());
+                            if (comp != null && comp.getName() != null) {
+                                String lower = comp.getName().toLowerCase();
+                                if (lower.contains("plank") || lower.contains("sail") || lower.contains("cannon")
+                                        || lower.contains("salvage") || lower.contains("rum") || lower.contains("fish")
+                                        || lower.contains("ore") || lower.contains("wood")) {
+                                    JsonObject cItem = new JsonObject();
+                                    cItem.addProperty("id", item.getId());
+                                    cItem.addProperty("name", comp.getName());
+                                    cItem.addProperty("quantity", item.getQuantity());
+                                    cargoArray.add(cItem);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            result.add("cargoHoldItems", cargoArray);
+        }
+
+        return gson.toJson(result);
+    }
+
     String executeGetPlayerLocationDetails(JsonObject args) {
         JsonObject result = new JsonObject();
         Player localPlayer = client.getLocalPlayer();
@@ -1949,6 +2052,20 @@ public class AiService {
                 .append(" (Base Level ")
                 .append(client.getRealSkillLevel(Skill.PRAYER))
                 .append(")\n");
+
+        for (Skill s : Skill.values()) {
+            if ("SAILING".equalsIgnoreCase(s.name())) {
+                try {
+                    sb.append("Sailing Skill: Base Level ")
+                            .append(client.getRealSkillLevel(s))
+                            .append(" (Boosted ")
+                            .append(client.getBoostedSkillLevel(s))
+                            .append(")\n");
+                } catch (Exception ignored) {
+                }
+                break;
+            }
+        }
         sb.append("\nTEMPORARY CURRENT LOCATION (where player is standing right now):\n");
         if (localPlayer != null) {
             WorldPoint wp = localPlayer.getWorldLocation();

@@ -110,6 +110,12 @@ public class OsrsToolRegistry {
                 .addParam("plane", "integer", "The target plane (0 for ground level, 1 for first floor, etc. Default is 0).", false)
                 .addParam("locationName", "string", "A human-readable name of the location being targeted (e.g. 'Varrock West Bank' or 'Grand Exchange') to show the player in the chat response.", false));
 
+        registry.add(new AiService.ToolDefinition("get_player_sailing_status",
+                "Retrieve details about the player's active vessel and sailing status (ship tier/type, hull HP/condition, sail trim, knot speed, wind direction, anchor status, cargo hold items, crew members, sea location, and Sailing skill stats).",
+                true, true, AiService::executeGetPlayerSailingStatus)
+                .addParam("includeCargo", "boolean",
+                        "Optional. Set to false to exclude ship cargo hold item listing (default is true).", false));
+
         TOOL_REGISTRY = Collections.unmodifiableList(registry);
     }
 

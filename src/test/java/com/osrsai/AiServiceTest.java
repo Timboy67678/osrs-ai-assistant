@@ -716,5 +716,39 @@ public class AiServiceTest {
         Assert.assertEquals("Boost Attack", box0.get("name").getAsString());
         Assert.assertEquals("+12", box0.get("text").getAsString());
     }
+
+    @Test
+    public void testGetPlayerSailingStatusTool() {
+        JsonObject args = new JsonObject();
+        args.addProperty("includeCargo", true);
+
+        ItemContainer mockInv = Mockito.mock(ItemContainer.class);
+        Item mockPlank = new Item(1001, 25);
+        Mockito.when(mockInv.getItems()).thenReturn(new Item[] { mockPlank });
+        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.INVENTORY)).thenReturn(mockInv);
+
+        ItemComposition mockComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(mockComp.getName()).thenReturn("Oak plank");
+        Mockito.when(itemManager.getItemComposition(1001)).thenReturn(mockComp);
+
+        String json = aiService.executeGetPlayerSailingStatus(args);
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertTrue(root.has("sailingSkill"));
+        Assert.assertTrue(root.has("vesselStatus"));
+        Assert.assertTrue(root.has("location"));
+        Assert.assertTrue(root.has("cargoHoldItems"));
+
+        JsonObject vessel = root.getAsJsonObject("vesselStatus");
+        Assert.assertTrue(vessel.has("shipType"));
+        Assert.assertTrue(vessel.has("hullHealthPercent"));
+        Assert.assertTrue(vessel.has("speedKnots"));
+        Assert.assertTrue(vessel.has("sailTrim"));
+
+        com.google.gson.JsonArray cargo = root.getAsJsonArray("cargoHoldItems");
+        Assert.assertEquals(1, cargo.size());
+        Assert.assertEquals("Oak plank", cargo.get(0).getAsJsonObject().get("name").getAsString());
+    }
 }
 
