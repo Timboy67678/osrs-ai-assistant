@@ -9,6 +9,12 @@ import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
+/**
+ * Implementation of {@link ProviderHandler} for Anthropic's Claude API.
+ * <p>
+ * Formats requests using Anthropic's Messages API specification (system prompt, messages array, tool definitions with input_schema)
+ * and parses response structures for tool use blocks and text content.
+ */
 public class ClaudeProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
     private static final String CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
@@ -35,6 +41,12 @@ public class ClaudeProviderHandler implements ProviderHandler {
         return bodyObj;
     }
 
+    /**
+     * Builds Anthropic tool definitions from registered plugin tools.
+     *
+     * @param shareCharInfo {@code true} if character-specific tools should be included
+     * @return {@link JsonArray} of tool definitions formatted with JSON Schema input schemas
+     */
     private JsonArray buildClaudeTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
         for (AiService.ToolDefinition def : AiService.getToolRegistry()) {

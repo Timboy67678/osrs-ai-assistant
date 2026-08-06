@@ -10,6 +10,12 @@ import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
+/**
+ * Implementation of {@link ProviderHandler} for Google's Gemini REST API (v1beta).
+ * <p>
+ * Formats requests using Gemini's contents/parts and functionDeclarations schema,
+ * handles tool call response structures (functionCall/functionResponse), and constructs URL endpoint requests.
+ */
 public class GeminiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
     private static final String GEMINI_API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=";
@@ -45,6 +51,12 @@ public class GeminiProviderHandler implements ProviderHandler {
         return bodyObj;
     }
 
+    /**
+     * Builds Gemini tool definitions from registered plugin tools.
+     *
+     * @param shareCharInfo {@code true} if character-specific tools should be included
+     * @return {@link JsonArray} of tools formatted with Gemini functionDeclarations
+     */
     private JsonArray buildGeminiTools(boolean shareCharInfo) {
         JsonArray declarations = new JsonArray();
         for (AiService.ToolDefinition def : AiService.getToolRegistry()) {

@@ -35,6 +35,7 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.Varbits;
+import net.runelite.api.widgets.Widget;
 import net.runelite.api.SoundEffectID;
 import net.runelite.api.ParamID;
 import net.runelite.client.Notifier;
@@ -57,6 +58,10 @@ import okhttp3.Response;
 
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Central service class managing AI provider communication, recursive tool execution loops,
+ * in-game context building, and tool handler execution.
+ */
 @Slf4j
 public class AiService {
     // URI Constants
@@ -68,13 +73,14 @@ public class AiService {
     private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
 
     // Game Varbits & Varplayer (Varp) IDs
-    private static final int VARBIT_SPELLBOOK = 4070;
-    private static final int VARBIT_TITHE_FARM_POINTS = 4893;
-    private static final int VARBIT_WILDERNESS_LEVEL = 5963;
-    private static final int VARP_SPECIAL_ATTACK_PERCENT = 300;
-    private static final int VARP_NMZ_REWARD_POINTS = 1056;
-    private static final int VARP_PEST_CONTROL_POINTS = 261;
-    private static final int POISON_VENOM_THRESHOLD = 1000000;
+    static final int VARBIT_SPELLBOOK = 4070;
+    static final int VARBIT_TITHE_FARM_POINTS = 4893;
+    static final int VARBIT_WILDERNESS_LEVEL = 5963;
+    static final int VARBIT_SAILING_STATE = 9999;
+    static final int VARP_SPECIAL_ATTACK_PERCENT = 300;
+    static final int VARP_NMZ_REWARD_POINTS = 1056;
+    static final int VARP_PEST_CONTROL_POINTS = 261;
+    static final int POISON_VENOM_THRESHOLD = 1000000;
 
     // Combat Achievement Enums & Struct Parameters
     private static final int CA_BOSS_ENUM = 3971;
@@ -90,6 +96,14 @@ public class AiService {
     private static final int CA_STRUCT_PARAM_DESCRIPTION = 1309;
     private static final int CA_STRUCT_PARAM_TYPE = 1311;
     private static final int CA_STRUCT_PARAM_BOSS_ID = 1312;
+
+    // Vessel & Sailing Telemetry Defaults
+    private static final int DEFAULT_VESSEL_HULL_HEALTH_PERCENT = 100;
+    private static final int DEFAULT_VESSEL_SPEED_KNOTS = 0;
+    private static final String DEFAULT_VESSEL_SHIP_TYPE = "Skiff / Small Boat";
+    private static final String DEFAULT_VESSEL_SAIL_TRIM = "Full";
+    private static final String DEFAULT_VESSEL_WIND_VECTOR = "Tailwind (NW)";
+    private static final String DEFAULT_VESSEL_ANCHOR_STATUS = "Raised";
 
     // Quest Struct Param IDs
     static final int QUEST_STRUCT_PARAM_VARBIT = 299;
@@ -192,6 +206,11 @@ public class AiService {
         return wikiClient;
     }
 
+    /**
+     * Retrieves the currently active AI provider profile configured by the user.
+     *
+     * @return active {@link AiProfile}, or {@code null} if none is selected or configured
+     */
     public AiProfile getActiveProfile() {
         String activeId = config.activeProfileId();
         if (activeId == null || activeId.isEmpty()) {
@@ -217,6 +236,13 @@ public class AiService {
         return null;
     }
 
+    /**
+     * Asynchronously processes a user prompt: validates configuration, gathers game state context on the RuneLite
+     * client thread, and submits the payload to the active AI provider endpoint.
+     *
+     * @param question the user's prompt string
+     * @param panel UI panel instance for rendering chat turns and progress indicators
+     */
     public void sendQuestion(String question, OsrsAiPanel panel) {
         final AiProfile activeProfile = getActiveProfile();
         if (activeProfile == null) {
@@ -460,6 +486,9 @@ public class AiService {
         return future;
     }
 
+    /**
+     * Data structure representing an AI-requested tool invocation call.
+     */
     public static class ToolCall {
         public final String id;
         public final String name;
@@ -472,6 +501,9 @@ public class AiService {
         }
     }
 
+    /**
+     * Data structure representing the execution result output of a tool call.
+     */
     public static class ToolResult {
         public final ToolCall call;
         public final String resultJson;
@@ -482,6 +514,9 @@ public class AiService {
         }
     }
 
+    /**
+     * Data structure defining a tool parameter attribute (name, type, description, required status).
+     */
     public static class ToolParameter {
         public final String name;
         public final String type;
@@ -496,11 +531,25 @@ public class AiService {
         }
     }
 
+    /**
+     * Functional interface for executing a registered tool.
+     */
     @FunctionalInterface
     public interface ToolExecutor {
+        /**
+         * Executes the tool logic with the provided AI arguments.
+         *
+         * @param service active {@link AiService} instance
+         * @param args tool input arguments formatted as JSON object
+         * @return JSON string or text output of the tool execution
+         * @throws Exception if an error occurs during tool execution
+         */
         String execute(AiService service, JsonObject args) throws Exception;
     }
 
+    /**
+     * Definition of a tool available to the AI assistant, including its parameters and execution metadata.
+     */
     public static class ToolDefinition {
         public final String name;
         public final String description;
@@ -518,12 +567,26 @@ public class AiService {
             this.executor = executor;
         }
 
+        /**
+         * Adds a parameter definition to this tool.
+         *
+         * @param name parameter name
+         * @param type data type (string, integer, boolean, array_integer, array_string)
+         * @param description parameter description
+         * @param required {@code true} if parameter is mandatory
+         * @return this {@link ToolDefinition} instance for chaining
+         */
         public ToolDefinition addParam(String name, String type, String description, boolean required) {
             this.parameters.add(new ToolParameter(name, type, description, required));
             return this;
         }
     }
 
+    /**
+     * Gets the global registry of tool definitions.
+     *
+     * @return unmodifiable list of {@link ToolDefinition} instances
+     */
     public static List<ToolDefinition> getToolRegistry() {
         return OsrsToolRegistry.getToolRegistry();
     }
@@ -713,6 +776,12 @@ public class AiService {
         return false;
     }
 
+    /**
+     * Executes the 'set_shortest_path_target' tool to set a destination overlay marker in the Shortest Path plugin via reflection.
+     *
+     * @param args JSON arguments containing "x", "y", optional "plane", and optional "locationName"
+     * @return JSON response string with status and outcome message
+     */
     String executeSetShortestPathTarget(JsonObject args) {
         JsonObject result = new JsonObject();
         if (args == null || !args.has("x") || !args.has("y")) {
@@ -756,6 +825,12 @@ public class AiService {
         return result.toString();
     }
 
+    /**
+     * Executes the 'get_player_skills' tool to retrieve player skill levels, XP, and target level milestones.
+     *
+     * @param args JSON arguments with optional "skill" filter name and optional "targetLevel" integer
+     * @return JSON string of skill stats and remaining XP thresholds
+     */
     String executeGetPlayerSkills(JsonObject args) {
         JsonObject result = new JsonObject();
         String filterSkill = (args != null && args.has("skill") && !args.get("skill").isJsonNull())
@@ -796,6 +871,12 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    /**
+     * Executes the 'get_player_inventory' tool to inspect current inventory contents, quantities, GE prices, and HA prices.
+     *
+     * @param args tool arguments
+     * @return JSON string mapping item names to inventory quantities and prices
+     */
     String executeGetPlayerInventory(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject invItems = new JsonObject();
@@ -807,6 +888,12 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    /**
+     * Executes the 'get_player_equipment' tool to inspect currently equipped worn equipment items and stats across all equipment slots.
+     *
+     * @param args tool arguments
+     * @return JSON string of equipped items organized by equipment slot name
+     */
     String executeGetPlayerEquipment(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject eqSlots = new JsonObject();
@@ -898,6 +985,12 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    /**
+     * Executes the 'get_player_slayer_task' tool to retrieve the active Slayer task monster, remaining count, points, and task streak.
+     *
+     * @param args tool arguments
+     * @return JSON string containing Slayer task details
+     */
     String executeGetPlayerSlayerTask(JsonObject args) {
         JsonObject result = new JsonObject();
         String taskName = configManager.getRSProfileConfiguration("slayer", "taskName");
@@ -942,6 +1035,12 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    /**
+     * Executes the 'get_player_quests' tool to retrieve quest completion counts, total Quest Points, and lists of in-progress/not-started/completed quests.
+     *
+     * @param args JSON arguments with optional "status" filter and optional "quest" name search term
+     * @return JSON string of quest completion status
+     */
     String executeGetPlayerQuests(JsonObject args) {
         JsonObject result = new JsonObject();
         int qp = client.getVarpValue(VarPlayerID.QP);
@@ -1052,6 +1151,12 @@ public class AiService {
         return -1;
     }
 
+    /**
+     * Executes the 'get_player_achievement_diaries' tool to retrieve Achievement Diary completion progress across all regions and tiers.
+     *
+     * @param args tool arguments
+     * @return JSON string of diary tier completion statuses
+     */
     String executeGetPlayerAchievementDiaries(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject diaries = new JsonObject();
@@ -1084,6 +1189,12 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    /**
+     * Executes the 'get_player_combat_achievements' tool to retrieve Combat Achievement tier completions, boss kill counts, and filtered task details.
+     *
+     * @param args JSON arguments with optional "tier", "boss", "completed", and "taskName" filters
+     * @return JSON string of Combat Achievement tiers, kill counts, and matching tasks
+     */
     String executeGetPlayerCombatAchievements(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject tiers = new JsonObject();
@@ -1292,140 +1403,120 @@ public class AiService {
 
     String executeGetPlayerClues(JsonObject args) throws Exception {
         JsonObject result = new JsonObject();
-        JsonArray invClueItems = new JsonArray();
-        ItemContainer invCont = client.getItemContainer(InventoryID.INVENTORY);
-        if (invCont != null) {
-            for (Item item : invCont.getItems()) {
-                if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
-                    continue;
-                }
-                net.runelite.api.ItemComposition comp = client.getItemDefinition(item.getId());
-                if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
-                    JsonObject clueItem = new JsonObject();
-                    clueItem.addProperty("id", item.getId());
-                    clueItem.addProperty("name", comp.getName());
-                    clueItem.addProperty("qty", item.getQuantity());
-                    clueItem.addProperty("location", "Inventory");
-                    invClueItems.add(clueItem);
-                }
-            }
-        }
-        result.add("inventoryClues", invClueItems);
-
-        JsonArray bankClueItems = new JsonArray();
-        ItemContainer bankCont = client.getItemContainer(InventoryID.BANK);
-        if (bankCont != null) {
-            for (Item item : bankCont.getItems()) {
-                if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
-                    continue;
-                }
-                net.runelite.api.ItemComposition comp = client.getItemDefinition(item.getId());
-                if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
-                    JsonObject clueItem = new JsonObject();
-                    clueItem.addProperty("id", item.getId());
-                    clueItem.addProperty("name", comp.getName());
-                    clueItem.addProperty("qty", item.getQuantity());
-                    clueItem.addProperty("location", "Bank");
-                    bankClueItems.add(clueItem);
-                }
-            }
-        }
-        result.add("bankClues", bankClueItems);
-
-        JsonObject activeClueObj = new JsonObject();
-        activeClueObj.addProperty("status", "No active clue scroll detected");
-        boolean foundPlugin = false;
-
-        if (pluginManager != null) {
-            for (net.runelite.client.plugins.Plugin p : pluginManager.getPlugins()) {
-                if (p.getClass().getName().equals("net.runelite.client.plugins.cluescrolls.ClueScrollPlugin")) {
-                    foundPlugin = true;
-                    if (pluginManager.isPluginEnabled(p)) {
-                        if (p instanceof net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) {
-                            net.runelite.client.plugins.cluescrolls.ClueScrollPlugin clueScrollPlugin = (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
-                            net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = clueScrollPlugin
-                                    .getClue();
-                            if (clue != null) {
-                                activeClueObj.addProperty("status", "Active clue scroll detected");
-                                activeClueObj.addProperty("type", clue.getClass().getSimpleName());
-
-                                net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
-                                try {
-                                    clue.makeOverlayHint(panel, clueScrollPlugin);
-                                    JsonArray hintLines = new JsonArray();
-                                    for (Object child : panel.getChildren()) {
-                                        if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
-                                            net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
-
-                                            String left = "";
-                                            String right = "";
-                                            try {
-                                                java.lang.reflect.Field leftField = lc.getClass()
-                                                        .getDeclaredField("left");
-                                                leftField.setAccessible(true);
-                                                left = (String) leftField.get(lc);
-                                            } catch (Exception ignored) {
-                                            }
-
-                                            try {
-                                                java.lang.reflect.Field rightField = lc.getClass()
-                                                        .getDeclaredField("right");
-                                                rightField.setAccessible(true);
-                                                right = (String) rightField.get(lc);
-                                            } catch (Exception ignored) {
-                                            }
-
-                                            if (left != null && !left.trim().isEmpty()) {
-                                                if (right != null && !right.trim().isEmpty()) {
-                                                    hintLines.add(left + ": " + right);
-                                                } else {
-                                                    hintLines.add(left);
-                                                }
-                                            }
-                                        } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
-                                            net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
-
-                                            String text = "";
-                                            try {
-                                                java.lang.reflect.Field textField = tc.getClass()
-                                                        .getDeclaredField("text");
-                                                textField.setAccessible(true);
-                                                text = (String) textField.get(tc);
-                                            } catch (Exception ignored) {
-                                            }
-
-                                            if (text != null && !text.trim().isEmpty()) {
-                                                hintLines.add(text);
-                                            }
-                                        } else {
-                                            hintLines.add(child.toString());
-                                        }
-                                    }
-                                    activeClueObj.add("details", hintLines);
-                                } catch (Throwable t) {
-                                    activeClueObj.addProperty("error",
-                                            "Failed to format clue details: " + t.getMessage());
-                                }
-                            } else {
-                                activeClueObj.addProperty("status",
-                                        "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
-                            }
-                        }
-                    } else {
-                        activeClueObj.addProperty("status",
-                                "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
-                    }
-                    break;
-                }
-            }
-        }
-
-        if (!foundPlugin) {
-            activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin was not found.");
-        }
-
-        result.add("activeClue", activeClueObj);
+        result.add("inventoryClues", extractClueItems(InventoryID.INVENTORY, "Inventory"));
+        result.add("bankClues", extractClueItems(InventoryID.BANK, "Bank"));
+        result.add("activeClue", extractActiveClueDetails());
         return gson.toJson(result);
+    }
+
+    private JsonArray extractClueItems(InventoryID inventoryId, String location) {
+        JsonArray clueItems = new JsonArray();
+        ItemContainer container = client.getItemContainer(inventoryId);
+        if (container != null) {
+            for (Item item : container.getItems()) {
+                if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                    continue;
+                }
+                ItemComposition comp = client.getItemDefinition(item.getId());
+                if (comp != null && comp.getIntValue(ParamID.CLUE_SCROLL) != -1) {
+                    JsonObject clueItem = new JsonObject();
+                    clueItem.addProperty("id", item.getId());
+                    clueItem.addProperty("name", comp.getName());
+                    clueItem.addProperty("qty", item.getQuantity());
+                    clueItem.addProperty("location", location);
+                    clueItems.add(clueItem);
+                }
+            }
+        }
+        return clueItems;
+    }
+
+    private JsonObject extractActiveClueDetails() {
+        JsonObject activeClueObj = new JsonObject();
+        if (pluginManager == null) {
+            activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin was not found.");
+            return activeClueObj;
+        }
+
+        net.runelite.client.plugins.cluescrolls.ClueScrollPlugin cluePlugin = null;
+        for (net.runelite.client.plugins.Plugin p : pluginManager.getPlugins()) {
+            if (p instanceof net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) {
+                cluePlugin = (net.runelite.client.plugins.cluescrolls.ClueScrollPlugin) p;
+                break;
+            }
+        }
+
+        if (cluePlugin == null) {
+            activeClueObj.addProperty("status", "RuneLite's built-in Clue Scroll plugin was not found.");
+            return activeClueObj;
+        }
+
+        if (!pluginManager.isPluginEnabled(cluePlugin)) {
+            activeClueObj.addProperty("status",
+                    "RuneLite's built-in Clue Scroll plugin is disabled in the client settings. Ask the player to enable it.");
+            return activeClueObj;
+        }
+
+        net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue = cluePlugin.getClue();
+        if (clue == null) {
+            activeClueObj.addProperty("status",
+                    "No active clue scroll step loaded. Ask the player to read/open their clue scroll once to activate tracking.");
+            return activeClueObj;
+        }
+
+        activeClueObj.addProperty("status", "Active clue scroll detected");
+        activeClueObj.addProperty("type", clue.getClass().getSimpleName());
+
+        try {
+            activeClueObj.add("details", formatClueDetails(clue, cluePlugin));
+        } catch (Throwable t) {
+            activeClueObj.addProperty("error", "Failed to format clue details: " + t.getMessage());
+        }
+
+        return activeClueObj;
+    }
+
+    private JsonArray formatClueDetails(net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue,
+            net.runelite.client.plugins.cluescrolls.ClueScrollPlugin cluePlugin) {
+        net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
+        clue.makeOverlayHint(panel, cluePlugin);
+
+        JsonArray hintLines = new JsonArray();
+        for (Object child : panel.getChildren()) {
+            if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
+                net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
+                String left = readDeclaredFieldString(lc, "left");
+                String right = readDeclaredFieldString(lc, "right");
+
+                if (left != null && !left.trim().isEmpty()) {
+                    if (right != null && !right.trim().isEmpty()) {
+                        hintLines.add(left + ": " + right);
+                    } else {
+                        hintLines.add(left);
+                    }
+                }
+            } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
+                net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
+                String text = readDeclaredFieldString(tc, "text");
+
+                if (text != null && !text.trim().isEmpty()) {
+                    hintLines.add(text);
+                }
+            } else {
+                hintLines.add(child.toString());
+            }
+        }
+        return hintLines;
+    }
+
+    private String readDeclaredFieldString(Object obj, String fieldName) {
+        try {
+            java.lang.reflect.Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (String) field.get(obj);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     String executeSearchOsrsWiki(JsonObject args) {
@@ -1625,6 +1716,104 @@ public class AiService {
         return gson.toJson(result);
     }
 
+    static class VesselWidgetData {
+        boolean foundVesselUi = false;
+        String shipName = null;
+        int currentHp = -1;
+        int maxHp = -1;
+        String sailingActivity = null;
+        List<String> facilities = new ArrayList<>();
+    }
+
+    VesselWidgetData scanVesselWidgets() {
+        VesselWidgetData data = new VesselWidgetData();
+        if (client == null) {
+            return data;
+        }
+
+        try {
+            Widget[] roots = client.getWidgetRoots();
+            if (roots != null) {
+                for (Widget root : roots) {
+                    scanWidgetNode(root, data);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Error scanning widgets for vessel telemetry", e);
+        }
+
+        return data;
+    }
+
+    private void scanWidgetNode(Widget widget, VesselWidgetData data) {
+        if (widget == null || widget.isSelfHidden()) {
+            return;
+        }
+
+        String text = widget.getText();
+        if (text != null && !text.isEmpty()) {
+            String cleanText = PATTERN_HTML_TAGS.matcher(text).replaceAll("").trim();
+            if (!cleanText.isEmpty()) {
+                if (cleanText.matches("^\\d{1,4}\\s*/\\s*\\d{1,4}$")) {
+                    String[] parts = cleanText.split("/");
+                    try {
+                        data.currentHp = Integer.parseInt(parts[0].trim());
+                        data.maxHp = Integer.parseInt(parts[1].trim());
+                        data.foundVesselUi = true;
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+
+                String lower = cleanText.toLowerCase();
+                if (lower.equals("facilities") || lower.equals("steering") || lower.startsWith("repairs")) {
+                    data.foundVesselUi = true;
+                    if (!data.facilities.contains(cleanText)) {
+                        data.facilities.add(cleanText);
+                    }
+                }
+
+                if (lower.contains("charting") || lower.contains("weather pattern")) {
+                    data.sailingActivity = cleanText;
+                    data.foundVesselUi = true;
+                }
+
+                if (cleanText.length() >= 3 && cleanText.length() <= 35) {
+                    if (lower.contains("clipper") || lower.contains("sloop") || lower.contains("skiff")
+                            || lower.contains("brig") || lower.contains("frigate") || lower.contains("boat")
+                            || lower.contains("galleon")) {
+                        data.shipName = cleanText;
+                        data.foundVesselUi = true;
+                    }
+                }
+            }
+        }
+
+        Widget[] children = widget.getChildren();
+        if (children != null) {
+            for (Widget child : children) {
+                scanWidgetNode(child, data);
+            }
+        }
+        Widget[] nested = widget.getNestedChildren();
+        if (nested != null) {
+            for (Widget child : nested) {
+                scanWidgetNode(child, data);
+            }
+        }
+        Widget[] dynamic = widget.getDynamicChildren();
+        if (dynamic != null) {
+            for (Widget child : dynamic) {
+                scanWidgetNode(child, data);
+            }
+        }
+        Widget[] staticChildren = widget.getStaticChildren();
+        if (staticChildren != null) {
+            for (Widget child : staticChildren) {
+                scanWidgetNode(child, data);
+            }
+        }
+    }
+
     String executeGetPlayerSailingStatus(JsonObject args) {
         JsonObject result = new JsonObject();
         boolean includeCargo = true;
@@ -1655,17 +1844,24 @@ public class AiService {
         }
         result.add("sailingSkill", skillData);
 
+        VesselWidgetData wData = scanVesselWidgets();
+
         JsonObject vessel = new JsonObject();
-        boolean aboardVessel = false;
-        String shipType = "Skiff / Small Boat";
-        int hullHealthPct = 100;
-        int speedKnots = 0;
-        String sailTrim = "Full";
-        String windVector = "Tailwind (NW)";
-        String anchorState = "Raised";
+        boolean aboardVessel = wData.foundVesselUi;
+        String shipType = (wData.shipName != null) ? wData.shipName : DEFAULT_VESSEL_SHIP_TYPE;
+        int hullHealthPct = DEFAULT_VESSEL_HULL_HEALTH_PERCENT;
+        if (wData.currentHp > 0 && wData.maxHp > 0) {
+            hullHealthPct = (int) Math.round(((double) wData.currentHp / wData.maxHp) * 100.0);
+            vessel.addProperty("currentHullHp", wData.currentHp);
+            vessel.addProperty("maxHullHp", wData.maxHp);
+        }
+        int speedKnots = DEFAULT_VESSEL_SPEED_KNOTS;
+        String sailTrim = DEFAULT_VESSEL_SAIL_TRIM;
+        String windVector = DEFAULT_VESSEL_WIND_VECTOR;
+        String anchorState = DEFAULT_VESSEL_ANCHOR_STATUS;
 
         try {
-            int sailingStateVarbit = client.getVarbitValue(9999);
+            int sailingStateVarbit = client.getVarbitValue(VARBIT_SAILING_STATE);
             if (sailingStateVarbit > 0) {
                 aboardVessel = true;
             }
@@ -1673,12 +1869,23 @@ public class AiService {
         }
 
         vessel.addProperty("aboardVessel", aboardVessel);
+        vessel.addProperty("shipName", shipType);
         vessel.addProperty("shipType", shipType);
         vessel.addProperty("hullHealthPercent", hullHealthPct);
         vessel.addProperty("speedKnots", speedKnots);
         vessel.addProperty("sailTrim", sailTrim);
         vessel.addProperty("windVector", windVector);
         vessel.addProperty("anchorStatus", anchorState);
+        if (wData.sailingActivity != null) {
+            vessel.addProperty("activeActivity", wData.sailingActivity);
+        }
+        if (!wData.facilities.isEmpty()) {
+            JsonArray facArray = new JsonArray();
+            for (String fac : wData.facilities) {
+                facArray.add(fac);
+            }
+            vessel.add("facilities", facArray);
+        }
         result.add("vesselStatus", vessel);
 
         JsonObject locObj = new JsonObject();
@@ -2064,6 +2271,24 @@ public class AiService {
                 } catch (Exception ignored) {
                 }
                 break;
+            }
+        }
+
+        VesselWidgetData vData = scanVesselWidgets();
+        if (vData.foundVesselUi) {
+            sb.append("\nCURRENTLY ABOARD VESSEL:\n");
+            sb.append("Vessel Status: ABOARD VESSEL\n");
+            sb.append("Vessel Name: ").append(vData.shipName != null ? vData.shipName : "Sailing Vessel").append("\n");
+            if (vData.currentHp > 0 && vData.maxHp > 0) {
+                int hpPct = (int) Math.round(((double) vData.currentHp / vData.maxHp) * 100.0);
+                sb.append("Hull Health: ").append(vData.currentHp).append("/").append(vData.maxHp)
+                        .append(" (").append(hpPct).append("%)\n");
+            }
+            if (vData.sailingActivity != null) {
+                sb.append("Current Activity: ").append(vData.sailingActivity).append("\n");
+            }
+            if (!vData.facilities.isEmpty()) {
+                sb.append("Active Facilities: ").append(String.join(", ", vData.facilities)).append("\n");
             }
         }
         sb.append("\nTEMPORARY CURRENT LOCATION (where player is standing right now):\n");

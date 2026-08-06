@@ -202,6 +202,18 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testExecuteGetPlayerClues() throws Exception {
+        JsonObject args = new JsonObject();
+        String json = aiService.executeGetPlayerClues(args);
+        Assert.assertNotNull(json);
+
+        JsonObject rootObj = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertTrue(rootObj.has("inventoryClues"));
+        Assert.assertTrue(rootObj.has("bankClues"));
+        Assert.assertTrue(rootObj.has("activeClue"));
+    }
+
+    @Test
     public void extractSearchQueryCleansConversationalPrefixes() {
         Assert.assertEquals("super antipoison",
                 AiService.extractSearchQuery("what are the ingredients for super antipoison?"));
@@ -664,7 +676,7 @@ public class AiServiceTest {
         Mockito.when(client.getRealSkillLevel(net.runelite.api.Skill.MAGIC)).thenReturn(75);
         Mockito.when(client.getBoostedSkillLevel(net.runelite.api.Skill.MAGIC)).thenReturn(75);
         Mockito.when(client.getRealSkillLevel(net.runelite.api.Skill.CONSTRUCTION)).thenReturn(83);
-        Mockito.when(client.getVarbitValue(4070)).thenReturn(0); // Standard spellbook
+        Mockito.when(client.getVarbitValue(AiService.VARBIT_SPELLBOOK)).thenReturn(0); // Standard spellbook
 
         String json = aiService.executeGetPlayerTransportation(new JsonObject());
         Assert.assertNotNull(json);
@@ -719,17 +731,20 @@ public class AiServiceTest {
 
     @Test
     public void testGetPlayerSailingStatusTool() {
+        final int testItemIdPlank = 1001;
+        final int testPlankQuantity = 25;
+
         JsonObject args = new JsonObject();
         args.addProperty("includeCargo", true);
 
         ItemContainer mockInv = Mockito.mock(ItemContainer.class);
-        Item mockPlank = new Item(1001, 25);
+        Item mockPlank = new Item(testItemIdPlank, testPlankQuantity);
         Mockito.when(mockInv.getItems()).thenReturn(new Item[] { mockPlank });
         Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.INVENTORY)).thenReturn(mockInv);
 
         ItemComposition mockComp = Mockito.mock(ItemComposition.class);
         Mockito.when(mockComp.getName()).thenReturn("Oak plank");
-        Mockito.when(itemManager.getItemComposition(1001)).thenReturn(mockComp);
+        Mockito.when(itemManager.getItemComposition(testItemIdPlank)).thenReturn(mockComp);
 
         String json = aiService.executeGetPlayerSailingStatus(args);
         Assert.assertNotNull(json);

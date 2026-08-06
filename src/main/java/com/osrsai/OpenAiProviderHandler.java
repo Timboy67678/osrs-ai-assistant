@@ -9,11 +9,22 @@ import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
+/**
+ * Implementation of {@link ProviderHandler} for OpenAI-compatible chat completion APIs (OpenAI, Grok, Custom endpoints).
+ * <p>
+ * Supports standard OpenAI JSON schema for messages, system prompt, max token caps (including reasoning models),
+ * function calling tools, and HTTP Authorization header authentication.
+ */
 public class OpenAiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
     private final String apiUrl;
     private final Gson gson = new Gson();
 
+    /**
+     * Constructs an {@code OpenAiProviderHandler} for a specific target API endpoint URL.
+     *
+     * @param apiUrl target endpoint URL (e.g. OpenAI chat completions or Grok endpoint)
+     */
     public OpenAiProviderHandler(String apiUrl) {
         this.apiUrl = apiUrl;
     }
@@ -28,8 +39,8 @@ public class OpenAiProviderHandler implements ProviderHandler {
         String lowerModel = modelId != null ? modelId.toLowerCase() : "";
         boolean isReasoningModel = lowerModel.startsWith("o1")
                 || lowerModel.startsWith("o3")
-                || lowerModel.contains("reasoning")
-                || lowerModel.contains("r1");
+        		|| lowerModel.contains("reasoning")
+        		|| lowerModel.contains("r1");
         if (isReasoningModel) {
             bodyObj.addProperty("max_completion_tokens", 16384);
         } else {
@@ -55,6 +66,12 @@ public class OpenAiProviderHandler implements ProviderHandler {
         return bodyObj;
     }
 
+    /**
+     * Builds OpenAI tool definitions from registered plugin tools.
+     *
+     * @param shareCharInfo {@code true} if character-specific tools should be included
+     * @return {@link JsonArray} of function tool declarations
+     */
     protected JsonArray buildOpenAiTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
         for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
@@ -102,6 +119,12 @@ public class OpenAiProviderHandler implements ProviderHandler {
         return tools;
     }
 
+    /**
+     * Helper method to extract the assistant message object from the response choices array or outputs array.
+     *
+     * @param responseRoot API response JSON object
+     * @return assistant message {@link JsonObject}, or {@code null} if not found
+     */
     private JsonObject getAssistantMessage(JsonObject responseRoot) {
         if (responseRoot == null) {
             return null;

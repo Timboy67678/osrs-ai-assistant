@@ -16,11 +16,19 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 
+/**
+ * The main RuneLite plugin class for the OSRS AI Assistant.
+ * <p>
+ * This class handles plugin startup/shutdown, registers the sidebar navigation button and UI panel,
+ * injects required RuneLite services, and routes user questions and configuration change events.
+ */
 @Slf4j
 @PluginDescriptor(name = "OSRS AI Assistant", description = "An AI chatbot assistant that reads your in-game stats. WARNING: Sends query & selected game details to third-party AI APIs (Gemini/OpenAI/Claude/Grok). Requires an external API key.", tags = {
         "ai", "chatbot", "gemini", "assistant" })
 public class OsrsAiPlugin extends Plugin {
-    // config group for saving data, stored in user's .runelite folder
+    /**
+     * Config group key used for persisting plugin settings in RuneLite's ConfigManager.
+     */
     public static final String CONFIG_GROUP = "osrsai";
 
     @Inject
@@ -35,9 +43,18 @@ public class OsrsAiPlugin extends Plugin {
     @Inject
     private AiService aiService;
 
+    /** The primary UI panel attached to the RuneLite sidebar or detached window. */
     private OsrsAiPanel panel;
+
+    /** Navigation button displayed on the RuneLite sidebar. */
     private NavigationButton navButton;
 
+    /**
+     * Starts up the plugin by initializing the UI panel, scaling the navigation icon,
+     * adding the sidebar button to the client toolbar, and restoring detached window state if enabled.
+     *
+     * @throws Exception if an initialization error occurs during startup
+     */
     @Override
     protected void startUp() throws Exception {
         log.info("OSRS AI Assistant started!");
@@ -65,6 +82,11 @@ public class OsrsAiPlugin extends Plugin {
         }
     }
 
+    /**
+     * Shuts down the plugin by closing any detached windows and removing the navigation button.
+     *
+     * @throws Exception if an error occurs during shutdown
+     */
     @Override
     protected void shutDown() throws Exception {
         log.info("OSRS AI Assistant stopped!");
@@ -74,15 +96,30 @@ public class OsrsAiPlugin extends Plugin {
         clientToolbar.removeNavigation(navButton);
     }
 
+    /**
+     * Sends a user query to the AI service for processing and response rendering.
+     *
+     * @param question the user's natural language question
+     */
     public void askQuestion(String question) {
         log.debug("Question asked: {}", question);
         aiService.sendQuestion(question, panel);
     }
 
+    /**
+     * Gets the active plugin configuration instance.
+     *
+     * @return the {@link OsrsAiConfig} instance
+     */
     public OsrsAiConfig getConfig() {
         return config;
     }
 
+    /**
+     * Listens for changes to the plugin's configuration settings and updates UI components accordingly.
+     *
+     * @param event the {@link ConfigChanged} event emitted by RuneLite
+     */
     @Subscribe
     public void onConfigChanged(ConfigChanged event) {
         if (CONFIG_GROUP.equals(event.getGroup())) {
@@ -94,6 +131,12 @@ public class OsrsAiPlugin extends Plugin {
         }
     }
 
+    /**
+     * Provides the configuration instance bound to the RuneLite Dependency Injection system.
+     *
+     * @param configManager the RuneLite {@link ConfigManager}
+     * @return the configured {@link OsrsAiConfig} instance
+     */
     @Provides
     OsrsAiConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(OsrsAiConfig.class);

@@ -24,14 +24,30 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+/**
+ * Utility class for searching and parsing the Old School RuneScape Wiki via MediaWiki API.
+ * <p>
+ * Cleans natural language search queries, performs API requests, caches query results,
+ * strips MediaWiki HTML noise, and converts article HTML into structured Markdown extracts.
+ */
 @Slf4j
 public class WikiSearchUtil {
+    /** Custom User-Agent header string required by Old School RuneScape Wiki API guidelines. */
     public static final String OSRS_AI_USER_AGENT = "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant";
+
+    /** Endpoint URL for the Old School RuneScape Wiki MediaWiki API. */
     public static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
+
+    /** Maximum nested template cleaning iterations. */
     public static final int MAX_TEMPLATE_REMOVALS = 5;
+
+    /** Maximum character limit for wiki article extracts passed to the AI prompt context. */
     public static final int WIKI_EXTRACT_CHARS = 8000;
+
+    /** Maximum number of entries retained in the synchronized search cache. */
     private static final int CACHE_MAX_ENTRIES = 500;
 
+    /** LRU cache storing recent wiki query results to prevent redundant HTTP network calls. */
     private static final Map<String, String> SEARCH_CACHE = Collections.synchronizedMap(
             new LinkedHashMap<>(CACHE_MAX_ENTRIES, 0.75f, true) {
                 @Override
@@ -65,10 +81,21 @@ public class WikiSearchUtil {
         // Utility class
     }
 
+    /**
+     * Clears all cached wiki search entries from memory.
+     */
     public static void clearCache() {
         SEARCH_CACHE.clear();
     }
 
+    /**
+     * Executes an OSRS Wiki search for the specified query, checking cache first before issuing network requests.
+     *
+     * @param wikiClient {@link OkHttpClient} configured for wiki HTTP calls
+     * @param gson {@link Gson} instance for JSON parsing
+     * @param query entity, location, item, monster, or topic search query
+     * @return JSON string containing article title and markdown extract, or error JSON if not found
+     */
     public static String executeWikiSearch(OkHttpClient wikiClient, Gson gson, String query) {
         String cleanedQuery = extractSearchQuery(query);
         String cacheKey = cleanedQuery.trim().toLowerCase();
@@ -98,6 +125,12 @@ public class WikiSearchUtil {
         return errJson;
     }
 
+    /**
+     * Strips common conversational question prefixes and query suffixes to produce a concise search term suitable for the Wiki API.
+     *
+     * @param question user prompt or tool search parameter
+     * @return cleaned OSRS search term
+     */
     public static String extractSearchQuery(String question) {
         if (question == null) {
             return "";
@@ -229,6 +262,14 @@ public class WikiSearchUtil {
         return q.isEmpty() ? question : q;
     }
 
+    /**
+     * Fetches and parses a wiki page directly by page title using MediaWiki action=parse.
+     *
+     * @param wikiClient {@link OkHttpClient} instance
+     * @param gson {@link Gson} instance
+     * @param query article title string
+     * @return JSON string with article title and markdown extract, or {@code null} if page not found
+     */
     public static String fetchDirectTitleExtract(OkHttpClient wikiClient, Gson gson, String query) {
         try {
             HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
@@ -272,6 +313,14 @@ public class WikiSearchUtil {
         return null;
     }
 
+    /**
+     * Fallback search strategy that searches the wiki via search list before parsing the top result.
+     *
+     * @param wikiClient {@link OkHttpClient} instance
+     * @param gson {@link Gson} instance
+     * @param query search query
+     * @return JSON string with article title and markdown extract, or {@code null}
+     */
     public static String fetchGeneratorSearchExtract(OkHttpClient wikiClient, Gson gson, String query) {
         String topTitle = searchWikiTopResult(wikiClient, gson, query);
         if (topTitle != null) {
@@ -280,6 +329,14 @@ public class WikiSearchUtil {
         return null;
     }
 
+    /**
+     * Resolves a query string directly to a canonical wiki article title (handling redirects).
+     *
+     * @param wikiClient {@link OkHttpClient} instance
+     * @param gson {@link Gson} instance
+     * @param query query or page title
+     * @return resolved article title, or {@code null}
+     */
     public static String resolveTitleDirectly(OkHttpClient wikiClient, Gson gson, String query) {
         try {
             HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
@@ -319,6 +376,14 @@ public class WikiSearchUtil {
         return null;
     }
 
+    /**
+     * Executes a MediaWiki search API query to retrieve the top matching article title.
+     *
+     * @param wikiClient {@link OkHttpClient} instance
+     * @param gson {@link Gson} instance
+     * @param query search query
+     * @return top article title, or {@code null}
+     */
     public static String searchWikiTopResult(OkHttpClient wikiClient, Gson gson, String query) {
         String directTitle = resolveTitleDirectly(wikiClient, gson, query);
         if (directTitle != null) {
@@ -358,6 +423,14 @@ public class WikiSearchUtil {
         }
     }
 
+    /**
+     * Fetches the markdown extract of a specific wiki page by title.
+     *
+     * @param wikiClient {@link OkHttpClient} instance
+     * @param gson {@link Gson} instance
+     * @param title article title
+     * @return markdown extract string, or {@code null}
+     */
     public static String fetchWikiExtract(OkHttpClient wikiClient, Gson gson, String title) {
         String jsonRes = fetchDirectTitleExtract(wikiClient, gson, title);
         if (jsonRes != null) {
@@ -375,6 +448,10 @@ public class WikiSearchUtil {
 
     /**
      * Converts server-rendered MediaWiki HTML into concise, structured Markdown.
+     *
+     * @param title article title
+     * @param html raw HTML from MediaWiki action=parse
+     * @return formatted Markdown string
      */
     public static String parseWikiHtmlToMarkdown(String title, String html) {
         if (html == null || html.trim().isEmpty()) {

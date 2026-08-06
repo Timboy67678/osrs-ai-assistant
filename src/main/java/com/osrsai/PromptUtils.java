@@ -1,13 +1,28 @@
 package com.osrsai;
 
+/**
+ * Utility class providing system prompt assembly, prompt character budgeting, notification truncation,
+ * and account type / spellbook description formatting.
+ */
 public class PromptUtils {
+    /** Maximum allowed character count for the game context payload in system prompts. */
     public static final int MAX_CONTEXT_CHARACTERS = 8000;
+
+    /** Maximum allowed character count for recent conversation history in system prompts. */
     public static final int MAX_RECENT_CONVERSATION_CHARS = 4000;
 
     private PromptUtils() {
         // Utility class
     }
 
+    /**
+     * Constructs the full system prompt string combining AI identity instructions, available tool descriptions,
+     * grounding rules, recent conversation history, and current in-game context.
+     *
+     * @param context full game context string
+     * @param recentConversation recent chat turn history
+     * @return structured system prompt string
+     */
     public static String buildSystemPrompt(String context, String recentConversation) {
         String compactConversation = trimToPromptBudget(recentConversation, MAX_RECENT_CONVERSATION_CHARS,
                 "...[recent conversation truncated]", true);
@@ -44,10 +59,27 @@ public class PromptUtils {
                 + trimToPromptBudget(context, MAX_CONTEXT_CHARACTERS, "...[game context truncated for prompt budget]");
     }
 
+    /**
+     * Trims text content to fit within a specified character length limit, truncating from the end by default.
+     *
+     * @param text input text
+     * @param maxChars maximum allowed character budget
+     * @param truncationLabel string appended/prepended when truncation occurs
+     * @return trimmed text string
+     */
     public static String trimToPromptBudget(String text, int maxChars, String truncationLabel) {
         return trimToPromptBudget(text, maxChars, truncationLabel, false);
     }
 
+    /**
+     * Trims text content to fit within a specified character length limit, with options to retain the start or end of text.
+     *
+     * @param text input text
+     * @param maxChars maximum allowed character budget
+     * @param truncationLabel string appended/prepended when truncation occurs
+     * @param keepEnd {@code true} to keep the trailing portion of the text; {@code false} to keep the leading portion
+     * @return trimmed text string
+     */
     public static String trimToPromptBudget(String text, int maxChars, String truncationLabel, boolean keepEnd) {
         if (maxChars <= 0) {
             return "";
@@ -78,6 +110,12 @@ public class PromptUtils {
         }
     }
 
+    /**
+     * Truncates long response text to fit within standard desktop notification popups.
+     *
+     * @param text raw response text
+     * @return truncated notification summary string
+     */
     public static String truncateForNotification(String text) {
         if (text == null) {
             return "";
@@ -88,6 +126,12 @@ public class PromptUtils {
         return text.substring(0, 77) + "...";
     }
 
+    /**
+     * Converts RuneLite's ACCOUNT_TYPE varbit integer value into a human-readable account type string.
+     *
+     * @param accountTypeVarbit varbit integer (0=Normal, 1=Ironman, 2=UIM, 3=HCIM, 4=GIM, 5=HGIM, 6=UGIM)
+     * @return account type display name
+     */
     public static String describeAccountType(Integer accountTypeVarbit) {
         if (accountTypeVarbit == null) {
             return "Unknown";
@@ -112,6 +156,12 @@ public class PromptUtils {
         }
     }
 
+    /**
+     * Converts RuneLite's active spellbook varbit integer into a human-readable spellbook name.
+     *
+     * @param val spellbook integer ID (0=Standard, 1=Ancient Magicks, 2=Lunar, 3=Arceuus)
+     * @return spellbook name string
+     */
     public static String describeSpellbook(int val) {
         switch (val) {
             case 0:

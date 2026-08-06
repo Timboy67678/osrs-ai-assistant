@@ -13,14 +13,18 @@ import net.runelite.api.InstanceTemplates;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 
+/**
+ * Internal resolver class for translating Old School RuneScape coordinates (WorldPoint),
+ * region IDs, instance templates, and underground offsets into human-readable area names.
+ */
 final class LocationResolver {
     private static final int[] UNDERGROUND_Y_OFFSETS = { 6400, 12800 };
     private static final String REGION_ALIAS_RESOURCE = "/com/osrsai/region-aliases.properties";
 
-    // Region aliases are easier to maintain than large rectangle lists for named
-    // dungeon zones.
+    /** Region aliases map loaded from region-aliases.properties resource. */
     private static final Map<Integer, RegionAlias> REGION_ALIASES = loadRegionAliases();
 
+    /** Known 2D bounding boxes for well-known OSRS cities, guilds, and dungeons. */
     private static final List<NamedArea> KNOWN_AREAS = Arrays.asList(
             new NamedArea("Grand Exchange", new WorldArea(3153, 3472, 34, 28, 0)),
             new NamedArea("Varrock West Bank", new WorldArea(3176, 3422, 22, 20, 0)),
@@ -128,6 +132,7 @@ final class LocationResolver {
             new NamedArea("Sunset Coast", new WorldArea(1200, 2900, 160, 320, 0)),
             new NamedArea("Varlamore Mountain Range", new WorldArea(1400, 3100, 100, 150, 0)));
 
+    /** Large province fallback bounding boxes for broad regional identification. */
     private static final List<NamedArea> PROVINCE_FALLBACKS = Arrays.asList(
             new NamedArea("Kebos Lowlands", new WorldArea(1100, 3500, 430, 420, 0)),
             new NamedArea("Great Kourend", new WorldArea(1560, 3450, 360, 360, 0)),
@@ -142,10 +147,26 @@ final class LocationResolver {
             new NamedArea("Morytania", new WorldArea(3380, 3140, 340, 460, 0)),
             new NamedArea("Fremennik Province", new WorldArea(2580, 3550, 270, 300, 0)));
 
+    /**
+     * Resolves a human-readable location description for a player position.
+     *
+     * @param worldPoint the player's {@link WorldPoint}
+     * @param inInstance {@code true} if the player is in an instanced area
+     * @param instanceTemplate the active {@link InstanceTemplates} if instanced
+     * @return display location string
+     */
     String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, false);
     }
 
+    /**
+     * Resolves an enriched location description formatted for AI system context (includes canonical aliases).
+     *
+     * @param worldPoint the player's {@link WorldPoint}
+     * @param inInstance {@code true} if the player is in an instanced area
+     * @param instanceTemplate the active {@link InstanceTemplates} if instanced
+     * @return AI prompt location string
+     */
     String describeForAi(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, true);
     }
@@ -254,13 +275,13 @@ final class LocationResolver {
 
     /**
      * Returns a location string enriched with the canonical OSRS name when it
-     * differs from the
-     * display name. This is the preferred method for building AI prompt context so
-     * the model can
-     * reason about well-known area names even when the in-game display differs.
+     * differs from the display name. This is the preferred method for building AI prompt context so
+     * the model can reason about well-known area names even when the in-game display differs.
      * e.g. "Kourend Underground (Catacombs of Kourend)"
+     *
+     * @param alias the {@link RegionAlias}
+     * @return formatted alias string
      */
-
     private static String formatAlias(RegionAlias alias) {
         if (alias.canonicalName.equals(alias.displayName)) {
             return alias.displayName;
@@ -383,6 +404,9 @@ final class LocationResolver {
         return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
     }
 
+    /**
+     * Struct representing a named OSRS area paired with its {@link WorldArea} bounding box.
+     */
     private static final class NamedArea {
         private final String name;
         private final WorldArea worldArea;
@@ -393,6 +417,9 @@ final class LocationResolver {
         }
     }
 
+    /**
+     * Struct representing a region ID alias containing a display name and canonical name.
+     */
     private static final class RegionAlias {
         private final String displayName;
         private final String canonicalName;

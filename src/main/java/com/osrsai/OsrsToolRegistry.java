@@ -4,6 +4,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Registry class that defines and holds all available function/tool definitions accessible by the AI assistant.
+ * <p>
+ * Tools enable the AI to query in-game player state (skills, inventory, equipment, quests, diary/combat achievements, bank, sailing),
+ * search the OSRS Wiki, or interact with RuneLite plugin features like Shortest Path target markers.
+ */
 public class OsrsToolRegistry {
     private static final List<AiService.ToolDefinition> TOOL_REGISTRY;
 
@@ -123,6 +129,11 @@ public class OsrsToolRegistry {
         // Utility class
     }
 
+    /**
+     * Gets the unmodifiable list of registered tool definitions available to the AI assistant.
+     *
+     * @return unmodifiable list of {@link AiService.ToolDefinition} objects
+     */
     public static List<AiService.ToolDefinition> getToolRegistry() {
         return TOOL_REGISTRY;
     }

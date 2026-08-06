@@ -13,13 +13,29 @@ import net.runelite.http.api.item.ItemStats;
 
 import java.util.*;
 
+/**
+ * Utility class for inspecting, aggregating, filtering, and retrieving item stats and details
+ * from RuneLite item containers (inventory, equipment, bank).
+ */
 public class ItemContainerUtils {
+    /** Maximum number of items returned for unfiltered bank/container queries to conserve token budget. */
     public static final int UNFILTERED_BANK_LIMIT = 50;
 
     private ItemContainerUtils() {
         // Utility class
     }
 
+    /**
+     * Aggregates items in an {@link ItemContainer}, resolving item names, stack quantities, Grand Exchange prices,
+     * and High Alchemy values. Applies optional name filters and minimum stack value filters.
+     *
+     * @param client RuneLite {@link Client} instance
+     * @param itemManager RuneLite {@link ItemManager} instance
+     * @param container the target {@link ItemContainer} (inventory, equipment, or bank)
+     * @param filter optional search filter expression (supports logical 'or', 'and', ',', '|')
+     * @param minValue optional minimum total stack value filter
+     * @return {@link JsonObject} mapping item names to item detail objects (id, qty, gePrice, haPrice)
+     */
     public static JsonObject aggregateItemsWithPrices(Client client, ItemManager itemManager, ItemContainer container,
             String filter, int minValue) {
         JsonObject result = new JsonObject();
@@ -153,6 +169,12 @@ public class ItemContainerUtils {
         return result;
     }
 
+    /**
+     * Checks if the currently logged-in player is on an Ironman account mode (Ironman, UIM, HCIM, GIM, HGIM, UGIM).
+     *
+     * @param client RuneLite {@link Client} instance
+     * @return {@code true} if an Ironman mode is active; {@code false} otherwise
+     */
     public static boolean isIronman(Client client) {
         if (client == null) {
             return false;
@@ -165,6 +187,13 @@ public class ItemContainerUtils {
         }
     }
 
+    /**
+     * Builds a detailed JSON representation of an item's equipment statistics, prices, weight, GE limits, and slot bonuses.
+     *
+     * @param itemManager RuneLite {@link ItemManager} instance
+     * @param itemId OSRS item ID
+     * @return {@link JsonObject} containing detailed item statistics
+     */
     public static JsonObject buildItemStatsJson(ItemManager itemManager, int itemId) {
         JsonObject obj = new JsonObject();
         obj.addProperty("id", itemId);
@@ -228,6 +257,14 @@ public class ItemContainerUtils {
         return obj;
     }
 
+    /**
+     * Searches player equipment, inventory, and bank containers for an item matching a target name substring.
+     *
+     * @param client RuneLite {@link Client} instance
+     * @param itemManager RuneLite {@link ItemManager} instance
+     * @param name target item name substring
+     * @return matching OSRS item ID, or {@code null} if not found in any container
+     */
     public static Integer findItemIdInContainers(Client client, ItemManager itemManager, String name) {
         if (client == null || name == null) {
             return null;
@@ -268,6 +305,13 @@ public class ItemContainerUtils {
         return null;
     }
 
+    /**
+     * Safely resolves an item's display name without throwing exceptions if item data is missing.
+     *
+     * @param itemManager RuneLite {@link ItemManager} instance
+     * @param itemId OSRS item ID
+     * @return resolved item name, or fallback string (e.g. "Item 1234")
+     */
     public static String safeItemName(ItemManager itemManager, int itemId) {
         if (itemManager == null) {
             return "Item " + itemId;
@@ -284,6 +328,12 @@ public class ItemContainerUtils {
         }
     }
 
+    /**
+     * Converts an equipment slot index integer into a human-readable equipment slot name.
+     *
+     * @param index slot index (0=Head, 1=Cape, 2=Amulet, 3=Weapon, 4=Body, 5=Shield, 6=Legs, 7=Gloves, 8=Boots, 9=Ring, 10=Ammo)
+     * @return equipment slot display name
+     */
     public static String getSlotName(int index) {
         switch (index) {
             case 0:
