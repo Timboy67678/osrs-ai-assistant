@@ -73,18 +73,18 @@ public class OsrsToolRegistry {
                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 
         registry.add(new AiService.ToolDefinition("get_item_stats",
-                "Retrieve detailed equipment statistics, combat bonuses, weight, slot, and prices for a list of item IDs or item names.",
+                "Retrieve detailed equipment statistics, combat bonuses (Strength, Attack, Defence, Prayer), weight, slot, and prices for a list of item IDs or item names. MUST be called whenever recommending gear setups, comparing equipment options, or answering questions about item stats.",
                 true, true, AiService::executeGetItemStats)
                 .addParam("itemIds", "array_integer", "Optional list of OSRS item IDs to retrieve stats for.", false)
                 .addParam("itemNames", "array_string",
-                        "Optional list of item names to search for in containers and retrieve stats.", false));
+                        "Optional list of item names to search for in game database or containers and retrieve stats.", false));
 
         registry.add(new AiService.ToolDefinition("get_player_clues",
                 "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.",
                 true, true, AiService::executeGetPlayerClues));
 
         registry.add(new AiService.ToolDefinition("search_osrs_wiki",
-                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, quest rewards, training methods, and information. MUST be called whenever answering questions about named quests, items, bosses, monsters, updates, quest rewards, or training methods to verify exact OSRS mechanics and rewards before formulating your response.",
+                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, quest rewards, training methods, and information. MUST be called whenever answering questions about named quests, items, gear choices, bosses, monsters (including combat distance styles, levitation/animation stances, and dungeon floor rules), updates, quest rewards, or training methods to verify exact OSRS mechanics and rewards before formulating your response.",
                 false, false, AiService::executeSearchOsrsWiki)
                 .addParam("query", "string",
                         "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",

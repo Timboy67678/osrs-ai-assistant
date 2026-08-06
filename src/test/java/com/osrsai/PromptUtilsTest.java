@@ -36,6 +36,9 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
         Assert.assertTrue(prompt.contains("get_player_transportation"));
         Assert.assertTrue(prompt.contains("ITEM SPAWNS & SPATIAL VERIFICATION"));
+        Assert.assertTrue(prompt.contains("GEAR COMPARISONS & ITEM STATS"));
+        Assert.assertTrue(prompt.contains("MONSTER BEHAVIOR & DUNGEON MECHANICS"));
+        Assert.assertTrue(prompt.contains("USER ALTERNATIVE QUESTIONS & COUNTER-CLAIMS"));
     }
 
 

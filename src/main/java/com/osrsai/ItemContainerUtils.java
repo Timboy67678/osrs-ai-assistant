@@ -9,6 +9,7 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.Varbits;
 import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemEquipmentStats;
+import net.runelite.http.api.item.ItemPrice;
 import net.runelite.http.api.item.ItemStats;
 
 import java.util.*;
@@ -266,42 +267,63 @@ public class ItemContainerUtils {
      * @return matching OSRS item ID, or {@code null} if not found in any container
      */
     public static Integer findItemIdInContainers(Client client, ItemManager itemManager, String name) {
-        if (client == null || name == null) {
+        if (name == null || name.trim().isEmpty()) {
             return null;
         }
         String search = name.trim().toLowerCase();
         Set<Integer> checkedIds = new HashSet<>();
 
-        ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
-        if (eq != null) {
-            for (Item item : eq.getItems()) {
-                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
-                    if (safeItemName(itemManager, item.getId()).toLowerCase().contains(search)) {
-                        return item.getId();
+        if (client != null) {
+            ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
+            if (eq != null) {
+                for (Item item : eq.getItems()) {
+                    if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
+                        if (safeItemName(itemManager, item.getId()).toLowerCase().contains(search)) {
+                            return item.getId();
+                        }
+                    }
+                }
+            }
+            ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+            if (inv != null) {
+                for (Item item : inv.getItems()) {
+                    if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
+                        if (safeItemName(itemManager, item.getId()).toLowerCase().contains(search)) {
+                            return item.getId();
+                        }
+                    }
+                }
+            }
+            ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+            if (bank != null) {
+                for (Item item : bank.getItems()) {
+                    if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
+                        if (safeItemName(itemManager, item.getId()).toLowerCase().contains(search)) {
+                            return item.getId();
+                        }
                     }
                 }
             }
         }
-        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
-        if (inv != null) {
-            for (Item item : inv.getItems()) {
-                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
-                    if (safeItemName(itemManager, item.getId()).toLowerCase().contains(search)) {
-                        return item.getId();
+
+        // Global item database search fallback via RuneLite ItemManager
+        if (itemManager != null) {
+            try {
+                List<ItemPrice> searchResults = itemManager.search(name);
+                if (searchResults != null) {
+                    for (ItemPrice ip : searchResults) {
+                        if (ip != null && ip.getId() > 0) {
+                            ItemComposition comp = itemManager.getItemComposition(ip.getId());
+                            if (comp != null && comp.getPlaceholderTemplateId() == -1) {
+                                return ip.getId();
+                            }
+                        }
                     }
                 }
+            } catch (Exception ignored) {
             }
         }
-        ItemContainer bank = client.getItemContainer(InventoryID.BANK);
-        if (bank != null) {
-            for (Item item : bank.getItems()) {
-                if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
-                    if (safeItemName(itemManager, item.getId()).toLowerCase().contains(search)) {
-                        return item.getId();
-                    }
-                }
-            }
-        }
+
         return null;
     }
 

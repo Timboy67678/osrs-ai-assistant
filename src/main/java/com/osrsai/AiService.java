@@ -1391,7 +1391,7 @@ public class AiService {
                         itemsStats.add(itemName, ItemContainerUtils.buildItemStatsJson(itemManager, itemId));
                     } else {
                         JsonObject errorObj = new JsonObject();
-                        errorObj.addProperty("error", "Item not found in equipment, inventory, or bank.");
+                        errorObj.addProperty("error", "Item '" + itemName + "' not found in game containers or item database. You MUST call 'search_osrs_wiki' with query '" + itemName + "' to look up its stats on the OSRS Wiki before making claims.");
                         itemsStats.add(itemName, errorObj);
                     }
                 }
