@@ -27,6 +27,7 @@ public class WikiSearchUtilTest {
         Assert.assertEquals("fire rune", WikiSearchUtil.extractSearchQuery("how to get a fire rune drop rate"));
         Assert.assertEquals("myths' guild", WikiSearchUtil.extractSearchQuery("Myths' Guild location coordinates"));
         Assert.assertEquals("dragon slayer ii", WikiSearchUtil.extractSearchQuery("Dragon Slayer II quest requirements"));
+        Assert.assertEquals("rune pouch", WikiSearchUtil.extractSearchQuery("rune pouch slayer points cost"));
     }
 
     @Test

@@ -35,7 +35,7 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerEquipment));
 
         registry.add(new AiService.ToolDefinition("get_player_slayer_task",
-                "Retrieve the player's current Slayer task, remaining quantity, current Slayer points, and current streak.",
+                "Retrieve the player's current Slayer task, remaining quantity, assigned location (if location-specific, e.g. Konar), current Slayer points, and current streak.",
                 true, true, AiService::executeGetPlayerSlayerTask));
 
         registry.add(new AiService.ToolDefinition("get_player_quests",

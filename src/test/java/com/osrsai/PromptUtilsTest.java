@@ -39,6 +39,9 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("GEAR COMPARISONS & ITEM STATS"));
         Assert.assertTrue(prompt.contains("MONSTER BEHAVIOR & DUNGEON MECHANICS"));
         Assert.assertTrue(prompt.contains("USER ALTERNATIVE QUESTIONS & COUNTER-CLAIMS"));
+        Assert.assertTrue(prompt.contains("WYVERN ICY BREATH VS DRAGONFIRE"));
+        Assert.assertTrue(prompt.contains("OVERRIDING PRIOR MISTAKES"));
+        Assert.assertTrue(prompt.contains("ITEM & REWARD COSTS"));
     }
 
 

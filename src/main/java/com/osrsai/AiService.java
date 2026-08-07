@@ -1001,6 +1001,16 @@ public class AiService {
         if (amount == null || amount.isEmpty()) {
             amount = configManager.getConfiguration("slayer", "amount");
         }
+        String taskLocation = configManager.getRSProfileConfiguration("slayer", "taskLocation");
+        if (taskLocation == null || taskLocation.isEmpty()) {
+            taskLocation = configManager.getConfiguration("slayer", "taskLocation");
+        }
+        if (taskLocation == null || taskLocation.isEmpty()) {
+            taskLocation = configManager.getRSProfileConfiguration("slayer", "location");
+        }
+        if (taskLocation == null || taskLocation.isEmpty()) {
+            taskLocation = configManager.getConfiguration("slayer", "location");
+        }
         String pointsStr = configManager.getRSProfileConfiguration("slayer", "points");
         if (pointsStr == null || pointsStr.isEmpty()) {
             pointsStr = configManager.getConfiguration("slayer", "points");
@@ -1028,6 +1038,9 @@ public class AiService {
         if (taskName != null && !taskName.isEmpty() && amount != null) {
             result.addProperty("task", taskName);
             result.addProperty("quantity", Integer.parseInt(amount));
+            if (taskLocation != null && !taskLocation.isEmpty() && !"None".equalsIgnoreCase(taskLocation.trim())) {
+                result.addProperty("location", taskLocation.trim());
+            }
         } else {
             result.addProperty("task", "None");
             result.addProperty("quantity", 0);

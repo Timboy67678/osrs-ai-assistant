@@ -765,5 +765,33 @@ public class AiServiceTest {
         Assert.assertEquals(1, cargo.size());
         Assert.assertEquals("Oak plank", cargo.get(0).getAsJsonObject().get("name").getAsString());
     }
+
+    @Test
+    public void testGetPlayerSlayerTaskIncludesLocation() {
+        ConfigManager mockConfig = Mockito.mock(ConfigManager.class);
+        Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "taskName")).thenReturn("Dagannoth");
+        Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "amount")).thenReturn("120");
+        Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "taskLocation")).thenReturn("Lighthouse");
+        Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "points")).thenReturn("259");
+        Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "streak")).thenReturn("99");
+
+        try {
+            Field configField = AiService.class.getDeclaredField("configManager");
+            configField.setAccessible(true);
+            configField.set(aiService, mockConfig);
+        } catch (Exception e) {
+            Assert.fail("Failed setting mock configManager: " + e.getMessage());
+        }
+
+        String json = aiService.executeGetPlayerSlayerTask(new JsonObject());
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("Dagannoth", root.get("task").getAsString());
+        Assert.assertEquals(120, root.get("quantity").getAsInt());
+        Assert.assertEquals("Lighthouse", root.get("location").getAsString());
+        Assert.assertEquals(259, root.get("points").getAsInt());
+        Assert.assertEquals(99, root.get("streak").getAsInt());
+    }
 }
 

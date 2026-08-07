@@ -206,6 +206,7 @@ public class WikiSearchUtil {
                 " location coordinates",
                 " buy shops locations",
                 " shop locations osrs",
+                " slayer points cost",
                 " quest requirements",
                 " skill requirements",
                 " elemental weakness",
@@ -219,10 +220,14 @@ public class WikiSearchUtil {
                 " shop locations",
                 " shop location",
                 " map location",
+                " slayer points",
                 " requirements",
                 " requirement",
                 " coordinates",
                 " ingredients",
+                " points cost",
+                " slayer point",
+                " point cost",
                 " drop rates",
                 " drop table",
                 " drop rate",
@@ -237,6 +242,11 @@ public class WikiSearchUtil {
                 " drops",
                 " stats",
                 " guide",
+                " points",
+                " costs",
+                " price",
+                " prices",
+                " cost",
                 " drop",
                 " shop",
                 " wiki",
@@ -396,7 +406,7 @@ public class WikiSearchUtil {
                     .addQueryParameter("list", "search")
                     .addQueryParameter("srsearch", query)
                     .addQueryParameter("srnamespace", "0")
-                    .addQueryParameter("srlimit", "1")
+                    .addQueryParameter("srlimit", "5")
                     .addQueryParameter("format", "json")
                     .build();
 
@@ -415,6 +425,18 @@ public class WikiSearchUtil {
                 JsonArray results = queryObj.getAsJsonArray("search");
                 if (results == null || results.size() == 0)
                     return null;
+
+                boolean wantsLeague = query != null && query.toLowerCase().contains("league");
+                for (int i = 0; i < results.size(); i++) {
+                    JsonObject item = results.get(i).getAsJsonObject();
+                    if (item.has("title")) {
+                        String candidateTitle = item.get("title").getAsString();
+                        if (!wantsLeague && candidateTitle.toLowerCase().contains(" league")) {
+                            continue;
+                        }
+                        return candidateTitle;
+                    }
+                }
                 return results.get(0).getAsJsonObject().get("title").getAsString();
             }
         } catch (Exception e) {
