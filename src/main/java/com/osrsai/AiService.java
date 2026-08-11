@@ -440,10 +440,7 @@ public class AiService {
                 try {
                     log.info("Executing tool: {}", tc.name);
 
-                    ToolDefinition def = getToolRegistry().stream()
-                            .filter(d -> d.name.equals(tc.name))
-                            .findFirst()
-                            .orElse(null);
+                    ToolDefinition def = OsrsToolRegistry.getTool(tc.name);
 
                     if (def == null) {
                         throw new IllegalArgumentException("Unknown tool: " + tc.name);

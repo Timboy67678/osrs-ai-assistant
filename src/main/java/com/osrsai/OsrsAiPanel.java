@@ -25,8 +25,10 @@ import com.google.gson.reflect.TypeToken;
 /**
  * Primary UI panel component for the OSRS AI Assistant plugin.
  * <p>
- * Manages chat session history, rich HTML chat rendering, interactive prompt submission,
- * detached window persistence, privacy warning indicators, and multi-profile AI provider configuration.
+ * Manages chat session history, rich HTML chat rendering, interactive prompt
+ * submission,
+ * detached window persistence, privacy warning indicators, and multi-profile AI
+ * provider configuration.
  */
 public class OsrsAiPanel extends PluginPanel {
     private static final int MAX_PROMPT_MESSAGES = 6;
@@ -73,7 +75,7 @@ public class OsrsAiPanel extends PluginPanel {
     /**
      * Constructs a new {@code OsrsAiPanel} UI instance.
      *
-     * @param plugin main {@link OsrsAiPlugin} instance
+     * @param plugin        main {@link OsrsAiPlugin} instance
      * @param configManager RuneLite {@link ConfigManager} for settings persistence
      */
     public OsrsAiPanel(OsrsAiPlugin plugin, ConfigManager configManager) {
@@ -268,7 +270,8 @@ public class OsrsAiPanel extends PluginPanel {
     }
 
     /**
-     * Closes and disposes of the detached window frame, saving its position and dimensions.
+     * Closes and disposes of the detached window frame, saving its position and
+     * dimensions.
      */
     public void closeDetachedWindow() {
         runOnEdt(() -> {
@@ -440,7 +443,8 @@ public class OsrsAiPanel extends PluginPanel {
     }
 
     /**
-     * Updates the data privacy warning banner label depending on whether in-game context sharing is enabled.
+     * Updates the data privacy warning banner label depending on whether in-game
+     * context sharing is enabled.
      */
     public void updateWarningLabel() {
         runOnEdt(() -> {
@@ -533,9 +537,10 @@ public class OsrsAiPanel extends PluginPanel {
     }
 
     /**
-     * Appends a user prompt or AI response turn to the active chat history and updates the UI display.
+     * Appends a user prompt or AI response turn to the active chat history and
+     * updates the UI display.
      *
-     * @param sender message sender ("You", "AI", or "System")
+     * @param sender  message sender ("You", "AI", or "System")
      * @param message natural language message text
      */
     public void addMessage(String sender, String message) {
@@ -593,7 +598,8 @@ public class OsrsAiPanel extends PluginPanel {
     }
 
     /**
-     * Formats recent chat message turns into a string for inclusion in the AI system prompt.
+     * Formats recent chat message turns into a string for inclusion in the AI
+     * system prompt.
      *
      * @param currentQuestion current user question string to exclude duplicates
      * @return formatted conversation context string, or "None"
@@ -634,9 +640,11 @@ public class OsrsAiPanel extends PluginPanel {
     }
 
     /**
-     * Enables or disables input controls and updates the button label to indicate an active background request.
+     * Enables or disables input controls and updates the button label to indicate
+     * an active background request.
      *
-     * @param thinking {@code true} if a request is in progress; {@code false} when idle
+     * @param thinking {@code true} if a request is in progress; {@code false} when
+     *                 idle
      */
     public void setThinking(boolean thinking) {
         SwingUtilities.invokeLater(() -> {

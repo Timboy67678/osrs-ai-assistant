@@ -26,7 +26,7 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("RECENT CONVERSATION"));
         Assert.assertTrue(prompt.contains("OSRS RuneLite assistant"));
         Assert.assertTrue(prompt.contains("Never invent stats"));
-        Assert.assertTrue(prompt.contains("High Alchemy value"));
+        Assert.assertTrue(prompt.contains("High Alchemy"));
         Assert.assertTrue(prompt.contains("active spellbook"));
         Assert.assertTrue(prompt.contains("search_osrs_wiki"));
         Assert.assertTrue(prompt.contains("Distinguish general readiness"));
@@ -35,13 +35,11 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("NOT present in OSRS"));
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
         Assert.assertTrue(prompt.contains("get_player_transportation"));
-        Assert.assertTrue(prompt.contains("ITEM SPAWNS & SPATIAL VERIFICATION"));
-        Assert.assertTrue(prompt.contains("GEAR COMPARISONS & ITEM STATS"));
-        Assert.assertTrue(prompt.contains("MONSTER BEHAVIOR & DUNGEON MECHANICS"));
-        Assert.assertTrue(prompt.contains("USER ALTERNATIVE QUESTIONS & COUNTER-CLAIMS"));
-        Assert.assertTrue(prompt.contains("WYVERN ICY BREATH VS DRAGONFIRE"));
-        Assert.assertTrue(prompt.contains("OVERRIDING PRIOR MISTAKES"));
-        Assert.assertTrue(prompt.contains("ITEM & REWARD COSTS"));
+        Assert.assertTrue(prompt.contains("ITEM DROP SOURCES & SHOPS"));
+        Assert.assertTrue(prompt.contains("GEAR STATS, COSTS & UPGRADE PATHS"));
+        Assert.assertTrue(prompt.contains("MONSTER BEHAVIOR & SLAYER REQUIREMENTS"));
+        Assert.assertTrue(prompt.contains("MAP OBJECTS & DUNGEON MECHANICS"));
+        Assert.assertTrue(prompt.contains("USER COUNTER-CLAIMS & OVERRIDING MISTAKES"));
     }
 
 

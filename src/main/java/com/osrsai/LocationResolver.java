@@ -1,7 +1,6 @@
 package com.osrsai;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,8 +13,10 @@ import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 
 /**
- * Internal resolver class for translating Old School RuneScape coordinates (WorldPoint),
- * region IDs, instance templates, and underground offsets into human-readable area names.
+ * Internal resolver class for translating Old School RuneScape coordinates
+ * (WorldPoint),
+ * region IDs, instance templates, and underground offsets into human-readable
+ * area names.
  */
 final class LocationResolver {
     private static final int[] UNDERGROUND_Y_OFFSETS = { 6400, 12800 };
@@ -150,8 +151,8 @@ final class LocationResolver {
     /**
      * Resolves a human-readable location description for a player position.
      *
-     * @param worldPoint the player's {@link WorldPoint}
-     * @param inInstance {@code true} if the player is in an instanced area
+     * @param worldPoint       the player's {@link WorldPoint}
+     * @param inInstance       {@code true} if the player is in an instanced area
      * @param instanceTemplate the active {@link InstanceTemplates} if instanced
      * @return display location string
      */
@@ -160,10 +161,11 @@ final class LocationResolver {
     }
 
     /**
-     * Resolves an enriched location description formatted for AI system context (includes canonical aliases).
+     * Resolves an enriched location description formatted for AI system context
+     * (includes canonical aliases).
      *
-     * @param worldPoint the player's {@link WorldPoint}
-     * @param inInstance {@code true} if the player is in an instanced area
+     * @param worldPoint       the player's {@link WorldPoint}
+     * @param inInstance       {@code true} if the player is in an instanced area
      * @param instanceTemplate the active {@link InstanceTemplates} if instanced
      * @return AI prompt location string
      */
@@ -268,15 +270,33 @@ final class LocationResolver {
     }
 
     private String humanize(String value) {
-        return Arrays.stream(value.split("_"))
-                .map(word -> word.charAt(0) + word.substring(1).toLowerCase(Locale.ENGLISH))
-                .collect(Collectors.joining(" "));
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        String[] words = value.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            String word = words[i];
+            if (word.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(word.charAt(0)));
+            if (word.length() > 1) {
+                sb.append(word.substring(1).toLowerCase(Locale.ENGLISH));
+            }
+        }
+        return sb.toString();
     }
 
     /**
      * Returns a location string enriched with the canonical OSRS name when it
-     * differs from the display name. This is the preferred method for building AI prompt context so
-     * the model can reason about well-known area names even when the in-game display differs.
+     * differs from the display name. This is the preferred method for building AI
+     * prompt context so
+     * the model can reason about well-known area names even when the in-game
+     * display differs.
      * e.g. "Kourend Underground (Catacombs of Kourend)"
      *
      * @param alias the {@link RegionAlias}
@@ -405,7 +425,8 @@ final class LocationResolver {
     }
 
     /**
-     * Struct representing a named OSRS area paired with its {@link WorldArea} bounding box.
+     * Struct representing a named OSRS area paired with its {@link WorldArea}
+     * bounding box.
      */
     private static final class NamedArea {
         private final String name;
@@ -418,7 +439,8 @@ final class LocationResolver {
     }
 
     /**
-     * Struct representing a region ID alias containing a display name and canonical name.
+     * Struct representing a region ID alias containing a display name and canonical
+     * name.
      */
     private static final class RegionAlias {
         private final String displayName;

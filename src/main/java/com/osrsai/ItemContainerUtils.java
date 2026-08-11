@@ -13,6 +13,7 @@ import net.runelite.http.api.item.ItemPrice;
 import net.runelite.http.api.item.ItemStats;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Utility class for inspecting, aggregating, filtering, and retrieving item stats and details
@@ -21,6 +22,9 @@ import java.util.*;
 public class ItemContainerUtils {
     /** Maximum number of items returned for unfiltered bank/container queries to conserve token budget. */
     public static final int UNFILTERED_BANK_LIMIT = 50;
+
+    private static final Pattern OR_SPLIT_PATTERN = Pattern.compile("\\s+or\\s+|\\s*,\\s*|\\s*\\|\\s*");
+    private static final Pattern AND_SPLIT_PATTERN = Pattern.compile("\\s+and\\s+|\\s*&\\s*");
 
     private ItemContainerUtils() {
         // Utility class
@@ -47,7 +51,7 @@ public class ItemContainerUtils {
         String search = (filter != null) ? filter.trim().toLowerCase() : null;
         String[] tokens = null;
         if (search != null) {
-            tokens = search.split("\\s+or\\s+|\\s*,\\s*|\\s*\\|\\s*");
+            tokens = OR_SPLIT_PATTERN.split(search);
         }
         boolean isIron = isIronman(client);
 
@@ -79,7 +83,7 @@ public class ItemContainerUtils {
                     }
 
                     // Split the OR group by " and " or "&" to find all AND tokens
-                    String[] andTokens = cleanGroup.split("\\s+and\\s+|\\s*&\\s*");
+                    String[] andTokens = AND_SPLIT_PATTERN.split(cleanGroup);
                     boolean matchesAllAndTokens = true;
                     for (String andToken : andTokens) {
                         String cleanAndToken = andToken.trim();

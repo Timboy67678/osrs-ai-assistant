@@ -19,7 +19,7 @@ import okhttp3.RequestBody;
 public class GeminiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
     private static final String GEMINI_API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=";
-    private final Gson gson = new Gson();
+    private static final Gson GSON = new Gson();
 
     @Override
     public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
@@ -167,7 +167,7 @@ public class GeminiProviderHandler implements ProviderHandler {
             JsonObject part = new JsonObject();
             JsonObject funcRes = new JsonObject();
             funcRes.addProperty("name", res.call.name);
-            funcRes.add("response", gson.fromJson(res.resultJson, JsonObject.class));
+            funcRes.add("response", GSON.fromJson(res.resultJson, JsonObject.class));
             part.add("functionResponse", funcRes);
             partsArray.add(part);
         }

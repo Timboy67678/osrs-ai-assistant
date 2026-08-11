@@ -2,7 +2,9 @@ package com.osrsai;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Registry class that defines and holds all available function/tool definitions accessible by the AI assistant.
@@ -12,9 +14,11 @@ import java.util.List;
  */
 public class OsrsToolRegistry {
     private static final List<AiService.ToolDefinition> TOOL_REGISTRY;
+    private static final Map<String, AiService.ToolDefinition> TOOL_MAP;
 
     static {
         List<AiService.ToolDefinition> registry = new ArrayList<>();
+        Map<String, AiService.ToolDefinition> map = new HashMap<>();
 
         registry.add(new AiService.ToolDefinition("get_player_skills",
                 "Retrieve the player's base levels, boosted levels, experience (XP), and thresholds. MUST be called before quoting or relying on any of the player's specific skill levels or XP progress.",
@@ -122,7 +126,12 @@ public class OsrsToolRegistry {
                 .addParam("includeCargo", "boolean",
                         "Optional. Set to false to exclude ship cargo hold item listing (default is true).", false));
 
+        for (AiService.ToolDefinition def : registry) {
+            map.put(def.name, def);
+        }
+
         TOOL_REGISTRY = Collections.unmodifiableList(registry);
+        TOOL_MAP = Collections.unmodifiableMap(map);
     }
 
     private OsrsToolRegistry() {
@@ -136,6 +145,16 @@ public class OsrsToolRegistry {
      */
     public static List<AiService.ToolDefinition> getToolRegistry() {
         return TOOL_REGISTRY;
+    }
+
+    /**
+     * Looks up a registered tool definition by its unique tool name in O(1) time.
+     *
+     * @param name tool name
+     * @return target {@link AiService.ToolDefinition}, or {@code null} if not registered
+     */
+    public static AiService.ToolDefinition getTool(String name) {
+        return (name != null) ? TOOL_MAP.get(name) : null;
     }
 }
 

@@ -17,8 +17,8 @@ import okhttp3.RequestBody;
  */
 public class OpenAiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
+    private static final Gson GSON = new Gson();
     private final String apiUrl;
-    private final Gson gson = new Gson();
 
     /**
      * Constructs an {@code OpenAiProviderHandler} for a specific target API endpoint URL.
@@ -174,9 +174,9 @@ public class OpenAiProviderHandler implements ProviderHandler {
             JsonObject func = tc.getAsJsonObject("function");
             String name = func.get("name").getAsString();
             String argsStr = func.get("arguments").isJsonObject()
-                    ? gson.toJson(func.getAsJsonObject("arguments"))
+                    ? GSON.toJson(func.getAsJsonObject("arguments"))
                     : func.get("arguments").getAsString();
-            JsonObject args = gson.fromJson(argsStr, JsonObject.class);
+            JsonObject args = GSON.fromJson(argsStr, JsonObject.class);
             toolCalls.add(new AiService.ToolCall(id, name, args));
         }
         return toolCalls;
