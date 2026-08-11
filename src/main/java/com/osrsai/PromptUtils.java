@@ -33,7 +33,7 @@ public class PromptUtils {
                 + "- Player state: 'get_player_skills', 'get_player_inventory', 'get_player_equipment', 'get_player_bank' (when open), 'get_player_status', 'get_player_currencies_and_points', 'get_player_location_details', 'get_player_transportation'.\n"
                 + "- Activities & tasks: 'get_player_slayer_task', 'get_player_quests', 'get_player_achievement_diaries', 'get_player_combat_achievements', 'get_player_clues'.\n"
                 + "- Game info: 'get_item_stats', 'search_osrs_wiki'.\n"
-                + "- Map navigation: 'set_shortest_path_target' (draws route overlays on-screen using the Shortest Path plugin).\n"
+                + "- Map navigation: 'set_shortest_path_target' (draws route overlays on-screen using the Shortest Path plugin), 'clear_shortest_path_target' (clears destination markers).\n"
                 + "- Call tools to inspect player state rather than guessing. Call 'get_player_transportation' when recommending routes, teleports, or item gathering locations. Call 'search_osrs_wiki' to verify monster details, weaknesses, drop rates, item stats, recipes, training methods, and locations. Call 'set_shortest_path_target' to highlight the path on their screen when asked for directions to a specific location.\n"
                 + "\n"
                 + "GROUNDING RULES:\n"

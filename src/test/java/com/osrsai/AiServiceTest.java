@@ -43,6 +43,12 @@ public class AiServiceTest {
     @Mock
     private net.runelite.client.ui.overlay.infobox.InfoBoxManager infoBoxManager;
 
+    @Mock
+    private net.runelite.client.eventbus.EventBus eventBus;
+
+    @Mock
+    private OsrsAiConfig config;
+
     @Test
     public void testGetPlayerQuestsToolIncludesStage() {
         JsonObject args = new JsonObject();
@@ -792,6 +798,40 @@ public class AiServiceTest {
         Assert.assertEquals("Lighthouse", root.get("location").getAsString());
         Assert.assertEquals(259, root.get("points").getAsInt());
         Assert.assertEquals(99, root.get("streak").getAsInt());
+    }
+
+    @Test
+    public void testExecuteSetShortestPathTargetPluginMessage() {
+        Mockito.when(config.useShortestPath()).thenReturn(true);
+
+        JsonObject args = new JsonObject();
+        args.addProperty("x", 3200);
+        args.addProperty("y", 3400);
+        args.addProperty("plane", 0);
+        args.addProperty("locationName", "Varrock Square");
+        args.addProperty("avoidWilderness", true);
+
+        String json = aiService.executeSetShortestPathTarget(args);
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("success", root.get("status").getAsString());
+        Assert.assertTrue(root.get("message").getAsString().contains("Varrock Square"));
+
+        Mockito.verify(eventBus).post(Mockito.any(net.runelite.client.events.PluginMessage.class));
+    }
+
+    @Test
+    public void testExecuteClearShortestPathTargetPluginMessage() {
+        Mockito.when(config.useShortestPath()).thenReturn(true);
+
+        String json = aiService.executeClearShortestPathTarget(new JsonObject());
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("success", root.get("status").getAsString());
+
+        Mockito.verify(eventBus).post(Mockito.any(net.runelite.client.events.PluginMessage.class));
     }
 }
 

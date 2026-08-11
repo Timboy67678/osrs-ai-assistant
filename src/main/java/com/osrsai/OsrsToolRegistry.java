@@ -113,12 +113,20 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerTransportation));
 
         registry.add(new AiService.ToolDefinition("set_shortest_path_target",
-                "Set a destination coordinate (X, Y, Plane) in the player's Shortest Path plugin to draw a route overlay on their game screen. Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
+                "Set a destination coordinate (X, Y, Plane) in the player's Shortest Path plugin to draw a route overlay on their game screen via cross-plugin communication. Supports optional custom start coordinates and pathfinding config overrides (e.g. avoidWilderness). Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
                 true, true, AiService::executeSetShortestPathTarget)
                 .addParam("x", "integer", "The target X coordinate (WorldPoint x, e.g. 3200).", true)
                 .addParam("y", "integer", "The target Y coordinate (WorldPoint y, e.g. 3400).", true)
                 .addParam("plane", "integer", "The target plane (0 for ground level, 1 for first floor, etc. Default is 0).", false)
-                .addParam("locationName", "string", "A human-readable name of the location being targeted (e.g. 'Varrock West Bank' or 'Grand Exchange') to show the player in the chat response.", false));
+                .addParam("locationName", "string", "A human-readable name of the location being targeted (e.g. 'Varrock West Bank' or 'Grand Exchange') to show the player in the chat response.", false)
+                .addParam("startX", "integer", "Optional custom starting X coordinate. Omit to start path calculation from player's current location.", false)
+                .addParam("startY", "integer", "Optional custom starting Y coordinate.", false)
+                .addParam("startPlane", "integer", "Optional custom starting plane.", false)
+                .addParam("avoidWilderness", "boolean", "Optional. Set to true to force pathfinding to avoid the Wilderness.", false));
+
+        registry.add(new AiService.ToolDefinition("clear_shortest_path_target",
+                "Clear the currently displayed route overlay and destination target in the Shortest Path plugin.",
+                true, true, AiService::executeClearShortestPathTarget));
 
         registry.add(new AiService.ToolDefinition("get_player_sailing_status",
                 "Retrieve details about the player's active vessel and sailing status (ship tier/type, hull HP/condition, sail trim, knot speed, wind direction, anchor status, cargo hold items, crew members, sea location, and Sailing skill stats).",

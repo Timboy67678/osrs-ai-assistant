@@ -38,6 +38,8 @@ import net.runelite.api.Varbits;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.SoundEffectID;
 import net.runelite.api.ParamID;
+import net.runelite.client.eventbus.EventBus;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.Notifier;
 import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.callback.ClientThread;
@@ -179,6 +181,9 @@ public class AiService {
 
     @Inject
     private InfoBoxManager infoBoxManager;
+
+    @Inject
+    private EventBus eventBus;
 
     private final LocationResolver locationResolver = new LocationResolver();
 
@@ -656,127 +661,49 @@ public class AiService {
         }
     }
 
-    boolean setShortestPathTarget(WorldPoint targetPoint) {
+    boolean setShortestPathTarget(WorldPoint targetPoint, WorldPoint startPoint, Map<String, Object> configOverrides) {
         try {
-            net.runelite.client.plugins.Plugin shortestPathPlugin = null;
-            for (net.runelite.client.plugins.Plugin p : pluginManager.getPlugins()) {
-                String className = p.getClass().getName();
-                String simpleName = p.getClass().getSimpleName();
-                if (simpleName.equals("ShortestPathPlugin") || className.contains("shortestpath.ShortestPathPlugin")) {
-                    shortestPathPlugin = p;
-                    break;
+            if (eventBus != null) {
+                Map<String, Object> data = new HashMap<>();
+                if (startPoint != null) {
+                    data.put("start", startPoint);
                 }
-            }
-
-            if (shortestPathPlugin == null) {
-                log.warn("Shortest Path plugin not found in RuneLite.");
-                return false;
-            }
-
-            for (java.lang.reflect.Method m : shortestPathPlugin.getClass().getDeclaredMethods()) {
-                if (m.getParameterCount() == 1 && m.getParameterTypes()[0].equals(WorldPoint.class)) {
-                    m.setAccessible(true);
-                    m.invoke(shortestPathPlugin, targetPoint);
-                    log.info("Set Shortest Path destination via WorldPoint method {} to {}", m.getName(), targetPoint);
-                    return true;
+                data.put("target", targetPoint);
+                if (configOverrides != null && !configOverrides.isEmpty()) {
+                    data.put("config", configOverrides);
                 }
-            }
-
-            for (java.lang.reflect.Method m : shortestPathPlugin.getClass().getDeclaredMethods()) {
-                if (m.getName().equals("setTarget")) {
-                    Class<?>[] paramTypes = m.getParameterTypes();
-                    int packedTarget;
-                    try {
-                        Class<?> utilClass = Class.forName("shortestpath.WorldPointUtil", true,
-                                shortestPathPlugin.getClass().getClassLoader());
-                        java.lang.reflect.Method packMethod = utilClass.getDeclaredMethod("packWorldPoint",
-                                WorldPoint.class);
-                        packMethod.setAccessible(true);
-                        packedTarget = (int) packMethod.invoke(null, targetPoint);
-                    } catch (Exception e) {
-                        packedTarget = (targetPoint.getX() & 0x7FFF) |
-                                ((targetPoint.getY() & 0x7FFF) << 15) |
-                                ((targetPoint.getPlane() & 0x3) << 30);
-                    }
-
-                    if (paramTypes.length == 1
-                            && (paramTypes[0].equals(int.class) || paramTypes[0].equals(Integer.class))) {
-                        m.setAccessible(true);
-                        m.invoke(shortestPathPlugin, packedTarget);
-                        log.info("Set Shortest Path destination via setTarget(int) to {} (packed: {})", targetPoint,
-                                packedTarget);
-                        return true;
-                    } else if (paramTypes.length == 2 &&
-                            (paramTypes[0].equals(int.class) || paramTypes[0].equals(Integer.class)) &&
-                            (paramTypes[1].equals(boolean.class) || paramTypes[1].equals(Boolean.class))) {
-                        m.setAccessible(true);
-                        m.invoke(shortestPathPlugin, packedTarget, true);
-                        log.info("Set Shortest Path destination via setTarget(int, boolean) to {} (packed: {})",
-                                targetPoint, packedTarget);
-                        return true;
-                    }
-                }
-            }
-
-            java.lang.reflect.Field targetField = null;
-            String[] targetFieldNames = { "target", "targetPoint", "destination" };
-            for (String fieldName : targetFieldNames) {
-                try {
-                    java.lang.reflect.Field f = shortestPathPlugin.getClass().getDeclaredField(fieldName);
-                    if (f.getType().equals(WorldPoint.class)) {
-                        targetField = f;
-                        break;
-                    }
-                } catch (NoSuchFieldException ignored) {
-                }
-            }
-
-            if (targetField == null) {
-                for (java.lang.reflect.Field f : shortestPathPlugin.getClass().getDeclaredFields()) {
-                    if (f.getType().equals(WorldPoint.class)) {
-                        targetField = f;
-                        break;
-                    }
-                }
-            }
-
-            if (targetField != null) {
-                targetField.setAccessible(true);
-                targetField.set(shortestPathPlugin, targetPoint);
-                log.info("Set Shortest Path field {} to {}", targetField.getName(), targetPoint);
-
-                for (java.lang.reflect.Method m : shortestPathPlugin.getClass().getDeclaredMethods()) {
-                    String methodName = m.getName().toLowerCase();
-                    if (methodName.contains("recalculate") || methodName.contains("path")
-                            || methodName.contains("update")) {
-                        if (m.getParameterCount() == 0) {
-                            m.setAccessible(true);
-                            m.invoke(shortestPathPlugin);
-                            log.info("Triggered Shortest Path recalculation via method {}", m.getName());
-                            break;
-                        }
-                    }
-                }
+                eventBus.post(new PluginMessage("shortestpath", "path", data));
+                log.info("Posted ShortestPath PluginMessage path event for target {} (start: {}, config: {})",
+                        targetPoint, startPoint, configOverrides);
                 return true;
-            } else {
-                log.warn("Failed to find target field or method in ShortestPathPlugin. Available fields/methods:");
-                for (java.lang.reflect.Field f : shortestPathPlugin.getClass().getDeclaredFields()) {
-                    log.warn("  Field: {} of type {}", f.getName(), f.getType().getName());
-                }
-                for (java.lang.reflect.Method m : shortestPathPlugin.getClass().getDeclaredMethods()) {
-                    log.warn("  Method: {} with parameters {}", m.getName(), Arrays.toString(m.getParameterTypes()));
-                }
             }
         } catch (Exception e) {
-            log.error("Failed to set Shortest Path target via reflection", e);
+            log.error("Failed to set Shortest Path target via PluginMessage event bus", e);
+        }
+        return false;
+    }
+
+    boolean setShortestPathTarget(WorldPoint targetPoint) {
+        return setShortestPathTarget(targetPoint, null, null);
+    }
+
+    boolean clearShortestPathTarget() {
+        try {
+            if (eventBus != null) {
+                eventBus.post(new PluginMessage("shortestpath", "clear"));
+                log.info("Posted ShortestPath PluginMessage clear event");
+                return true;
+            }
+        } catch (Exception e) {
+            log.error("Failed to post Shortest Path clear event", e);
         }
         return false;
     }
 
     /**
-     * Executes the 'set_shortest_path_target' tool to set a destination overlay marker in the Shortest Path plugin via reflection.
+     * Executes the 'set_shortest_path_target' tool to set a destination overlay marker in the Shortest Path plugin via PluginMessage.
      *
-     * @param args JSON arguments containing "x", "y", optional "plane", and optional "locationName"
+     * @param args JSON arguments containing "x", "y", optional "plane", optional "locationName", optional "startX", "startY", "startPlane", and optional "avoidWilderness"
      * @return JSON response string with status and outcome message
      */
     String executeSetShortestPathTarget(JsonObject args) {
@@ -803,12 +730,28 @@ public class AiService {
                     : "Destination";
 
             WorldPoint targetPoint = new WorldPoint(x, y, plane);
-            boolean success = setShortestPathTarget(targetPoint);
+
+            WorldPoint startPoint = null;
+            if (args.has("startX") && args.has("startY") && !args.get("startX").isJsonNull() && !args.get("startY").isJsonNull()) {
+                int startX = args.get("startX").getAsInt();
+                int startY = args.get("startY").getAsInt();
+                int startPlane = (args.has("startPlane") && !args.get("startPlane").isJsonNull()) ? args.get("startPlane").getAsInt() : 0;
+                startPoint = new WorldPoint(startX, startY, startPlane);
+            }
+
+            Map<String, Object> configOverrides = new HashMap<>();
+            if (args.has("avoidWilderness") && !args.get("avoidWilderness").isJsonNull()) {
+                configOverrides.put("avoidWilderness", args.get("avoidWilderness").getAsBoolean());
+            }
+
+            boolean success = setShortestPathTarget(targetPoint, startPoint, configOverrides.isEmpty() ? null : configOverrides);
 
             if (success) {
                 result.addProperty("status", "success");
                 result.addProperty("message",
-                        "Successfully set Shortest Path target to " + locationName + " at " + targetPoint.toString());
+                        "Successfully set Shortest Path target to " + locationName + " at " + targetPoint.toString()
+                                + (startPoint != null ? " (starting from " + startPoint.toString() + ")" : "")
+                                + (!configOverrides.isEmpty() ? " with config overrides: " + configOverrides : ""));
             } else {
                 result.addProperty("status", "error");
                 result.addProperty("message", "Shortest Path plugin is not installed or enabled in RuneLite.");
@@ -819,6 +762,37 @@ public class AiService {
             result.addProperty("message", "Exception: " + e.getMessage());
         }
 
+        return result.toString();
+    }
+
+    /**
+     * Executes the 'clear_shortest_path_target' tool to clear any active route overlay in the Shortest Path plugin.
+     *
+     * @param args JSON arguments (unused)
+     * @return JSON response string with status and outcome message
+     */
+    String executeClearShortestPathTarget(JsonObject args) {
+        JsonObject result = new JsonObject();
+        try {
+            if (!config.useShortestPath()) {
+                result.addProperty("status", "error");
+                result.addProperty("message", "Shortest Path integration is disabled in plugin config.");
+                return result.toString();
+            }
+
+            boolean success = clearShortestPathTarget();
+            if (success) {
+                result.addProperty("status", "success");
+                result.addProperty("message", "Successfully cleared Shortest Path target and route overlay.");
+            } else {
+                result.addProperty("status", "error");
+                result.addProperty("message", "Failed to send clear message to Shortest Path plugin.");
+            }
+        } catch (Exception e) {
+            log.error("Failed to execute clear_shortest_path_target tool", e);
+            result.addProperty("status", "error");
+            result.addProperty("message", "Exception: " + e.getMessage());
+        }
         return result.toString();
     }
 
