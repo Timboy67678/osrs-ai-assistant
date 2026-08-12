@@ -113,7 +113,7 @@ public class OsrsToolRegistry {
                 true, true, AiService::executeGetPlayerTransportation));
 
         registry.add(new AiService.ToolDefinition("set_shortest_path_target",
-                "Set a destination coordinate (X, Y, Plane) in the player's Shortest Path plugin to draw a route overlay on their game screen via cross-plugin communication. Supports optional custom start coordinates and pathfinding config overrides (e.g. avoidWilderness). Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
+                "Set a destination coordinate (X, Y, Plane) in the player's Shortest Path plugin to draw a route overlay on their game screen via cross-plugin communication. IMPORTANT: Always specify surface entrance coordinates (Y < 5000) for dungeons, caves, or underground locations (e.g. Chasm of Fire entrance at X=1435, Y=3671 instead of internal underground offset Y=10077) so the pathfinder draws a valid route on the world map. Supports optional custom start coordinates and pathfinding config overrides (e.g. avoidWilderness). Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
                 true, true, AiService::executeSetShortestPathTarget)
                 .addParam("x", "integer", "The target X coordinate (WorldPoint x, e.g. 3200).", true)
                 .addParam("y", "integer", "The target Y coordinate (WorldPoint y, e.g. 3400).", true)

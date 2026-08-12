@@ -120,6 +120,10 @@ public class AiService {
     private static final int ITEM_ID_ARCHERY_TICKET = 1464;
     private static final int ITEM_ID_MERMAIDS_TEAR = 27433;
 
+    // Coordinate & Map Navigation Constants
+    private static final int MAX_SURFACE_WORLD_Y_COORDINATE = 5000;
+    private static final int OSRS_UNDERGROUND_Y_OFFSET_STEP = 6400;
+
     private static final Map<Integer, String> CA_TIER_MAP = Map.of(
             CA_TIER_EASY_ENUM, "Easy",
             CA_TIER_MEDIUM_ENUM, "Medium",
@@ -661,9 +665,36 @@ public class AiService {
         }
     }
 
+    /**
+     * Normalizes a WorldPoint coordinate for ShortestPath pathfinding.
+     * If the Y coordinate is an underground offset (y >= MAX_SURFACE_WORLD_Y_COORDINATE), normalizes it down to the corresponding
+     * surface level coordinate so that the map overlay draws correctly on the surface world map.
+     */
+    private WorldPoint normalizeShortestPathPoint(WorldPoint point) {
+        if (point == null) {
+            return null;
+        }
+        int y = point.getY();
+        if (y >= MAX_SURFACE_WORLD_Y_COORDINATE) {
+            int surfaceY = y;
+            while (surfaceY >= MAX_SURFACE_WORLD_Y_COORDINATE) {
+                surfaceY -= OSRS_UNDERGROUND_Y_OFFSET_STEP;
+            }
+            if (surfaceY > 0) {
+                log.info("Normalized underground coordinate WorldPoint({}, {}, {}) to surface WorldPoint({}, {}, {})",
+                        point.getX(), y, point.getPlane(), point.getX(), surfaceY, point.getPlane());
+                return new WorldPoint(point.getX(), surfaceY, point.getPlane());
+            }
+        }
+        return point;
+    }
+
     boolean setShortestPathTarget(WorldPoint targetPoint, WorldPoint startPoint, Map<String, Object> configOverrides) {
         try {
-            if (eventBus != null) {
+            if (eventBus != null && targetPoint != null) {
+                targetPoint = normalizeShortestPathPoint(targetPoint);
+                startPoint = normalizeShortestPathPoint(startPoint);
+
                 Map<String, Object> data = new HashMap<>();
                 if (startPoint != null) {
                     data.put("start", startPoint);

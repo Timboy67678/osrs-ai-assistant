@@ -833,5 +833,36 @@ public class AiServiceTest {
 
         Mockito.verify(eventBus).post(Mockito.any(net.runelite.client.events.PluginMessage.class));
     }
+
+    @Test
+    public void testExecuteSetShortestPathTargetNormalizesUndergroundCoordinates() {
+        Mockito.when(config.useShortestPath()).thenReturn(true);
+
+        JsonObject args = new JsonObject();
+        args.addProperty("x", 1435);
+        args.addProperty("y", 10077); // Underground offset (Chasm of Fire)
+        args.addProperty("plane", 0);
+        args.addProperty("locationName", "Chasm of Fire");
+
+        String json = aiService.executeSetShortestPathTarget(args);
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("success", root.get("status").getAsString());
+
+        org.mockito.ArgumentCaptor<net.runelite.client.events.PluginMessage> messageCaptor =
+                org.mockito.ArgumentCaptor.forClass(net.runelite.client.events.PluginMessage.class);
+        Mockito.verify(eventBus, Mockito.atLeastOnce()).post(messageCaptor.capture());
+
+        net.runelite.client.events.PluginMessage postedMsg = messageCaptor.getValue();
+        Assert.assertEquals("shortestpath", postedMsg.getNamespace());
+        Assert.assertEquals("path", postedMsg.getName());
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> data = (java.util.Map<String, Object>) postedMsg.getData();
+        net.runelite.api.coords.WorldPoint target = (net.runelite.api.coords.WorldPoint) data.get("target");
+        Assert.assertEquals(1435, target.getX());
+        Assert.assertEquals(3677, target.getY()); // Normalized from 10077 down to 3677 (10077 - 6400)
+    }
 }
 
