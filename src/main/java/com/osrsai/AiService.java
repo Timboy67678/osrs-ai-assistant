@@ -61,7 +61,8 @@ import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Central service class managing AI provider communication, recursive tool execution loops,
+ * Central service class managing AI provider communication, recursive tool
+ * execution loops,
  * in-game context building, and tool handler execution.
  */
 @Slf4j
@@ -218,7 +219,8 @@ public class AiService {
     /**
      * Retrieves the currently active AI provider profile configured by the user.
      *
-     * @return active {@link AiProfile}, or {@code null} if none is selected or configured
+     * @return active {@link AiProfile}, or {@code null} if none is selected or
+     *         configured
      */
     public AiProfile getActiveProfile() {
         String activeId = config.activeProfileId();
@@ -246,11 +248,13 @@ public class AiService {
     }
 
     /**
-     * Asynchronously processes a user prompt: validates configuration, gathers game state context on the RuneLite
+     * Asynchronously processes a user prompt: validates configuration, gathers game
+     * state context on the RuneLite
      * client thread, and submits the payload to the active AI provider endpoint.
      *
      * @param question the user's prompt string
-     * @param panel UI panel instance for rendering chat turns and progress indicators
+     * @param panel    UI panel instance for rendering chat turns and progress
+     *                 indicators
      */
     public void sendQuestion(String question, OsrsAiPanel panel) {
         final AiProfile activeProfile = getActiveProfile();
@@ -521,7 +525,8 @@ public class AiService {
     }
 
     /**
-     * Data structure defining a tool parameter attribute (name, type, description, required status).
+     * Data structure defining a tool parameter attribute (name, type, description,
+     * required status).
      */
     public static class ToolParameter {
         public final String name;
@@ -546,7 +551,7 @@ public class AiService {
          * Executes the tool logic with the provided AI arguments.
          *
          * @param service active {@link AiService} instance
-         * @param args tool input arguments formatted as JSON object
+         * @param args    tool input arguments formatted as JSON object
          * @return JSON string or text output of the tool execution
          * @throws Exception if an error occurs during tool execution
          */
@@ -554,7 +559,8 @@ public class AiService {
     }
 
     /**
-     * Definition of a tool available to the AI assistant, including its parameters and execution metadata.
+     * Definition of a tool available to the AI assistant, including its parameters
+     * and execution metadata.
      */
     public static class ToolDefinition {
         public final String name;
@@ -576,10 +582,11 @@ public class AiService {
         /**
          * Adds a parameter definition to this tool.
          *
-         * @param name parameter name
-         * @param type data type (string, integer, boolean, array_integer, array_string)
+         * @param name        parameter name
+         * @param type        data type (string, integer, boolean, array_integer,
+         *                    array_string)
          * @param description parameter description
-         * @param required {@code true} if parameter is mandatory
+         * @param required    {@code true} if parameter is mandatory
          * @return this {@link ToolDefinition} instance for chaining
          */
         public ToolDefinition addParam(String name, String type, String description, boolean required) {
@@ -667,8 +674,10 @@ public class AiService {
 
     /**
      * Normalizes a WorldPoint coordinate for ShortestPath pathfinding.
-     * If the Y coordinate is an underground offset (y >= MAX_SURFACE_WORLD_Y_COORDINATE), normalizes it down to the corresponding
-     * surface level coordinate so that the map overlay draws correctly on the surface world map.
+     * If the Y coordinate is an underground offset (y >=
+     * MAX_SURFACE_WORLD_Y_COORDINATE), normalizes it down to the corresponding
+     * surface level coordinate so that the map overlay draws correctly on the
+     * surface world map.
      */
     private WorldPoint normalizeShortestPathPoint(WorldPoint point) {
         if (point == null) {
@@ -732,9 +741,12 @@ public class AiService {
     }
 
     /**
-     * Executes the 'set_shortest_path_target' tool to set a destination overlay marker in the Shortest Path plugin via PluginMessage.
+     * Executes the 'set_shortest_path_target' tool to set a destination overlay
+     * marker in the Shortest Path plugin via PluginMessage.
      *
-     * @param args JSON arguments containing "x", "y", optional "plane", optional "locationName", optional "startX", "startY", "startPlane", and optional "avoidWilderness"
+     * @param args JSON arguments containing "x", "y", optional "plane", optional
+     *             "locationName", optional "startX", "startY", "startPlane", and
+     *             optional "avoidWilderness"
      * @return JSON response string with status and outcome message
      */
     String executeSetShortestPathTarget(JsonObject args) {
@@ -763,10 +775,13 @@ public class AiService {
             WorldPoint targetPoint = new WorldPoint(x, y, plane);
 
             WorldPoint startPoint = null;
-            if (args.has("startX") && args.has("startY") && !args.get("startX").isJsonNull() && !args.get("startY").isJsonNull()) {
+            if (args.has("startX") && args.has("startY") && !args.get("startX").isJsonNull()
+                    && !args.get("startY").isJsonNull()) {
                 int startX = args.get("startX").getAsInt();
                 int startY = args.get("startY").getAsInt();
-                int startPlane = (args.has("startPlane") && !args.get("startPlane").isJsonNull()) ? args.get("startPlane").getAsInt() : 0;
+                int startPlane = (args.has("startPlane") && !args.get("startPlane").isJsonNull())
+                        ? args.get("startPlane").getAsInt()
+                        : 0;
                 startPoint = new WorldPoint(startX, startY, startPlane);
             }
 
@@ -775,7 +790,8 @@ public class AiService {
                 configOverrides.put("avoidWilderness", args.get("avoidWilderness").getAsBoolean());
             }
 
-            boolean success = setShortestPathTarget(targetPoint, startPoint, configOverrides.isEmpty() ? null : configOverrides);
+            boolean success = setShortestPathTarget(targetPoint, startPoint,
+                    configOverrides.isEmpty() ? null : configOverrides);
 
             if (success) {
                 result.addProperty("status", "success");
@@ -797,7 +813,8 @@ public class AiService {
     }
 
     /**
-     * Executes the 'clear_shortest_path_target' tool to clear any active route overlay in the Shortest Path plugin.
+     * Executes the 'clear_shortest_path_target' tool to clear any active route
+     * overlay in the Shortest Path plugin.
      *
      * @param args JSON arguments (unused)
      * @return JSON response string with status and outcome message
@@ -828,9 +845,11 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_skills' tool to retrieve player skill levels, XP, and target level milestones.
+     * Executes the 'get_player_skills' tool to retrieve player skill levels, XP,
+     * and target level milestones.
      *
-     * @param args JSON arguments with optional "skill" filter name and optional "targetLevel" integer
+     * @param args JSON arguments with optional "skill" filter name and optional
+     *             "targetLevel" integer
      * @return JSON string of skill stats and remaining XP thresholds
      */
     String executeGetPlayerSkills(JsonObject args) {
@@ -874,7 +893,8 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_inventory' tool to inspect current inventory contents, quantities, GE prices, and HA prices.
+     * Executes the 'get_player_inventory' tool to inspect current inventory
+     * contents, quantities, GE prices, and HA prices.
      *
      * @param args tool arguments
      * @return JSON string mapping item names to inventory quantities and prices
@@ -891,7 +911,8 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_equipment' tool to inspect currently equipped worn equipment items and stats across all equipment slots.
+     * Executes the 'get_player_equipment' tool to inspect currently equipped worn
+     * equipment items and stats across all equipment slots.
      *
      * @param args tool arguments
      * @return JSON string of equipped items organized by equipment slot name
@@ -988,7 +1009,8 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_slayer_task' tool to retrieve the active Slayer task monster, remaining count, points, and task streak.
+     * Executes the 'get_player_slayer_task' tool to retrieve the active Slayer task
+     * monster, remaining count, points, and task streak.
      *
      * @param args tool arguments
      * @return JSON string containing Slayer task details
@@ -1051,9 +1073,11 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_quests' tool to retrieve quest completion counts, total Quest Points, and lists of in-progress/not-started/completed quests.
+     * Executes the 'get_player_quests' tool to retrieve quest completion counts,
+     * total Quest Points, and lists of in-progress/not-started/completed quests.
      *
-     * @param args JSON arguments with optional "status" filter and optional "quest" name search term
+     * @param args JSON arguments with optional "status" filter and optional "quest"
+     *             name search term
      * @return JSON string of quest completion status
      */
     String executeGetPlayerQuests(JsonObject args) {
@@ -1167,7 +1191,8 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_achievement_diaries' tool to retrieve Achievement Diary completion progress across all regions and tiers.
+     * Executes the 'get_player_achievement_diaries' tool to retrieve Achievement
+     * Diary completion progress across all regions and tiers.
      *
      * @param args tool arguments
      * @return JSON string of diary tier completion statuses
@@ -1205,10 +1230,13 @@ public class AiService {
     }
 
     /**
-     * Executes the 'get_player_combat_achievements' tool to retrieve Combat Achievement tier completions, boss kill counts, and filtered task details.
+     * Executes the 'get_player_combat_achievements' tool to retrieve Combat
+     * Achievement tier completions, boss kill counts, and filtered task details.
      *
-     * @param args JSON arguments with optional "tier", "boss", "completed", and "taskName" filters
-     * @return JSON string of Combat Achievement tiers, kill counts, and matching tasks
+     * @param args JSON arguments with optional "tier", "boss", "completed", and
+     *             "taskName" filters
+     * @return JSON string of Combat Achievement tiers, kill counts, and matching
+     *         tasks
      */
     String executeGetPlayerCombatAchievements(JsonObject args) {
         JsonObject result = new JsonObject();
@@ -1406,7 +1434,9 @@ public class AiService {
                         itemsStats.add(itemName, ItemContainerUtils.buildItemStatsJson(itemManager, itemId));
                     } else {
                         JsonObject errorObj = new JsonObject();
-                        errorObj.addProperty("error", "Item '" + itemName + "' not found in game containers or item database. You MUST call 'search_osrs_wiki' with query '" + itemName + "' to look up its stats on the OSRS Wiki before making claims.");
+                        errorObj.addProperty("error", "Item '" + itemName
+                                + "' not found in game containers or item database. You MUST call 'search_osrs_wiki' with query '"
+                                + itemName + "' to look up its stats on the OSRS Wiki before making claims.");
                         itemsStats.add(itemName, errorObj);
                     }
                 }

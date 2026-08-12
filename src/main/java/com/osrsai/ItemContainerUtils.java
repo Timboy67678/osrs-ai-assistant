@@ -16,11 +16,15 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for inspecting, aggregating, filtering, and retrieving item stats and details
+ * Utility class for inspecting, aggregating, filtering, and retrieving item
+ * stats and details
  * from RuneLite item containers (inventory, equipment, bank).
  */
 public class ItemContainerUtils {
-    /** Maximum number of items returned for unfiltered bank/container queries to conserve token budget. */
+    /**
+     * Maximum number of items returned for unfiltered bank/container queries to
+     * conserve token budget.
+     */
     public static final int UNFILTERED_BANK_LIMIT = 50;
 
     private static final Pattern OR_SPLIT_PATTERN = Pattern.compile("\\s+or\\s+|\\s*,\\s*|\\s*\\|\\s*");
@@ -31,15 +35,20 @@ public class ItemContainerUtils {
     }
 
     /**
-     * Aggregates items in an {@link ItemContainer}, resolving item names, stack quantities, Grand Exchange prices,
-     * and High Alchemy values. Applies optional name filters and minimum stack value filters.
+     * Aggregates items in an {@link ItemContainer}, resolving item names, stack
+     * quantities, Grand Exchange prices,
+     * and High Alchemy values. Applies optional name filters and minimum stack
+     * value filters.
      *
-     * @param client RuneLite {@link Client} instance
+     * @param client      RuneLite {@link Client} instance
      * @param itemManager RuneLite {@link ItemManager} instance
-     * @param container the target {@link ItemContainer} (inventory, equipment, or bank)
-     * @param filter optional search filter expression (supports logical 'or', 'and', ',', '|')
-     * @param minValue optional minimum total stack value filter
-     * @return {@link JsonObject} mapping item names to item detail objects (id, qty, gePrice, haPrice)
+     * @param container   the target {@link ItemContainer} (inventory, equipment, or
+     *                    bank)
+     * @param filter      optional search filter expression (supports logical 'or',
+     *                    'and', ',', '|')
+     * @param minValue    optional minimum total stack value filter
+     * @return {@link JsonObject} mapping item names to item detail objects (id,
+     *         qty, gePrice, haPrice)
      */
     public static JsonObject aggregateItemsWithPrices(Client client, ItemManager itemManager, ItemContainer container,
             String filter, int minValue) {
@@ -73,34 +82,9 @@ public class ItemContainerUtils {
                     ? comp.getName()
                     : "Item " + item.getId();
 
-            // Apply name filter if present
-            if (tokens != null && tokens.length > 0) {
-                boolean matchesAnyOrGroup = false;
-                for (String orGroup : tokens) {
-                    String cleanGroup = orGroup.trim();
-                    if (cleanGroup.isEmpty()) {
-                        continue;
-                    }
-
-                    // Split the OR group by " and " or "&" to find all AND tokens
-                    String[] andTokens = AND_SPLIT_PATTERN.split(cleanGroup);
-                    boolean matchesAllAndTokens = true;
-                    for (String andToken : andTokens) {
-                        String cleanAndToken = andToken.trim();
-                        if (!cleanAndToken.isEmpty() && !itemName.toLowerCase().contains(cleanAndToken)) {
-                            matchesAllAndTokens = false;
-                            break;
-                        }
-                    }
-
-                    if (matchesAllAndTokens) {
-                        matchesAnyOrGroup = true;
-                        break;
-                    }
-                }
-                if (!matchesAnyOrGroup) {
-                    continue;
-                }
+            // Apply name filter or category filter if present
+            if (search != null && !matchesCategoryOrFilter(itemName, item.getId(), itemManager, search, tokens)) {
+                continue;
             }
 
             quantities.put(itemName, quantities.getOrDefault(itemName, 0L) + item.getQuantity());
@@ -108,20 +92,28 @@ public class ItemContainerUtils {
             itemHaPrices.putIfAbsent(itemName, comp != null ? comp.getHaPrice() : 0);
         }
 
-        // Help sort items by total stack value
+        // Help sort items by total stack value with equipment priority
         class BankItem {
             final String name;
             final long qty;
             final int gePrice;
             final int haPrice;
+            final boolean equipable;
             final long totalSortVal;
 
-            BankItem(String name, long qty, int gePrice, int haPrice) {
+            BankItem(String name, long qty, int gePrice, int haPrice, boolean equipable) {
                 this.name = name;
                 this.qty = qty;
                 this.gePrice = gePrice;
                 this.haPrice = haPrice;
+                this.equipable = equipable;
                 long unitPrice = isIron ? haPrice : gePrice;
+                if (unitPrice <= 0) {
+                    unitPrice = Math.max(gePrice, haPrice);
+                }
+                if (unitPrice <= 0 && equipable) {
+                    unitPrice = 1000;
+                }
                 this.totalSortVal = unitPrice * qty;
             }
         }
@@ -149,11 +141,17 @@ public class ItemContainerUtils {
                 continue;
             }
 
-            list.add(new BankItem(name, qty, price, haPrice));
+            boolean equipable = isEquipableItem(itemManager, itemId, name);
+            list.add(new BankItem(name, qty, price, haPrice, equipable));
         }
 
-        // Sort by totalSortVal descending
-        list.sort((a, b) -> Long.compare(b.totalSortVal, a.totalSortVal));
+        // Sort equipable items first, then by totalSortVal descending
+        list.sort((a, b) -> {
+            if (a.equipable != b.equipable) {
+                return a.equipable ? -1 : 1;
+            }
+            return Long.compare(b.totalSortVal, a.totalSortVal);
+        });
 
         // Limit unfiltered container output to top items to conserve tokens
         int limit = (search == null) ? UNFILTERED_BANK_LIMIT : Integer.MAX_VALUE;
@@ -174,8 +172,133 @@ public class ItemContainerUtils {
         return result;
     }
 
+    private static boolean matchesCategoryOrFilter(String itemName, int itemId, ItemManager itemManager, String search,
+            String[] tokens) {
+        if (search == null || search.trim().isEmpty()) {
+            return true;
+        }
+        String lowerName = itemName.toLowerCase();
+
+        // Category keyword checks
+        if (search.equals("gear") || search.equals("equipment") || search.contains("gear")
+                || search.contains("equipment")) {
+            if (isEquipableItem(itemManager, itemId, itemName)) {
+                return true;
+            }
+        }
+        if (search.contains("weapon")) {
+            if (isEquipableItem(itemManager, itemId, itemName) && (lowerName.contains("whip")
+                    || lowerName.contains("scimitar")
+                    || lowerName.contains("sword") || lowerName.contains("bow") || lowerName.contains("staff")
+                    || lowerName.contains("wand")
+                    || lowerName.contains("dagger") || lowerName.contains("spear") || lowerName.contains("mace")
+                    || lowerName.contains("axe")
+                    || lowerName.contains("crossbow") || lowerName.contains("blowpipe") || lowerName.contains("trident")
+                    || lowerName.contains("scepter")
+                    || lowerName.contains("halberd") || lowerName.contains("dart") || lowerName.contains("knife"))) {
+                return true;
+            }
+        }
+        if (search.contains("armour") || search.contains("armor")) {
+            if (isEquipableItem(itemManager, itemId, itemName)
+                    && (lowerName.contains("helm") || lowerName.contains("mask")
+                            || lowerName.contains("torso") || lowerName.contains("body")
+                            || lowerName.contains("platebody") || lowerName.contains("legs")
+                            || lowerName.contains("platelegs") || lowerName.contains("chaps")
+                            || lowerName.contains("robe") || lowerName.contains("boots")
+                            || lowerName.contains("gloves") || lowerName.contains("shield")
+                            || lowerName.contains("defender") || lowerName.contains("cape")
+                            || lowerName.contains("cuirass") || lowerName.contains("brassard")
+                            || lowerName.contains("skirt") || lowerName.contains("coif")
+                            || lowerName.contains("void") || lowerName.contains("graceful")
+                            || lowerName.contains("barrows") || lowerName.contains("armour")
+                            || lowerName.contains("armor"))) {
+                return true;
+            }
+        }
+        if (search.contains("potion")) {
+            if (lowerName.contains("potion") || lowerName.contains("brew") || lowerName.contains("super ")
+                    || lowerName.contains("stamina")
+                    || lowerName.contains("antifire") || lowerName.contains("(4)") || lowerName.contains("(3)")
+                    || lowerName.contains("(2)")
+                    || lowerName.contains("(1)")) {
+                return true;
+            }
+        }
+        if (search.contains("food")) {
+            if (lowerName.contains("shark") || lowerName.contains("monkfish") || lowerName.contains("karambwan")
+                    || lowerName.contains("lobster")
+                    || lowerName.contains("swordfish") || lowerName.contains("manta") || lowerName.contains("angler")
+                    || lowerName.contains("tuna")
+                    || lowerName.contains("cooked") || lowerName.contains("cake") || lowerName.contains("pie")
+                    || lowerName.contains("pizza")) {
+                return true;
+            }
+        }
+
+        if (tokens != null && tokens.length > 0) {
+            for (String orGroup : tokens) {
+                String cleanGroup = orGroup.trim();
+                if (cleanGroup.isEmpty()) {
+                    continue;
+                }
+                String[] andTokens = AND_SPLIT_PATTERN.split(cleanGroup);
+                boolean matchesAllAndTokens = true;
+                for (String andToken : andTokens) {
+                    String cleanAndToken = andToken.trim();
+                    if (!cleanAndToken.isEmpty() && !lowerName.contains(cleanAndToken)) {
+                        matchesAllAndTokens = false;
+                        break;
+                    }
+                }
+                if (matchesAllAndTokens) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean isEquipableItem(ItemManager itemManager, int itemId, String itemName) {
+        if (itemManager != null) {
+            try {
+                ItemStats stats = itemManager.getItemStats(itemId, false);
+                if (stats != null && stats.isEquipable()) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (itemName == null) {
+            return false;
+        }
+        String lower = itemName.toLowerCase();
+        return lower.contains("helm") || lower.contains("mask") || lower.contains("torso") || lower.contains("body")
+                || lower.contains("platebody") || lower.contains("legs") || lower.contains("platelegs")
+                || lower.contains("chaps")
+                || lower.contains("robe") || lower.contains("boots") || lower.contains("gloves")
+                || lower.contains("shield")
+                || lower.contains("defender") || lower.contains("cape") || lower.contains("accumulator")
+                || lower.contains("assembler")
+                || lower.contains("whip") || lower.contains("sword") || lower.contains("scimitar")
+                || lower.contains("bow")
+                || lower.contains("staff") || lower.contains("wand") || lower.contains("dagger")
+                || lower.contains("spear")
+                || lower.contains("mace") || lower.contains("axe") || lower.contains("pickaxe")
+                || lower.contains("ring")
+                || lower.contains("amulet") || lower.contains("necklace") || lower.contains("blessing")
+                || lower.contains("coif")
+                || lower.contains("brassard") || lower.contains("skirt") || lower.contains("vamb")
+                || lower.contains("bracer")
+                || lower.contains("gauntlets") || lower.contains("tome") || lower.contains("book")
+                || lower.contains("quiver")
+                || lower.contains("void") || lower.contains("graceful") || lower.contains("fighter")
+                || lower.contains("barrows");
+    }
+
     /**
-     * Checks if the currently logged-in player is on an Ironman account mode (Ironman, UIM, HCIM, GIM, HGIM, UGIM).
+     * Checks if the currently logged-in player is on an Ironman account mode
+     * (Ironman, UIM, HCIM, GIM, HGIM, UGIM).
      *
      * @param client RuneLite {@link Client} instance
      * @return {@code true} if an Ironman mode is active; {@code false} otherwise
@@ -193,10 +316,11 @@ public class ItemContainerUtils {
     }
 
     /**
-     * Builds a detailed JSON representation of an item's equipment statistics, prices, weight, GE limits, and slot bonuses.
+     * Builds a detailed JSON representation of an item's equipment statistics,
+     * prices, weight, GE limits, and slot bonuses.
      *
      * @param itemManager RuneLite {@link ItemManager} instance
-     * @param itemId OSRS item ID
+     * @param itemId      OSRS item ID
      * @return {@link JsonObject} containing detailed item statistics
      */
     public static JsonObject buildItemStatsJson(ItemManager itemManager, int itemId) {
@@ -263,11 +387,12 @@ public class ItemContainerUtils {
     }
 
     /**
-     * Searches player equipment, inventory, and bank containers for an item matching a target name substring.
+     * Searches player equipment, inventory, and bank containers for an item
+     * matching a target name substring.
      *
-     * @param client RuneLite {@link Client} instance
+     * @param client      RuneLite {@link Client} instance
      * @param itemManager RuneLite {@link ItemManager} instance
-     * @param name target item name substring
+     * @param name        target item name substring
      * @return matching OSRS item ID, or {@code null} if not found in any container
      */
     public static Integer findItemIdInContainers(Client client, ItemManager itemManager, String name) {
@@ -332,10 +457,11 @@ public class ItemContainerUtils {
     }
 
     /**
-     * Safely resolves an item's display name without throwing exceptions if item data is missing.
+     * Safely resolves an item's display name without throwing exceptions if item
+     * data is missing.
      *
      * @param itemManager RuneLite {@link ItemManager} instance
-     * @param itemId OSRS item ID
+     * @param itemId      OSRS item ID
      * @return resolved item name, or fallback string (e.g. "Item 1234")
      */
     public static String safeItemName(ItemManager itemManager, int itemId) {
@@ -355,9 +481,11 @@ public class ItemContainerUtils {
     }
 
     /**
-     * Converts an equipment slot index integer into a human-readable equipment slot name.
+     * Converts an equipment slot index integer into a human-readable equipment slot
+     * name.
      *
-     * @param index slot index (0=Head, 1=Cape, 2=Amulet, 3=Weapon, 4=Body, 5=Shield, 6=Legs, 7=Gloves, 8=Boots, 9=Ring, 10=Ammo)
+     * @param index slot index (0=Head, 1=Cape, 2=Amulet, 3=Weapon, 4=Body,
+     *              5=Shield, 6=Legs, 7=Gloves, 8=Boots, 9=Ring, 10=Ammo)
      * @return equipment slot display name
      */
     public static String getSlotName(int index) {

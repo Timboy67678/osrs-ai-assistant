@@ -53,10 +53,16 @@ public class WikiSearchUtil {
      */
     public static final int WIKI_EXTRACT_CHARS = 8000;
 
-    /** Maximum number of data rows to include when formatting wikitables/drop tables into Markdown. */
+    /**
+     * Maximum number of data rows to include when formatting wikitables/drop tables
+     * into Markdown.
+     */
     public static final int MAX_WIKITABLE_DATA_ROWS = 35;
 
-    /** Total table row threshold (including header) for formatting truncation notice. */
+    /**
+     * Total table row threshold (including header) for formatting truncation
+     * notice.
+     */
     public static final int MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD = 36;
 
     /** Maximum search candidates to retrieve from MediaWiki search API. */
@@ -722,7 +728,8 @@ public class WikiSearchUtil {
                 }
 
                 if (rows.size() > MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD) {
-                    tableSb.append("*...[").append(rows.size() - MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD).append(" additional rows truncated]*\n");
+                    tableSb.append("*...[").append(rows.size() - MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD)
+                            .append(" additional rows truncated]*\n");
                 }
                 tableSb.append("\n");
 

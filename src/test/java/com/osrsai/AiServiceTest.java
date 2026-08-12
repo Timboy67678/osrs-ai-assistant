@@ -342,6 +342,75 @@ public class AiServiceTest {
     }
 
     @Test
+    public void aggregateItemsWithPricesPrioritizesEquipableGearOverCommodities() throws Exception {
+        ItemComposition torsoComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(torsoComp.getName()).thenReturn("Fighter torso");
+        Mockito.when(torsoComp.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(torsoComp.getHaPrice()).thenReturn(0);
+        Mockito.when(itemManager.getItemComposition(10551)).thenReturn(torsoComp);
+
+        ItemComposition coinsComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(coinsComp.getName()).thenReturn("Coins");
+        Mockito.when(coinsComp.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(coinsComp.getHaPrice()).thenReturn(1);
+        Mockito.when(itemManager.getItemComposition(995)).thenReturn(coinsComp);
+
+        ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
+        Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
+                new Item(995, 1000000), // 1 million coins
+                new Item(10551, 1)      // 1 Fighter torso (0 HA)
+        });
+
+        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
+                ItemContainer.class, String.class, int.class);
+        aggregateItemsWithPrices.setAccessible(true);
+
+        com.google.gson.JsonObject result = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, null, 0);
+
+        Assert.assertNotNull(result);
+        Assert.assertTrue(result.has("Fighter torso"));
+        Assert.assertTrue(result.has("Coins"));
+
+        // Verify Fighter torso appears first in JsonObject key order
+        String firstKey = result.keySet().iterator().next();
+        Assert.assertEquals("Fighter torso", firstKey);
+    }
+
+    @Test
+    public void aggregateItemsWithPricesSupportsCategoryFiltering() throws Exception {
+        ItemComposition scimComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(scimComp.getName()).thenReturn("Dragon scimitar");
+        Mockito.when(scimComp.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(itemManager.getItemComposition(4587)).thenReturn(scimComp);
+
+        ItemComposition potionComp = Mockito.mock(ItemComposition.class);
+        Mockito.when(potionComp.getName()).thenReturn("Prayer potion(4)");
+        Mockito.when(potionComp.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(itemManager.getItemComposition(2434)).thenReturn(potionComp);
+
+        ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
+        Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
+                new Item(4587, 1),
+                new Item(2434, 10)
+        });
+
+        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
+                ItemContainer.class, String.class, int.class);
+        aggregateItemsWithPrices.setAccessible(true);
+
+        com.google.gson.JsonObject gearResult = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "gear", 0);
+        Assert.assertTrue(gearResult.has("Dragon scimitar"));
+        Assert.assertFalse(gearResult.has("Prayer potion(4)"));
+
+        com.google.gson.JsonObject potionResult = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
+                aiService, mockContainer, "potions", 0);
+        Assert.assertTrue(potionResult.has("Prayer potion(4)"));
+        Assert.assertFalse(potionResult.has("Dragon scimitar"));
+    }
+
+    @Test
     public void testGetPlayerCluesTool() throws Exception {
         // Mock items in inventory
         ItemContainer invMock = Mockito.mock(ItemContainer.class);
@@ -858,7 +927,6 @@ public class AiServiceTest {
         Assert.assertEquals("shortestpath", postedMsg.getNamespace());
         Assert.assertEquals("path", postedMsg.getName());
 
-        @SuppressWarnings("unchecked")
         java.util.Map<String, Object> data = (java.util.Map<String, Object>) postedMsg.getData();
         net.runelite.api.coords.WorldPoint target = (net.runelite.api.coords.WorldPoint) data.get("target");
         Assert.assertEquals(1435, target.getX());

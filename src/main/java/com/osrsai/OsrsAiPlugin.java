@@ -19,15 +19,18 @@ import net.runelite.client.util.ImageUtil;
 /**
  * The main RuneLite plugin class for the OSRS AI Assistant.
  * <p>
- * This class handles plugin startup/shutdown, registers the sidebar navigation button and UI panel,
- * injects required RuneLite services, and routes user questions and configuration change events.
+ * This class handles plugin startup/shutdown, registers the sidebar navigation
+ * button and UI panel,
+ * injects required RuneLite services, and routes user questions and
+ * configuration change events.
  */
 @Slf4j
 @PluginDescriptor(name = "OSRS AI Assistant", description = "An AI chatbot assistant that reads your in-game stats. WARNING: Sends query & selected game details to third-party AI APIs (Gemini/OpenAI/Claude/Grok). Requires an external API key.", tags = {
         "ai", "chatbot", "gemini", "assistant" })
 public class OsrsAiPlugin extends Plugin {
     /**
-     * Config group key used for persisting plugin settings in RuneLite's ConfigManager.
+     * Config group key used for persisting plugin settings in RuneLite's
+     * ConfigManager.
      */
     public static final String CONFIG_GROUP = "osrsai";
 
@@ -50,8 +53,10 @@ public class OsrsAiPlugin extends Plugin {
     private NavigationButton navButton;
 
     /**
-     * Starts up the plugin by initializing the UI panel, scaling the navigation icon,
-     * adding the sidebar button to the client toolbar, and restoring detached window state if enabled.
+     * Starts up the plugin by initializing the UI panel, scaling the navigation
+     * icon,
+     * adding the sidebar button to the client toolbar, and restoring detached
+     * window state if enabled.
      *
      * @throws Exception if an initialization error occurs during startup
      */
@@ -83,7 +88,8 @@ public class OsrsAiPlugin extends Plugin {
     }
 
     /**
-     * Shuts down the plugin by closing any detached windows and removing the navigation button.
+     * Shuts down the plugin by closing any detached windows and removing the
+     * navigation button.
      *
      * @throws Exception if an error occurs during shutdown
      */
@@ -116,7 +122,8 @@ public class OsrsAiPlugin extends Plugin {
     }
 
     /**
-     * Listens for changes to the plugin's configuration settings and updates UI components accordingly.
+     * Listens for changes to the plugin's configuration settings and updates UI
+     * components accordingly.
      *
      * @param event the {@link ConfigChanged} event emitted by RuneLite
      */
@@ -132,7 +139,8 @@ public class OsrsAiPlugin extends Plugin {
     }
 
     /**
-     * Provides the configuration instance bound to the RuneLite Dependency Injection system.
+     * Provides the configuration instance bound to the RuneLite Dependency
+     * Injection system.
      *
      * @param configManager the RuneLite {@link ConfigManager}
      * @return the configured {@link OsrsAiConfig} instance
