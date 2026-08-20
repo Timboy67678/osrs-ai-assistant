@@ -1,4 +1,8 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
-    "java.compile.nullAnalysis.mode": "disabled"
+    "java.compile.nullAnalysis.mode": "disabled",
+    "gradle.java.home": "C:\\Program Files\\Java\\jdk-17.0.1",
+    "gradle.javaHome": "C:\\Program Files\\Java\\jdk-17.0.1",
+    "java.import.gradle.java.home": "C:\\Program Files\\Java\\jdk-17.0.1",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-17.0.1"
 }
