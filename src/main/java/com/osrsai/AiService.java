@@ -67,6 +67,9 @@ import org.jetbrains.annotations.NotNull;
  */
 @Slf4j
 public class AiService {
+    // Constants
+    private static final int MAX_TOOLTIP_LENGTH = 150;
+
     // URI Constants
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
 
@@ -1010,39 +1013,21 @@ public class AiService {
 
     /**
      * Executes the 'get_player_slayer_task' tool to retrieve the active Slayer task
-     * monster, remaining count, points, and task streak.
+     * monster, remaining count, assigned Slayer master, location, points, and task
+     * streak.
      *
      * @param args tool arguments
      * @return JSON string containing Slayer task details
      */
     String executeGetPlayerSlayerTask(JsonObject args) {
         JsonObject result = new JsonObject();
-        String taskName = configManager.getRSProfileConfiguration("slayer", "taskName");
-        if (taskName == null || taskName.isEmpty()) {
-            taskName = configManager.getConfiguration("slayer", "taskName");
-        }
-        String amount = configManager.getRSProfileConfiguration("slayer", "amount");
-        if (amount == null || amount.isEmpty()) {
-            amount = configManager.getConfiguration("slayer", "amount");
-        }
-        String taskLocation = configManager.getRSProfileConfiguration("slayer", "taskLocation");
-        if (taskLocation == null || taskLocation.isEmpty()) {
-            taskLocation = configManager.getConfiguration("slayer", "taskLocation");
-        }
-        if (taskLocation == null || taskLocation.isEmpty()) {
-            taskLocation = configManager.getRSProfileConfiguration("slayer", "location");
-        }
-        if (taskLocation == null || taskLocation.isEmpty()) {
-            taskLocation = configManager.getConfiguration("slayer", "location");
-        }
-        String pointsStr = configManager.getRSProfileConfiguration("slayer", "points");
-        if (pointsStr == null || pointsStr.isEmpty()) {
-            pointsStr = configManager.getConfiguration("slayer", "points");
-        }
-        String streakStr = configManager.getRSProfileConfiguration("slayer", "streak");
-        if (streakStr == null || streakStr.isEmpty()) {
-            streakStr = configManager.getConfiguration("slayer", "streak");
-        }
+        String taskName = getConfigValue("slayer", "taskName");
+        String amount = getConfigValue("slayer", "amount");
+        String taskLocation = getConfigValue("slayer", "taskLocation", "location");
+        String slayerMaster = getConfigValue("slayer", "slayerMaster", "masterName", "master", "taskMaster");
+        String pointsStr = getConfigValue("slayer", "points");
+        String streakStr = getConfigValue("slayer", "streak");
+
         int pointsVal = 0;
         if (pointsStr != null && !pointsStr.isEmpty()) {
             try {
@@ -1065,11 +1050,30 @@ public class AiService {
             if (taskLocation != null && !taskLocation.isEmpty() && !"None".equalsIgnoreCase(taskLocation.trim())) {
                 result.addProperty("location", taskLocation.trim());
             }
+            if (slayerMaster != null && !slayerMaster.isEmpty() && !"None".equalsIgnoreCase(slayerMaster.trim())) {
+                result.addProperty("slayerMaster", slayerMaster.trim());
+            }
         } else {
             result.addProperty("task", "None");
             result.addProperty("quantity", 0);
         }
         return gson.toJson(result);
+    }
+
+    private String getConfigValue(String group, String... keys) {
+        if (configManager == null) {
+            return null;
+        }
+        for (String key : keys) {
+            String val = configManager.getRSProfileConfiguration(group, key);
+            if (val == null || val.isEmpty()) {
+                val = configManager.getConfiguration(group, key);
+            }
+            if (val != null && !val.isEmpty()) {
+                return val;
+            }
+        }
+        return null;
     }
 
     /**
@@ -1269,7 +1273,7 @@ public class AiService {
                     if (filterBoss != null && !key.toLowerCase().contains(filterBoss)) {
                         continue;
                     }
-                    String valueStr = configManager.getRSProfileConfiguration("killcount", key);
+                    String valueStr = getConfigValue("killcount", key);
                     if (valueStr != null) {
                         try {
                             int count = Integer.parseInt(valueStr);
@@ -1664,8 +1668,8 @@ public class AiService {
                     if (tooltip != null && !tooltip.trim().isEmpty()) {
                         String noHtml = PATTERN_HTML_TAGS.matcher(tooltip).replaceAll(" ");
                         String cleanTooltip = PATTERN_WHITESPACE.matcher(noHtml).replaceAll(" ").trim();
-                        if (cleanTooltip.length() > 150) {
-                            cleanTooltip = cleanTooltip.substring(0, 147) + "...";
+                        if (cleanTooltip.length() > MAX_TOOLTIP_LENGTH) {
+                            cleanTooltip = cleanTooltip.substring(0, MAX_TOOLTIP_LENGTH - 3) + "...";
                         }
                         boxObj.addProperty("tooltip", cleanTooltip);
                     }
@@ -1704,15 +1708,11 @@ public class AiService {
         }
 
         try {
-            String pts = configManager.getRSProfileConfiguration("slayer", "points");
-            if (pts == null || pts.isEmpty())
-                pts = configManager.getConfiguration("slayer", "points");
+            String pts = getConfigValue("slayer", "points");
             if (pts != null && !pts.isEmpty()) {
                 points.addProperty("slayerPoints", Integer.parseInt(pts));
             }
-            String strk = configManager.getRSProfileConfiguration("slayer", "streak");
-            if (strk == null || strk.isEmpty())
-                strk = configManager.getConfiguration("slayer", "streak");
+            String strk = getConfigValue("slayer", "streak");
             if (strk != null && !strk.isEmpty()) {
                 points.addProperty("slayerStreak", Integer.parseInt(strk));
             }

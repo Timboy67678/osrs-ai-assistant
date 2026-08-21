@@ -842,11 +842,12 @@ public class AiServiceTest {
     }
 
     @Test
-    public void testGetPlayerSlayerTaskIncludesLocation() {
+    public void testGetPlayerSlayerTaskIncludesLocationAndMaster() {
         ConfigManager mockConfig = Mockito.mock(ConfigManager.class);
         Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "taskName")).thenReturn("Dagannoth");
         Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "amount")).thenReturn("120");
         Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "taskLocation")).thenReturn("Lighthouse");
+        Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "slayerMaster")).thenReturn("Duradel");
         Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "points")).thenReturn("259");
         Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "streak")).thenReturn("99");
 
@@ -865,6 +866,7 @@ public class AiServiceTest {
         Assert.assertEquals("Dagannoth", root.get("task").getAsString());
         Assert.assertEquals(120, root.get("quantity").getAsInt());
         Assert.assertEquals("Lighthouse", root.get("location").getAsString());
+        Assert.assertEquals("Duradel", root.get("slayerMaster").getAsString());
         Assert.assertEquals(259, root.get("points").getAsInt());
         Assert.assertEquals(99, root.get("streak").getAsInt());
     }

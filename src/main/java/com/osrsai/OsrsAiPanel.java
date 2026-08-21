@@ -121,6 +121,48 @@ public class OsrsAiPanel extends PluginPanel {
 
         chatSessionComboBox = new JComboBox<>();
         chatSessionComboBox.setFocusable(false);
+        chatSessionComboBox.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof ChatSession) {
+                    ChatSession session = (ChatSession) value;
+                    String fullTitle = session.getTitle();
+                    label.setToolTipText(fullTitle);
+
+                    int availWidth;
+                    if (index == -1) {
+                        availWidth = chatSessionComboBox.getWidth() - 32;
+                    } else if (list != null && list.getWidth() > 0) {
+                        availWidth = list.getWidth() - 16;
+                    } else {
+                        availWidth = chatSessionComboBox.getWidth() - 16;
+                    }
+
+                    if (availWidth > 20 && fullTitle != null) {
+                        FontMetrics fm = label.getFontMetrics(label.getFont());
+                        if (fm.stringWidth(fullTitle) <= availWidth) {
+                            label.setText(fullTitle);
+                        } else {
+                            String ellipsis = "...";
+                            int ellipsisWidth = fm.stringWidth(ellipsis);
+                            StringBuilder sb = new StringBuilder();
+                            for (int i = 0; i < fullTitle.length(); i++) {
+                                char c = fullTitle.charAt(i);
+                                if (fm.stringWidth(sb.toString() + c) + ellipsisWidth > availWidth) {
+                                    break;
+                                }
+                                sb.append(c);
+                            }
+                            label.setText(sb.toString().trim() + ellipsis);
+                        }
+                    } else if (fullTitle != null) {
+                        label.setText(fullTitle);
+                    }
+                }
+                return label;
+            }
+        });
 
         // Row 0: Buttons
         c.gridy = 0;
@@ -551,9 +593,9 @@ public class OsrsAiPanel extends PluginPanel {
             }
 
             if ("You".equals(sender) && "New Chat".equals(activeSession.getTitle())) {
-                String newTitle = message.trim();
-                if (newTitle.length() > 25) {
-                    newTitle = newTitle.substring(0, 22) + "...";
+                String newTitle = message.replaceAll("\\r?\\n", " ").trim();
+                if (newTitle.length() > 80) {
+                    newTitle = newTitle.substring(0, 80);
                 }
                 if (newTitle.isEmpty()) {
                     newTitle = "Chat " + (sessions.indexOf(activeSession) + 1);
@@ -713,6 +755,20 @@ public class OsrsAiPanel extends PluginPanel {
             if (loaded != null) {
                 // Remove empty sessions on startup to prevent clutter
                 loaded.removeIf(s -> s.getMessages().isEmpty());
+                for (ChatSession s : loaded) {
+                    if (s.getTitle() != null && (s.getTitle().endsWith("...") || "New Chat".equals(s.getTitle()))) {
+                        for (ChatMessage msg : s.getMessages()) {
+                            if ("You".equals(msg.getSender()) && msg.getMessage() != null && !msg.getMessage().trim().isEmpty()) {
+                                String fullTitle = msg.getMessage().replaceAll("\\r?\\n", " ").trim();
+                                if (fullTitle.length() > 80) {
+                                    fullTitle = fullTitle.substring(0, 80);
+                                }
+                                s.setTitle(fullTitle);
+                                break;
+                            }
+                        }
+                    }
+                }
                 sessions.addAll(loaded);
             }
 
