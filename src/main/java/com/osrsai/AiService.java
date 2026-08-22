@@ -2455,5 +2455,4 @@ public class AiService {
     private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
         return ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, container, filter, minValue);
     }
-
 }

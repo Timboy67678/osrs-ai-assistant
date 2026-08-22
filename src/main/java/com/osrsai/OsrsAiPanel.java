@@ -164,34 +164,39 @@ public class OsrsAiPanel extends PluginPanel {
             }
         });
 
-        // Row 0: Buttons
+        // Row 0: Buttons (3 equal columns)
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 3, 2, 0));
+        buttonPanel.setOpaque(false);
+        buttonPanel.add(newChatButton);
+        buttonPanel.add(deleteChatButton);
+        buttonPanel.add(detachButton);
+
         c.gridy = 0;
-        c.weightx = 0.3;
         c.gridx = 0;
-        topBar.add(newChatButton, c);
-
-        c.weightx = 0.3;
-        c.gridx = 1;
-        topBar.add(deleteChatButton, c);
-
-        c.weightx = 0.4;
-        c.gridx = 2;
-        topBar.add(detachButton, c);
+        c.gridwidth = 2;
+        c.weightx = 1.0;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        topBar.add(buttonPanel, c);
 
         // Row 1: Dropdown & Profiles Button
         c.gridy = 1;
         c.gridx = 0;
-        c.gridwidth = 2;
-        c.weightx = 0.85;
+        c.gridwidth = 1;
+        c.weightx = 1.0;
+        c.fill = GridBagConstraints.HORIZONTAL;
         topBar.add(chatSessionComboBox, c);
 
-        JButton profilesBtn = new JButton("⚙️");
+        JButton profilesBtn = new JButton("⚙");
         profilesBtn.setToolTipText("Configure AI Profiles");
         profilesBtn.setFocusable(false);
+        profilesBtn.setMargin(new Insets(2, 4, 2, 4));
+        profilesBtn.setPreferredSize(new Dimension(28, 24));
+        profilesBtn.setMinimumSize(new Dimension(24, 24));
         profilesBtn.addActionListener(e -> switchToProfilesView());
-        c.gridx = 2;
+        c.gridx = 1;
         c.gridwidth = 1;
-        c.weightx = 0.15;
+        c.weightx = 0.0;
+        c.fill = GridBagConstraints.NONE;
         topBar.add(profilesBtn, c);
 
         // Row 2: Warning Label
@@ -202,8 +207,9 @@ public class OsrsAiPanel extends PluginPanel {
         updateWarningLabel();
         c.gridy = 2;
         c.gridx = 0;
-        c.gridwidth = 3;
+        c.gridwidth = 2;
         c.weightx = 1.0;
+        c.fill = GridBagConstraints.HORIZONTAL;
         topBar.add(warningLabel, c);
 
         chatViewPanel.add(topBar, BorderLayout.NORTH);
