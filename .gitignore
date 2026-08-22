@@ -50,4 +50,4 @@ build/
 *.iws
 *.ipr
 bin/
-.vscode/*
+.vscode/

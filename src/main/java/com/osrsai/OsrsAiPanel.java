@@ -123,8 +123,10 @@ public class OsrsAiPanel extends PluginPanel {
         chatSessionComboBox.setFocusable(false);
         chatSessionComboBox.setRenderer(new DefaultListCellRenderer() {
             @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected,
+                    boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected,
+                        cellHasFocus);
                 if (value instanceof ChatSession) {
                     ChatSession session = (ChatSession) value;
                     String fullTitle = session.getTitle();
@@ -764,7 +766,8 @@ public class OsrsAiPanel extends PluginPanel {
                 for (ChatSession s : loaded) {
                     if (s.getTitle() != null && (s.getTitle().endsWith("...") || "New Chat".equals(s.getTitle()))) {
                         for (ChatMessage msg : s.getMessages()) {
-                            if ("You".equals(msg.getSender()) && msg.getMessage() != null && !msg.getMessage().trim().isEmpty()) {
+                            if ("You".equals(msg.getSender()) && msg.getMessage() != null
+                                    && !msg.getMessage().trim().isEmpty()) {
                                 String fullTitle = msg.getMessage().replaceAll("\\r?\\n", " ").trim();
                                 if (fullTitle.length() > 80) {
                                     fullTitle = fullTitle.substring(0, 80);

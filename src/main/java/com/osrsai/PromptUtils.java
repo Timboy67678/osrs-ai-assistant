@@ -1,25 +1,36 @@
 package com.osrsai;
 
 /**
- * Utility class providing system prompt assembly, prompt character budgeting, notification truncation,
+ * Utility class providing system prompt assembly, prompt character budgeting,
+ * notification truncation,
  * and account type / spellbook description formatting.
  */
 public class PromptUtils {
-    /** Maximum allowed character count for the game context payload in system prompts. */
+    /**
+     * Maximum allowed character count for the game context payload in system
+     * prompts.
+     */
     public static final int MAX_CONTEXT_CHARACTERS = 8000;
 
-    /** Maximum allowed character count for recent conversation history in system prompts. */
+    /**
+     * Maximum allowed character count for recent conversation history in system
+     * prompts.
+     */
     public static final int MAX_RECENT_CONVERSATION_CHARS = 4000;
+
+    /** Maximum allowed character count for desktop notification summaries. */
+    public static final int MAX_NOTIFICATION_LENGTH = 80;
 
     private PromptUtils() {
         // Utility class
     }
 
     /**
-     * Constructs the full system prompt string combining AI identity instructions, available tool descriptions,
+     * Constructs the full system prompt string combining AI identity instructions,
+     * available tool descriptions,
      * grounding rules, recent conversation history, and current in-game context.
      *
-     * @param context full game context string
+     * @param context            full game context string
      * @param recentConversation recent chat turn history
      * @return structured system prompt string
      */
@@ -64,10 +75,11 @@ public class PromptUtils {
     }
 
     /**
-     * Trims text content to fit within a specified character length limit, truncating from the end by default.
+     * Trims text content to fit within a specified character length limit,
+     * truncating from the end by default.
      *
-     * @param text input text
-     * @param maxChars maximum allowed character budget
+     * @param text            input text
+     * @param maxChars        maximum allowed character budget
      * @param truncationLabel string appended/prepended when truncation occurs
      * @return trimmed text string
      */
@@ -76,12 +88,14 @@ public class PromptUtils {
     }
 
     /**
-     * Trims text content to fit within a specified character length limit, with options to retain the start or end of text.
+     * Trims text content to fit within a specified character length limit, with
+     * options to retain the start or end of text.
      *
-     * @param text input text
-     * @param maxChars maximum allowed character budget
+     * @param text            input text
+     * @param maxChars        maximum allowed character budget
      * @param truncationLabel string appended/prepended when truncation occurs
-     * @param keepEnd {@code true} to keep the trailing portion of the text; {@code false} to keep the leading portion
+     * @param keepEnd         {@code true} to keep the trailing portion of the text;
+     *                        {@code false} to keep the leading portion
      * @return trimmed text string
      */
     public static String trimToPromptBudget(String text, int maxChars, String truncationLabel, boolean keepEnd) {
@@ -115,7 +129,8 @@ public class PromptUtils {
     }
 
     /**
-     * Truncates long response text to fit within standard desktop notification popups.
+     * Truncates long response text to fit within standard desktop notification
+     * popups.
      *
      * @param text raw response text
      * @return truncated notification summary string
@@ -124,16 +139,18 @@ public class PromptUtils {
         if (text == null) {
             return "";
         }
-        if (text.length() <= 80) {
+        if (text.length() <= MAX_NOTIFICATION_LENGTH) {
             return text;
         }
-        return text.substring(0, 77) + "...";
+        return text.substring(0, MAX_NOTIFICATION_LENGTH - 3) + "...";
     }
 
     /**
-     * Converts RuneLite's ACCOUNT_TYPE varbit integer value into a human-readable account type string.
+     * Converts RuneLite's ACCOUNT_TYPE varbit integer value into a human-readable
+     * account type string.
      *
-     * @param accountTypeVarbit varbit integer (0=Normal, 1=Ironman, 2=UIM, 3=HCIM, 4=GIM, 5=HGIM, 6=UGIM)
+     * @param accountTypeVarbit varbit integer (0=Normal, 1=Ironman, 2=UIM, 3=HCIM,
+     *                          4=GIM, 5=HGIM, 6=UGIM)
      * @return account type display name
      */
     public static String describeAccountType(Integer accountTypeVarbit) {
@@ -161,9 +178,11 @@ public class PromptUtils {
     }
 
     /**
-     * Converts RuneLite's active spellbook varbit integer into a human-readable spellbook name.
+     * Converts RuneLite's active spellbook varbit integer into a human-readable
+     * spellbook name.
      *
-     * @param val spellbook integer ID (0=Standard, 1=Ancient Magicks, 2=Lunar, 3=Arceuus)
+     * @param val spellbook integer ID (0=Standard, 1=Ancient Magicks, 2=Lunar,
+     *            3=Arceuus)
      * @return spellbook name string
      */
     public static String describeSpellbook(int val) {
