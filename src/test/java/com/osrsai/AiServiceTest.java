@@ -179,6 +179,22 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testIsQueryRelatedToSlayerTask() throws Exception {
+        Method isQueryRelatedToSlayerTask = AiService.class.getDeclaredMethod("isQueryRelatedToSlayerTask", String.class, String.class);
+        isQueryRelatedToSlayerTask.setAccessible(true);
+
+        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "banshees", "Banshees"));
+        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "banshee", "Banshees"));
+        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "aberrant spectres", "Aberrant spectres"));
+        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "aberrant spectre", "Aberrant spectres"));
+        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "abyssal demons", "abyssal demon"));
+        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "demons", "Abyssal demons"));
+
+        Assert.assertFalse((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "abyssal whip", "Banshees"));
+        Assert.assertFalse((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "cows", "Banshees"));
+    }
+
+    @Test
     public void buildSystemPromptIncludesGroundingRules() {
         String prompt = AiService.buildSystemPrompt("Location Name: Grand Exchange", "You: Where am I?");
 

@@ -1612,7 +1612,76 @@ public class AiService {
 
     String executeSearchOsrsWiki(JsonObject args) {
         String query = args.has("query") ? args.get("query").getAsString() : "";
+        if (query.isEmpty()) {
+            return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
+        }
+
+        String cleanedQuery = WikiSearchUtil.extractSearchQuery(query).trim();
+        String activeTaskName = getConfigValue("slayer", "taskName");
+
+        if (activeTaskName != null && !activeTaskName.isEmpty() && !cleanedQuery.toLowerCase().startsWith("slayer task/")) {
+            if (isQueryRelatedToSlayerTask(cleanedQuery, activeTaskName)) {
+                String slayerTaskQuery = "Slayer task/" + activeTaskName;
+                log.info("Slayer task detected. Attempting wiki search for: {}", slayerTaskQuery);
+                String slayerResult = WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, slayerTaskQuery);
+
+                if (!isNotFoundResult(slayerResult)) {
+                    return slayerResult;
+                }
+                log.info("Slayer task page not found for '{}'. Falling back to original query: {}", slayerTaskQuery, query);
+            }
+        }
+
         return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
+    }
+
+    private boolean isQueryRelatedToSlayerTask(String query, String activeTask) {
+        if (query == null || activeTask == null || query.isEmpty() || activeTask.isEmpty()) {
+            return false;
+        }
+        String q = query.trim().toLowerCase();
+        String t = activeTask.trim().toLowerCase();
+
+        if (q.equals(t)) {
+            return true;
+        }
+
+        String qNorm = normalizeSlayerTaskName(q);
+        String tNorm = normalizeSlayerTaskName(t);
+        if (qNorm.equals(tNorm)) {
+            return true;
+        }
+
+        if (q.length() >= 3) {
+            if (t.contains(q) || q.contains(t)) {
+                return true;
+            }
+            if (tNorm.contains(qNorm) || qNorm.contains(tNorm)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeSlayerTaskName(String name) {
+        if (name.endsWith("es")) {
+            return name.substring(0, name.length() - 2);
+        } else if (name.endsWith("s")) {
+            return name.substring(0, name.length() - 1);
+        }
+        return name;
+    }
+
+    private boolean isNotFoundResult(String jsonResult) {
+        if (jsonResult == null || jsonResult.isEmpty()) {
+            return true;
+        }
+        try {
+            JsonObject obj = gson.fromJson(jsonResult, JsonObject.class);
+            return obj != null && obj.has("status") && "not_found".equals(obj.get("status").getAsString());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     static String extractSearchQuery(String question) {
