@@ -668,8 +668,8 @@ public class AiServiceTest {
 
     @Test
     public void testGetPlayerAchievementDiariesTool() throws Exception {
-        // Varbit value 1 = Completed for Achievement Diaries
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_EASY)).thenReturn(1);
+        // Varbit value >= maxTasks = Completed for Achievement Diaries
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_EASY)).thenReturn(11);
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_MEDIUM)).thenReturn(0);
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_HARD)).thenReturn(0);
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_ELITE)).thenReturn(0);
