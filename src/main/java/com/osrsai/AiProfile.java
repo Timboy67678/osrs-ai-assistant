@@ -5,8 +5,10 @@ import java.util.UUID;
 /**
  * Data model representing a user-configured AI provider profile.
  * <p>
- * Holds configuration details such as profile name, provider type (Gemini, OpenAI, Claude, Grok, Custom),
- * API keys, optional client/organization IDs, custom model identifiers, and custom API endpoints.
+ * Holds configuration details such as profile name, provider type (Gemini,
+ * OpenAI, Claude, Grok, Custom),
+ * API keys, optional client/organization IDs, custom model identifiers, and
+ * custom API endpoints.
  */
 public class AiProfile {
     private String id;
@@ -18,13 +20,14 @@ public class AiProfile {
     private String customEndpoint;
 
     /**
-     * Constructs a new {@code AiProfile} initialized with a random UUID, default name,
+     * Constructs a new {@code AiProfile} initialized with a random UUID, default
+     * name,
      * and default provider (Gemini).
      */
     public AiProfile() {
         this.id = UUID.randomUUID().toString();
         this.name = "New Profile";
-        this.provider = AiProvider.GEMINI;
+        this.provider = AiProvider.GROK;
         this.apiKey = "";
         this.clientId = "";
         this.customModel = "";
@@ -122,7 +125,8 @@ public class AiProfile {
     }
 
     /**
-     * Gets the custom model identifier (used when provider is CUSTOM or model override is specified).
+     * Gets the custom model identifier (used when provider is CUSTOM or model
+     * override is specified).
      *
      * @return custom model name string
      */

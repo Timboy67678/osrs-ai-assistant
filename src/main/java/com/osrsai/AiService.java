@@ -88,6 +88,22 @@ public class AiService {
     static final int VARP_PEST_CONTROL_POINTS = 261;
     static final int POISON_VENOM_THRESHOLD = 1000000;
 
+    // Minigame Points Varbit IDs
+    static final int VARBIT_VALE_RESEARCH_POINTS = 16301;
+    static final int VARBIT_MTA_TELEKINETIC_PIZZAZZ = 287;
+    static final int VARBIT_MTA_ALCHEMIST_PIZZAZZ = 288;
+    static final int VARBIT_MTA_ENCHANTING_PIZZAZZ = 289;
+    static final int VARBIT_MTA_GRAVEYARD_PIZZAZZ = 290;
+    static final int VARBIT_BA_ATTACKER_POINTS = 4761;
+    static final int VARBIT_BA_DEFENDER_POINTS = 4762;
+    static final int VARBIT_BA_COLLECTOR_POINTS = 4763;
+    static final int VARBIT_BA_HEALER_POINTS = 4764;
+    static final int VARBIT_CARPENTERS_POINTS = 10671;
+    static final int VARBIT_GIANTS_FOUNDRY_REPUTATION = 13919;
+    static final int VARBIT_VOLCANIC_MINE_POINTS = 5934;
+    static final int VARBIT_LMS_POINTS = 9304;
+    static final int VARBIT_BOUNTY_HUNTER_POINTS = 10079;
+
     // Combat Achievement Enums & Struct Parameters
     private static final int CA_BOSS_ENUM = 3971;
     private static final int CA_TIER_EASY_ENUM = 3981;
@@ -114,15 +130,6 @@ public class AiService {
     // Quest Struct Param IDs
     static final int QUEST_STRUCT_PARAM_VARBIT = 299;
     static final int QUEST_STRUCT_PARAM_VARP = 300;
-
-    // Currency & Activity Item IDs
-    private static final int ITEM_ID_MARK_OF_GRACE = 11849;
-    private static final int ITEM_ID_GOLDEN_NUGGET = 12012;
-    private static final int ITEM_ID_ABYSSAL_PEARL = 26884;
-    private static final int ITEM_ID_TOKKUL = 6529;
-    private static final int ITEM_ID_STARDUST = 25527;
-    private static final int ITEM_ID_ARCHERY_TICKET = 1464;
-    private static final int ITEM_ID_MERMAIDS_TEAR = 27433;
 
     // Coordinate & Map Navigation Constants
     private static final int MAX_SURFACE_WORLD_Y_COORDINATE = 5000;
@@ -1204,31 +1211,66 @@ public class AiService {
     String executeGetPlayerAchievementDiaries(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject diaries = new JsonObject();
-        diaries.add("Ardougne", createDiaryProgress(Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM,
-                Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE));
-        diaries.add("Desert", createDiaryProgress(Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM,
-                Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE));
-        diaries.add("Falador", createDiaryProgress(Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM,
-                Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE));
-        diaries.add("Fremennik", createDiaryProgress(Varbits.DIARY_FREMENNIK_EASY,
-                Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE));
-        diaries.add("Kandarin", createDiaryProgress(Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM,
-                Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE));
-        diaries.add("Karamja", createDiaryProgress(Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM,
-                Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE));
-        diaries.add("Kourend", createDiaryProgress(Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM,
-                Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE));
-        diaries.add("Lumbridge", createDiaryProgress(Varbits.DIARY_LUMBRIDGE_EASY,
-                Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE));
-        diaries.add("Morytania", createDiaryProgress(Varbits.DIARY_MORYTANIA_EASY,
-                Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE));
-        diaries.add("Varrock", createDiaryProgress(Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM,
-                Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE));
-        diaries.add("Western", createDiaryProgress(Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM,
-                Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE));
-        diaries.add("Wilderness",
-                createDiaryProgress(Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM,
-                        Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE));
+        diaries.add("Ardougne", createDiaryProgress(
+                Varbits.DIARY_ARDOUGNE_EASY, 11,
+                Varbits.DIARY_ARDOUGNE_MEDIUM, 13,
+                Varbits.DIARY_ARDOUGNE_HARD, 12,
+                Varbits.DIARY_ARDOUGNE_ELITE, 8));
+        diaries.add("Desert", createDiaryProgress(
+                Varbits.DIARY_DESERT_EASY, 11,
+                Varbits.DIARY_DESERT_MEDIUM, 12,
+                Varbits.DIARY_DESERT_HARD, 10,
+                Varbits.DIARY_DESERT_ELITE, 6));
+        diaries.add("Falador", createDiaryProgress(
+                Varbits.DIARY_FALADOR_EASY, 11,
+                Varbits.DIARY_FALADOR_MEDIUM, 14,
+                Varbits.DIARY_FALADOR_HARD, 11,
+                Varbits.DIARY_FALADOR_ELITE, 6));
+        diaries.add("Fremennik", createDiaryProgress(
+                Varbits.DIARY_FREMENNIK_EASY, 10,
+                Varbits.DIARY_FREMENNIK_MEDIUM, 9,
+                Varbits.DIARY_FREMENNIK_HARD, 10,
+                Varbits.DIARY_FREMENNIK_ELITE, 6));
+        diaries.add("Kandarin", createDiaryProgress(
+                Varbits.DIARY_KANDARIN_EASY, 11,
+                Varbits.DIARY_KANDARIN_MEDIUM, 11,
+                Varbits.DIARY_KANDARIN_HARD, 11,
+                Varbits.DIARY_KANDARIN_ELITE, 7));
+        diaries.add("Karamja", createDiaryProgress(
+                Varbits.DIARY_KARAMJA_EASY, 10,
+                Varbits.DIARY_KARAMJA_MEDIUM, 19,
+                Varbits.DIARY_KARAMJA_HARD, 10,
+                Varbits.DIARY_KARAMJA_ELITE, 5));
+        diaries.add("Kourend", createDiaryProgress(
+                Varbits.DIARY_KOUREND_EASY, 12,
+                Varbits.DIARY_KOUREND_MEDIUM, 13,
+                Varbits.DIARY_KOUREND_HARD, 10,
+                Varbits.DIARY_KOUREND_ELITE, 8));
+        diaries.add("Lumbridge", createDiaryProgress(
+                Varbits.DIARY_LUMBRIDGE_EASY, 12,
+                Varbits.DIARY_LUMBRIDGE_MEDIUM, 12,
+                Varbits.DIARY_LUMBRIDGE_HARD, 11,
+                Varbits.DIARY_LUMBRIDGE_ELITE, 6));
+        diaries.add("Morytania", createDiaryProgress(
+                Varbits.DIARY_MORYTANIA_EASY, 11,
+                Varbits.DIARY_MORYTANIA_MEDIUM, 11,
+                Varbits.DIARY_MORYTANIA_HARD, 11,
+                Varbits.DIARY_MORYTANIA_ELITE, 6));
+        diaries.add("Varrock", createDiaryProgress(
+                Varbits.DIARY_VARROCK_EASY, 14,
+                Varbits.DIARY_VARROCK_MEDIUM, 13,
+                Varbits.DIARY_VARROCK_HARD, 10,
+                Varbits.DIARY_VARROCK_ELITE, 5));
+        diaries.add("Western", createDiaryProgress(
+                Varbits.DIARY_WESTERN_EASY, 11,
+                Varbits.DIARY_WESTERN_MEDIUM, 13,
+                Varbits.DIARY_WESTERN_HARD, 13,
+                Varbits.DIARY_WESTERN_ELITE, 7));
+        diaries.add("Wilderness", createDiaryProgress(
+                Varbits.DIARY_WILDERNESS_EASY, 12,
+                Varbits.DIARY_WILDERNESS_MEDIUM, 12,
+                Varbits.DIARY_WILDERNESS_HARD, 10,
+                Varbits.DIARY_WILDERNESS_ELITE, 7));
         result.add("diaries", diaries);
         return gson.toJson(result);
     }
@@ -1708,6 +1750,62 @@ public class AiService {
         }
 
         try {
+            int vale = client.getVarbitValue(VARBIT_VALE_RESEARCH_POINTS);
+            points.addProperty("valeResearchPoints", vale);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            JsonObject mta = new JsonObject();
+            mta.addProperty("telekineticPizzazz", client.getVarbitValue(VARBIT_MTA_TELEKINETIC_PIZZAZZ));
+            mta.addProperty("alchemistPizzazz", client.getVarbitValue(VARBIT_MTA_ALCHEMIST_PIZZAZZ));
+            mta.addProperty("enchantingPizzazz", client.getVarbitValue(VARBIT_MTA_ENCHANTING_PIZZAZZ));
+            mta.addProperty("graveyardPizzazz", client.getVarbitValue(VARBIT_MTA_GRAVEYARD_PIZZAZZ));
+            points.add("mageTrainingArenaPizzazzPoints", mta);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            JsonObject ba = new JsonObject();
+            ba.addProperty("attackerPoints", client.getVarbitValue(VARBIT_BA_ATTACKER_POINTS));
+            ba.addProperty("defenderPoints", client.getVarbitValue(VARBIT_BA_DEFENDER_POINTS));
+            ba.addProperty("collectorPoints", client.getVarbitValue(VARBIT_BA_COLLECTOR_POINTS));
+            ba.addProperty("healerPoints", client.getVarbitValue(VARBIT_BA_HEALER_POINTS));
+            points.add("barbarianAssaultHonorPoints", ba);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            int carp = client.getVarbitValue(VARBIT_CARPENTERS_POINTS);
+            points.addProperty("carpentersPoints", carp);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            int gf = client.getVarbitValue(VARBIT_GIANTS_FOUNDRY_REPUTATION);
+            points.addProperty("giantsFoundryReputation", gf);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            int vm = client.getVarbitValue(VARBIT_VOLCANIC_MINE_POINTS);
+            points.addProperty("volcanicMinePoints", vm);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            int lms = client.getVarbitValue(VARBIT_LMS_POINTS);
+            points.addProperty("lmsPoints", lms);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            int bh = client.getVarbitValue(VARBIT_BOUNTY_HUNTER_POINTS);
+            points.addProperty("bountyHunterPoints", bh);
+        } catch (Exception ignored) {
+        }
+
+        try {
             String pts = getConfigValue("slayer", "points");
             if (pts != null && !pts.isEmpty()) {
                 points.addProperty("slayerPoints", Integer.parseInt(pts));
@@ -1719,40 +1817,68 @@ public class AiService {
         } catch (Exception ignored) {
         }
 
-        Map<String, Integer> targetItemNames = Map.of(
-                "Mark of grace", ITEM_ID_MARK_OF_GRACE,
-                "Golden nugget", ITEM_ID_GOLDEN_NUGGET,
-                "Abyssal pearl", ITEM_ID_ABYSSAL_PEARL,
-                "Tokkul", ITEM_ID_TOKKUL,
-                "Stardust", ITEM_ID_STARDUST,
-                "Archery ticket", ITEM_ID_ARCHERY_TICKET,
-                "Mermaid's tear", ITEM_ID_MERMAIDS_TEAR);
+        Set<String> targetNames = Set.of(
+                "mark of grace",
+                "golden nugget",
+                "abyssal pearl",
+                "tokkul",
+                "stardust",
+                "archery ticket",
+                "mermaid's tear",
+                "hallowed mark",
+                "molch pearl",
+                "castle wars ticket",
+                "agility arena ticket",
+                "warrior guild token",
+                "zeal token",
+                "blessed bone shard",
+                "sunfire splinter",
+                "trading stick",
+                "piece of eight",
+                "spirit flakes");
 
         JsonObject itemCurrencies = new JsonObject();
-        Map<Integer, Long> counts = new HashMap<>();
+        Map<String, Long> nameCounts = new LinkedHashMap<>();
+
+        List<ItemContainer> containers = new ArrayList<>();
         ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
         if (inv != null) {
-            for (Item item : inv.getItems()) {
-                if (item != null && item.getId() > 0) {
-                    counts.put(item.getId(), counts.getOrDefault(item.getId(), 0L) + item.getQuantity());
-                }
-            }
+            containers.add(inv);
         }
         ItemContainer bank = client.getItemContainer(InventoryID.BANK);
         if (bank != null) {
-            for (Item item : bank.getItems()) {
-                if (item != null && item.getId() > 0) {
-                    counts.put(item.getId(), counts.getOrDefault(item.getId(), 0L) + item.getQuantity());
+            containers.add(bank);
+        }
+
+        for (ItemContainer container : containers) {
+            for (Item item : container.getItems()) {
+                if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                    continue;
+                }
+                ItemComposition rawComp = (itemManager != null) ? itemManager.getItemComposition(item.getId()) : null;
+                if (rawComp != null && rawComp.getPlaceholderTemplateId() != -1) {
+                    continue;
+                }
+                int canonicalId = (itemManager != null) ? itemManager.canonicalize(item.getId()) : item.getId();
+                ItemComposition comp = (itemManager != null) ? itemManager.getItemComposition(canonicalId) : rawComp;
+                String name = (comp != null && comp.getName() != null) ? comp.getName().trim() : "";
+                if (name.isEmpty()) {
+                    continue;
+                }
+
+                String lowerName = name.toLowerCase();
+                for (String target : targetNames) {
+                    if (lowerName.contains(target)) {
+                        nameCounts.put(name, nameCounts.getOrDefault(name, 0L) + item.getQuantity());
+                        break;
+                    }
                 }
             }
         }
 
-        for (Map.Entry<String, Integer> entry : targetItemNames.entrySet()) {
-            String name = entry.getKey();
-            int targetId = entry.getValue();
-            long total = counts.getOrDefault(targetId, 0L);
-            if (total > 0) {
-                itemCurrencies.addProperty(name, total);
+        for (Map.Entry<String, Long> entry : nameCounts.entrySet()) {
+            if (entry.getValue() > 0) {
+                itemCurrencies.addProperty(entry.getKey(), entry.getValue());
             }
         }
         points.add("currencyItems", itemCurrencies);
@@ -2414,25 +2540,34 @@ public class AiService {
         return InstanceTemplates.findMatch(chunks[plane][chunkX][chunkY]);
     }
 
-    private String getDiaryStatus(int varbitId) {
-        int val = client.getVarbitValue(varbitId);
-        switch (val) {
-            case 0:
+    private String getDiaryStatus(int varbitId, int maxTasks) {
+        if (client == null) {
+            return "Not Started";
+        }
+        try {
+            int val = client.getVarbitValue(varbitId);
+            if (val <= 0) {
                 return "Not Started";
-            case 1:
-            case 2:
+            }
+            if (val >= maxTasks) {
                 return "Completed";
-            default:
-                return val > 0 ? "Completed" : "Not Started";
+            }
+            return "In Progress (" + val + "/" + maxTasks + " tasks)";
+        } catch (Exception ignored) {
+            return "Not Started";
         }
     }
 
-    private JsonObject createDiaryProgress(int easy, int med, int hard, int elite) {
+    private JsonObject createDiaryProgress(
+            int easyVarbit, int easyMax,
+            int medVarbit, int medMax,
+            int hardVarbit, int hardMax,
+            int eliteVarbit, int eliteMax) {
         JsonObject obj = new JsonObject();
-        obj.addProperty("Easy", getDiaryStatus(easy));
-        obj.addProperty("Medium", getDiaryStatus(med));
-        obj.addProperty("Hard", getDiaryStatus(hard));
-        obj.addProperty("Elite", getDiaryStatus(elite));
+        obj.addProperty("Easy", getDiaryStatus(easyVarbit, easyMax));
+        obj.addProperty("Medium", getDiaryStatus(medVarbit, medMax));
+        obj.addProperty("Hard", getDiaryStatus(hardVarbit, hardMax));
+        obj.addProperty("Elite", getDiaryStatus(eliteVarbit, eliteMax));
         return obj;
     }
 

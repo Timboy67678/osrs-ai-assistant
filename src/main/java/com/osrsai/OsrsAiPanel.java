@@ -846,6 +846,8 @@ public class OsrsAiPanel extends PluginPanel {
                     .append("</div>");
         }
 
+        inputField.grabFocus();
+
         updateChatHtml();
     }
 
@@ -892,6 +894,7 @@ public class OsrsAiPanel extends PluginPanel {
 
         selectSession(newSession);
         saveSessions();
+        inputField.grabFocus();
     }
 
     private void promoteToActive(ChatSession session) {
