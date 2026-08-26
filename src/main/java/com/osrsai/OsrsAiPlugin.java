@@ -139,6 +139,18 @@ public class OsrsAiPlugin extends Plugin {
     }
 
     /**
+     * Listens for item container updates to maintain offline bank caching.
+     *
+     * @param event the {@link net.runelite.api.events.ItemContainerChanged} event
+     */
+    @Subscribe
+    public void onItemContainerChanged(net.runelite.api.events.ItemContainerChanged event) {
+        if (event.getContainerId() == net.runelite.api.InventoryID.BANK.getId()) {
+            aiService.updateCachedBank(event.getItemContainer());
+        }
+    }
+
+    /**
      * Provides the configuration instance bound to the RuneLite Dependency
      * Injection system.
      *

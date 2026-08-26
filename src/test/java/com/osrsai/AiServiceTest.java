@@ -5,6 +5,8 @@ import java.lang.reflect.Field;
 import okhttp3.OkHttpClient;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
+import java.util.*;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -50,13 +52,265 @@ public class AiServiceTest {
     private OsrsAiConfig config;
 
     @Test
+    public void testFarmingTrackerDirectPrediction() {
+        try {
+            Mockito.when(client.getWorldType()).thenReturn(EnumSet.noneOf(net.runelite.api.WorldType.class));
+            Class<?> ftClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingTracker");
+            Class<?> fwClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingWorld");
+            java.lang.reflect.Constructor<?> fwCtor = fwClass.getDeclaredConstructor();
+            fwCtor.setAccessible(true);
+            Object fw = fwCtor.newInstance();
+
+            java.lang.reflect.Constructor<?>[] ctors = ftClass.getDeclaredConstructors();
+            java.lang.reflect.Constructor<?> ftCtor = ctors[0];
+            ftCtor.setAccessible(true);
+            Class<?>[] paramTypes = ftCtor.getParameterTypes();
+            Object[] args = new Object[paramTypes.length];
+            for (int i = 0; i < paramTypes.length; i++) {
+                if (paramTypes[i].equals(net.runelite.api.Client.class))
+                    args[i] = client;
+                else if (paramTypes[i].equals(ConfigManager.class))
+                    args[i] = configManager;
+                else if (paramTypes[i].equals(fwClass))
+                    args[i] = fw;
+                else
+                    args[i] = null;
+            }
+            Object ft = ftCtor.newInstance(args);
+
+            Method predictMethod = ftClass.getDeclaredMethod("predictPatch",
+                    Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingPatch"), String.class);
+            predictMethod.setAccessible(true);
+
+            Field regionsField = fwClass.getDeclaredField("regions");
+            regionsField.setAccessible(true);
+            com.google.common.collect.Multimap<?, ?> regions = (com.google.common.collect.Multimap<?, ?>) regionsField
+                    .get(fw);
+            Class<?> regionClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingRegion");
+            Method getPatches = regionClass.getDeclaredMethod("getPatches");
+            getPatches.setAccessible(true);
+            Class<?> patchClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingPatch");
+            Method configKeyMethod = patchClass.getDeclaredMethod("configKey");
+            configKeyMethod.setAccessible(true);
+
+            // Test a Mahogany tree planted 3 days ago: nowSec - 259200
+            long nowSec = java.time.Instant.now().getEpochSecond();
+            long plantedTime = nowSec - 259200; // 3 days ago
+
+            for (Object region : regions.values()) {
+                Object[] patches = (Object[]) getPatches.invoke(region);
+                for (Object patch : patches) {
+                    String key = (String) configKeyMethod.invoke(patch);
+                    if ("14651.4771".equals(key)) { // Fossil island hardwood
+                        // Mahogany planted varbit = 25 (or whatever mahogany stage 0 is), planted 3
+                        // days ago
+                        Mockito.when(configManager.getConfiguration("timetracking", "default", key))
+                                .thenReturn("25:" + plantedTime);
+                        Object prediction = predictMethod.invoke(ft, patch, "default");
+                        System.out.println("Mahogany 3 days ago prediction: " + prediction);
+                    }
+                    if ("5021.7908".equals(key)) { // Hespori
+                        Mockito.when(configManager.getConfiguration("timetracking", "default", key))
+                                .thenReturn("1:" + plantedTime);
+                        Object prediction = predictMethod.invoke(ft, patch, "default");
+                        System.out.println("Hespori 3 days ago prediction: " + prediction);
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
+            Assert.fail(t.getMessage());
+        }
+    }
+
+    @Test
+    public void testInspectHesporiImplementation() {
+        try {
+            Class<?> piClass = Class.forName("net.runelite.client.plugins.timetracking.farming.PatchImplementation");
+            Method forVarbit = piClass.getDeclaredMethod("forVarbitValue", int.class);
+            forVarbit.setAccessible(true);
+            Object hesporiImp = null;
+            for (Object constant : piClass.getEnumConstants()) {
+                if ("HESPORI".equals(((Enum<?>) constant).name())) {
+                    hesporiImp = constant;
+                    break;
+                }
+            }
+            Assert.assertNotNull(hesporiImp);
+            System.out.println("=== HESPORI VARBITS ===");
+            for (int v = 0; v <= 10; v++) {
+                Object state = forVarbit.invoke(hesporiImp, v);
+                System.out.println("v=" + v + " -> " + state);
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testFarmingPatchesExactCategorizationAndFiltering() {
+        // Set up mock config for patches
+        // 1. Catherby Herb patch: Ranarr harvestable (varbit value 11)
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "11062.4774")).thenReturn("11:1700000000");
+
+        // Let's find real varbits for Mahogany and Palm
+        Class<?> piClass;
+        int mahogReadyVarbit = 0;
+        int palmReadyVarbit = 0;
+        try {
+            piClass = Class.forName("net.runelite.client.plugins.timetracking.farming.PatchImplementation");
+            for (Object piObj : piClass.getEnumConstants()) {
+                Enum<?> pi = (Enum<?>) piObj;
+                Method forVarbitValue = pi.getClass().getDeclaredMethod("forVarbitValue", int.class);
+                forVarbitValue.setAccessible(true);
+                if (pi.name().equals("HARDWOOD_TREE")) {
+                    for (int v = 1; v <= 100; v++) {
+                        Object ps = forVarbitValue.invoke(pi, v);
+                        if (ps != null && ps.toString().contains("MAHOGANY") && ps.toString().contains("HARVESTABLE")) {
+                            mahogReadyVarbit = v;
+                            break;
+                        }
+                    }
+                } else if (pi.name().equals("FRUIT_TREE")) {
+                    for (int v = 1; v <= 300; v++) {
+                        Object ps = forVarbitValue.invoke(pi, v);
+                        if (ps != null && ps.toString().contains("HARVESTABLE")) {
+                            palmReadyVarbit = v;
+                            System.out.println("FOUND FRUIT TREE HARVESTABLE: v=" + v + " -> " + ps);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        // 2. Fossil Island Hardwood trees: 3 planted & ready
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "14651.4771"))
+                .thenReturn(mahogReadyVarbit + ":1700000000");
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "14651.4772"))
+                .thenReturn(mahogReadyVarbit + ":1700000000");
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "14651.4773"))
+                .thenReturn(mahogReadyVarbit + ":1700000000");
+
+        // 3. Brimhaven Fruit Tree: Palm tree
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "11058.4771"))
+                .thenReturn(palmReadyVarbit + ":1700000000");
+
+        // 4. Special patches NOT planted (0 or weeds or empty)
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "4922.7907")).thenReturn("0:1700000000"); // Redwood
+                                                                                                                       // empty
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "11056.4771")).thenReturn("0"); // Calquat
+                                                                                                             // empty
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "4922.7910")).thenReturn("0:1700000000"); // Celastrus
+                                                                                                                       // empty
+
+        String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        JsonObject farming = root.getAsJsonObject("farmingPatchesAndCrops");
+
+        Assert.assertNotNull(farming);
+        System.out.println("DEBUG FARMING JSON: " + farming);
+        JsonArray readyHerbs = farming.getAsJsonArray("readyHerbPatches");
+        Assert.assertEquals(1, readyHerbs.size());
+        Assert.assertTrue(readyHerbs.get(0).getAsString().contains("Catherby"));
+        Assert.assertTrue(readyHerbs.get(0).getAsString().contains("Marrentill"));
+
+        JsonArray readyHardwoods = farming.getAsJsonArray("readyHardwoodTrees");
+        Assert.assertEquals(3, readyHardwoods.size());
+        Assert.assertTrue(readyHardwoods.get(0).getAsString().contains("Fossil Island"));
+
+        // Make sure hardwood trees did NOT leak into normal trees!
+        Assert.assertNull(farming.get("readyTreePatches"));
+
+        JsonArray readyFruitTrees = farming.getAsJsonArray("readyFruitTreePatches");
+        Assert.assertEquals(1, readyFruitTrees.size());
+        Assert.assertTrue(readyFruitTrees.get(0).getAsString().contains("Brimhaven"));
+
+        // Special patches should NOT have Redwood, Calquat, or Celastrus
+        if (farming.has("specialPatches")) {
+            JsonArray special = farming.getAsJsonArray("specialPatches");
+            for (int i = 0; i < special.size(); i++) {
+                JsonObject s = special.get(i).getAsJsonObject();
+                String type = s.get("type").getAsString();
+                Assert.assertNotEquals("Redwood", type);
+                Assert.assertNotEquals("Calquat", type);
+                Assert.assertNotEquals("Celastrus", type);
+            }
+        }
+    }
+
+    @Test
+    public void testKingdomLiveVarps() {
+        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_FAVOUR)).thenReturn(127);
+        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_COFFER)).thenReturn(1250000);
+
+        String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        JsonObject kingdom = root.getAsJsonObject("kingdomOfMiscellania");
+
+        Assert.assertNotNull(kingdom);
+        Assert.assertEquals(100, kingdom.get("favourPercent").getAsInt());
+        Assert.assertEquals(1250000, kingdom.get("cofferGp").getAsInt());
+        Assert.assertTrue(kingdom.get("source").getAsString().contains("live"));
+    }
+
+    @Test
+    public void testKingdomCachedAndEstimated() {
+        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_FAVOUR)).thenReturn(0);
+        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_COFFER)).thenReturn(0);
+
+        Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "approval")).thenReturn("127");
+        Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "coffer")).thenReturn("1250000");
+        Mockito.when(
+                configManager.getRSProfileConfiguration("kingdomofmiscellania", "lastChanged", java.time.Instant.class))
+                .thenReturn(java.time.Instant.now());
+
+        String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        JsonObject kingdom = root.getAsJsonObject("kingdomOfMiscellania");
+
+        Assert.assertNotNull(kingdom);
+        Assert.assertEquals(100, kingdom.get("favourPercent").getAsInt());
+        Assert.assertEquals(1250000, kingdom.get("cofferGp").getAsInt());
+        Assert.assertEquals(0, kingdom.get("daysSinceLastVisit").getAsInt());
+        Assert.assertTrue(kingdom.get("source").getAsString().contains("cached & estimated"));
+    }
+
+    @Test
+    public void testKingdomMultiDayDecay() {
+        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_FAVOUR)).thenReturn(0);
+        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_COFFER)).thenReturn(0);
+
+        // 3 days ago, 127 approval, 1.25M coffer
+        java.time.Instant threeDaysAgo = java.time.Instant.now().minus(java.time.Duration.ofDays(3));
+        Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "approval")).thenReturn("127");
+        Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "coffer")).thenReturn("1250000");
+        Mockito.when(
+                configManager.getRSProfileConfiguration("kingdomofmiscellania", "lastChanged", java.time.Instant.class))
+                .thenReturn(threeDaysAgo);
+
+        String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        JsonObject kingdom = root.getAsJsonObject("kingdomOfMiscellania");
+
+        Assert.assertNotNull(kingdom);
+        Assert.assertTrue(kingdom.get("daysSinceLastVisit").getAsInt() >= 3);
+        // Coffer was 1,250,000. With 3 days withdrawal (at least 50k/day = 150k or
+        // 75k/day = 225k):
+        Assert.assertTrue(kingdom.get("cofferGp").getAsInt() < 1250000);
+        Assert.assertTrue(kingdom.get("favourPercent").getAsInt() <= 100);
+    }
+
+    @Test
     public void testGetPlayerQuestsToolIncludesStage() {
         JsonObject args = new JsonObject();
         args.addProperty("status", "IN_PROGRESS");
 
         Mockito.when(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP)).thenReturn(10);
         net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
-        Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId())).thenReturn(mockStruct);
+        Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId()))
+                .thenReturn(mockStruct);
         Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
         Mockito.when(client.getVarbitValue(101)).thenReturn(10);
 
@@ -90,7 +344,8 @@ public class AiServiceTest {
 
         Mockito.when(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP)).thenReturn(10);
         net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
-        Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId())).thenReturn(mockStruct);
+        Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId()))
+                .thenReturn(mockStruct);
         Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
         Mockito.when(client.getVarbitValue(101)).thenReturn(10);
 
@@ -122,7 +377,8 @@ public class AiServiceTest {
         }
         Assert.assertTrue(foundCooks);
 
-        // The notStartedQuests (which otherwise has all other quests) should NOT contain other quests
+        // The notStartedQuests (which otherwise has all other quests) should NOT
+        // contain other quests
         if (rootObj.has("notStartedQuests")) {
             com.google.gson.JsonArray notStarted = rootObj.getAsJsonArray("notStartedQuests");
             for (int i = 0; i < notStarted.size(); i++) {
@@ -180,13 +436,16 @@ public class AiServiceTest {
 
     @Test
     public void testIsQueryRelatedToSlayerTask() throws Exception {
-        Method isQueryRelatedToSlayerTask = AiService.class.getDeclaredMethod("isQueryRelatedToSlayerTask", String.class, String.class);
+        Method isQueryRelatedToSlayerTask = AiService.class.getDeclaredMethod("isQueryRelatedToSlayerTask",
+                String.class, String.class);
         isQueryRelatedToSlayerTask.setAccessible(true);
 
         Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "banshees", "Banshees"));
         Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "banshee", "Banshees"));
-        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "aberrant spectres", "Aberrant spectres"));
-        Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "aberrant spectre", "Aberrant spectres"));
+        Assert.assertTrue(
+                (Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "aberrant spectres", "Aberrant spectres"));
+        Assert.assertTrue(
+                (Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "aberrant spectre", "Aberrant spectres"));
         Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "abyssal demons", "abyssal demon"));
         Assert.assertTrue((Boolean) isQueryRelatedToSlayerTask.invoke(aiService, "demons", "Abyssal demons"));
 
@@ -273,8 +532,8 @@ public class AiServiceTest {
         ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
         Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
                 new Item(995, 1000), // Coins -> "Item 995"
-                new Item(556, 50),   // Air rune -> "Item 556"
-                new Item(560, 20)    // Death rune -> "Item 560"
+                new Item(556, 50), // Air rune -> "Item 556"
+                new Item(560, 20) // Death rune -> "Item 560"
         });
 
         // Get private method aggregateItemsWithPrices
@@ -341,7 +600,7 @@ public class AiServiceTest {
         ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
         Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
                 new Item(995, 1000), // Coins (normal)
-                new Item(4152, 1)    // Abyssal whip (placeholder)
+                new Item(4152, 1) // Abyssal whip (placeholder)
         });
 
         // Invoke aggregateItemsWithPrices
@@ -374,7 +633,7 @@ public class AiServiceTest {
         ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
         Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
                 new Item(995, 1000000), // 1 million coins
-                new Item(10551, 1)      // 1 Fighter torso (0 HA)
+                new Item(10551, 1) // 1 Fighter torso (0 HA)
         });
 
         Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
@@ -458,14 +717,14 @@ public class AiServiceTest {
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
         String jsonResult = def.executor.execute(aiService, new com.google.gson.JsonObject());
         System.out.println("Result of get_player_clues: " + jsonResult);
-        
+
         Assert.assertNotNull(jsonResult);
         com.google.gson.JsonObject rootObj = new Gson().fromJson(jsonResult, com.google.gson.JsonObject.class);
-        
+
         Assert.assertTrue(rootObj.has("inventoryClues"));
         Assert.assertTrue(rootObj.has("bankClues"));
         Assert.assertTrue(rootObj.has("activeClue"));
-        
+
         com.google.gson.JsonArray invArray = rootObj.getAsJsonArray("inventoryClues");
         Assert.assertEquals(1, invArray.size());
         Assert.assertEquals("Clue scroll (easy)", invArray.get(0).getAsJsonObject().get("name").getAsString());
@@ -539,7 +798,8 @@ public class AiServiceTest {
         String jsonResultFiltered = def.executor.execute(aiService, argsWithFilter);
         System.out.println("Result of get_player_skills (filtered): " + jsonResultFiltered);
         Assert.assertNotNull(jsonResultFiltered);
-        com.google.gson.JsonObject rootObjFiltered = new Gson().fromJson(jsonResultFiltered, com.google.gson.JsonObject.class);
+        com.google.gson.JsonObject rootObjFiltered = new Gson().fromJson(jsonResultFiltered,
+                com.google.gson.JsonObject.class);
         Assert.assertTrue(rootObjFiltered.has("Attack"));
         Assert.assertFalse(rootObjFiltered.has("Strength"));
 
@@ -549,7 +809,8 @@ public class AiServiceTest {
         String jsonResultAbbrev = def.executor.execute(aiService, argsWithAbbrev);
         System.out.println("Result of get_player_skills (abbrev filter): " + jsonResultAbbrev);
         Assert.assertNotNull(jsonResultAbbrev);
-        com.google.gson.JsonObject rootObjAbbrev = new Gson().fromJson(jsonResultAbbrev, com.google.gson.JsonObject.class);
+        com.google.gson.JsonObject rootObjAbbrev = new Gson().fromJson(jsonResultAbbrev,
+                com.google.gson.JsonObject.class);
         Assert.assertTrue(rootObjAbbrev.has("Attack"));
         Assert.assertFalse(rootObjAbbrev.has("Strength"));
     }
@@ -580,7 +841,8 @@ public class AiServiceTest {
         String jsonResultMatch = def.executor.execute(aiService, argsMatch);
         System.out.println("Result of get_player_bank (match): " + jsonResultMatch);
 
-        com.google.gson.JsonObject rootObjMatch = new Gson().fromJson(jsonResultMatch, com.google.gson.JsonObject.class);
+        com.google.gson.JsonObject rootObjMatch = new Gson().fromJson(jsonResultMatch,
+                com.google.gson.JsonObject.class);
         Assert.assertEquals("success", rootObjMatch.get("status").getAsString());
         Assert.assertTrue(rootObjMatch.get("bankOpen").getAsBoolean());
         Assert.assertEquals("gold", rootObjMatch.get("filterApplied").getAsString());
@@ -592,7 +854,8 @@ public class AiServiceTest {
         String jsonResultNoMatch = def.executor.execute(aiService, argsNoMatch);
         System.out.println("Result of get_player_bank (no match): " + jsonResultNoMatch);
 
-        com.google.gson.JsonObject rootObjNoMatch = new Gson().fromJson(jsonResultNoMatch, com.google.gson.JsonObject.class);
+        com.google.gson.JsonObject rootObjNoMatch = new Gson().fromJson(jsonResultNoMatch,
+                com.google.gson.JsonObject.class);
         Assert.assertEquals("success", rootObjNoMatch.get("status").getAsString());
         Assert.assertTrue(rootObjNoMatch.get("bankOpen").getAsBoolean());
         Assert.assertEquals("crafting", rootObjNoMatch.get("filterApplied").getAsString());
@@ -603,8 +866,10 @@ public class AiServiceTest {
     public void testGetPlayerCombatAchievementsTool() throws Exception {
         // Mock Varbits for Combat Achievements Tiers
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_EASY)).thenReturn(2); // Completed
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MEDIUM)).thenReturn(1); // In Progress
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_HARD)).thenReturn(0); // Not Started
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MEDIUM)).thenReturn(1); // In
+                                                                                                                    // Progress
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_HARD)).thenReturn(0); // Not
+                                                                                                                  // Started
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_ELITE)).thenReturn(0);
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MASTER)).thenReturn(0);
         Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_GRANDMASTER)).thenReturn(0);
@@ -658,12 +923,14 @@ public class AiServiceTest {
         Assert.assertTrue(rootNoFilters.has("killCounts"));
         Assert.assertFalse(rootNoFilters.has("tasks"));
 
-        // 2. Run with filters (tier=Easy, taskName=Noxious) -> individual tasks should be returned
+        // 2. Run with filters (tier=Easy, taskName=Noxious) -> individual tasks should
+        // be returned
         com.google.gson.JsonObject argsWithFilters = new com.google.gson.JsonObject();
         argsWithFilters.addProperty("tier", "Easy");
         argsWithFilters.addProperty("taskName", "Noxious");
         String jsonWithFilters = def.executor.execute(aiService, argsWithFilters);
-        com.google.gson.JsonObject rootWithFilters = new Gson().fromJson(jsonWithFilters, com.google.gson.JsonObject.class);
+        com.google.gson.JsonObject rootWithFilters = new Gson().fromJson(jsonWithFilters,
+                com.google.gson.JsonObject.class);
 
         Assert.assertTrue(rootWithFilters.has("tiers"));
         Assert.assertTrue(rootWithFilters.has("killCounts"));
@@ -791,17 +1058,20 @@ public class AiServiceTest {
 
     @Test
     public void testGetPlayerStatusFiltersDormantInfoBoxes() {
-        net.runelite.client.ui.overlay.infobox.InfoBox activeBox = Mockito.mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
+        net.runelite.client.ui.overlay.infobox.InfoBox activeBox = Mockito
+                .mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
         Mockito.when(activeBox.getName()).thenReturn("Boost Attack");
         Mockito.when(activeBox.getText()).thenReturn("+12");
         Mockito.when(activeBox.getTooltip()).thenReturn("Attack boost");
 
-        net.runelite.client.ui.overlay.infobox.InfoBox dormantBox = Mockito.mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
+        net.runelite.client.ui.overlay.infobox.InfoBox dormantBox = Mockito
+                .mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
         Mockito.when(dormantBox.getName()).thenReturn("Potion Agility");
         Mockito.when(dormantBox.getText()).thenReturn("0");
         Mockito.when(dormantBox.getTooltip()).thenReturn("Agility potion: 0");
 
-        net.runelite.client.ui.overlay.infobox.InfoBox emptyBox = Mockito.mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
+        net.runelite.client.ui.overlay.infobox.InfoBox emptyBox = Mockito
+                .mock(net.runelite.client.ui.overlay.infobox.InfoBox.class);
         Mockito.when(emptyBox.getName()).thenReturn("Empty Box");
         Mockito.when(emptyBox.getText()).thenReturn("");
 
@@ -937,8 +1207,8 @@ public class AiServiceTest {
         JsonObject root = new Gson().fromJson(json, JsonObject.class);
         Assert.assertEquals("success", root.get("status").getAsString());
 
-        org.mockito.ArgumentCaptor<net.runelite.client.events.PluginMessage> messageCaptor =
-                org.mockito.ArgumentCaptor.forClass(net.runelite.client.events.PluginMessage.class);
+        org.mockito.ArgumentCaptor<net.runelite.client.events.PluginMessage> messageCaptor = org.mockito.ArgumentCaptor
+                .forClass(net.runelite.client.events.PluginMessage.class);
         Mockito.verify(eventBus, Mockito.atLeastOnce()).post(messageCaptor.capture());
 
         net.runelite.client.events.PluginMessage postedMsg = messageCaptor.getValue();
@@ -950,5 +1220,125 @@ public class AiServiceTest {
         Assert.assertEquals(1435, target.getX());
         Assert.assertEquals(3677, target.getY()); // Normalized from 10077 down to 3677 (10077 - 6400)
     }
-}
 
+    @Test
+    public void testExecuteSetShortestPathTargetWithPoiName() {
+        Mockito.when(config.useShortestPath()).thenReturn(true);
+
+        JsonObject args = new JsonObject();
+        args.addProperty("poiName", "Farming Guild");
+
+        String json = aiService.executeSetShortestPathTarget(args);
+        Assert.assertNotNull(json);
+
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("success", root.get("status").getAsString());
+        Assert.assertTrue(root.get("message").getAsString().contains("1248"));
+    }
+
+    @Test
+    public void testOfflineBankCachingReturnsCachedItemsWhenBankClosed() {
+        // When bank container is null and no cache, returns error
+        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(null);
+        String jsonError = aiService.executeGetPlayerBank(new JsonObject());
+        JsonObject rootError = new Gson().fromJson(jsonError, JsonObject.class);
+        Assert.assertEquals("error", rootError.get("status").getAsString());
+
+        // Now simulate bank opening with items
+        Item realItem = new Item(2434, 50); // Prayer potion(4)
+        ItemContainer bankContainer = Mockito.mock(ItemContainer.class);
+        Mockito.when(bankContainer.getItems()).thenReturn(new Item[] { realItem });
+
+        ItemComposition comp = Mockito.mock(ItemComposition.class);
+        Mockito.when(comp.getName()).thenReturn("Prayer potion(4)");
+        Mockito.when(comp.getPlaceholderTemplateId()).thenReturn(-1);
+        Mockito.when(itemManager.getItemComposition(2434)).thenReturn(comp);
+        Mockito.when(itemManager.getItemPrice(2434)).thenReturn(10000);
+
+        aiService.updateCachedBank(bankContainer);
+
+        // Bank is closed now
+        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(null);
+        String jsonCached = aiService.executeGetPlayerBank(new JsonObject());
+        JsonObject rootCached = new Gson().fromJson(jsonCached, JsonObject.class);
+        Assert.assertEquals("success", rootCached.get("status").getAsString());
+        Assert.assertFalse(rootCached.get("bankOpen").getAsBoolean());
+        Assert.assertTrue(rootCached.get("cached").getAsBoolean());
+        Assert.assertEquals(1, rootCached.get("cachedItemCount").getAsInt());
+        Assert.assertTrue(rootCached.has("items"));
+    }
+
+    @Test
+    public void testExecuteGetMarketPrices() {
+        ItemComposition comp = Mockito.mock(ItemComposition.class);
+        Mockito.when(comp.getName()).thenReturn("Rune 2h sword");
+        Mockito.when(comp.getHaPrice()).thenReturn(38400);
+        Mockito.when(itemManager.getItemComposition(1319)).thenReturn(comp);
+        Mockito.when(itemManager.getItemPrice(1319)).thenReturn(37000);
+        Mockito.when(itemManager.getItemPrice(561)).thenReturn(100); // Nature rune
+
+        JsonObject args = new JsonObject();
+        com.google.gson.JsonArray ids = new com.google.gson.JsonArray();
+        ids.add(1319);
+        args.add("itemIds", ids);
+
+        String json = aiService.executeGetMarketPrices(args);
+        Assert.assertNotNull(json);
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertTrue(root.has("items"));
+        JsonObject rune2h = root.getAsJsonObject("items").getAsJsonObject("Rune 2h sword");
+        Assert.assertNotNull(rune2h);
+        Assert.assertEquals(38400, rune2h.get("highAlchValue").getAsInt());
+        Assert.assertEquals(37000, rune2h.get("gePrice").getAsInt());
+        Assert.assertEquals(1300, rune2h.get("highAlchProfitPerItem").getAsInt()); // 38400 - (37000 + 100) = 1300
+        Assert.assertTrue(rune2h.get("isAlchProfitable").getAsBoolean());
+    }
+
+    @Test
+    public void testExecuteGetPlayerGeOffers() {
+        net.runelite.api.GrandExchangeOffer mockOffer = Mockito.mock(net.runelite.api.GrandExchangeOffer.class);
+        Mockito.when(mockOffer.getState()).thenReturn(net.runelite.api.GrandExchangeOfferState.BUYING);
+        Mockito.when(mockOffer.getItemId()).thenReturn(2434);
+        Mockito.when(mockOffer.getPrice()).thenReturn(10500);
+        Mockito.when(mockOffer.getTotalQuantity()).thenReturn(100);
+        Mockito.when(mockOffer.getQuantitySold()).thenReturn(50);
+        Mockito.when(mockOffer.getSpent()).thenReturn(525000);
+
+        net.runelite.api.GrandExchangeOffer[] offers = new net.runelite.api.GrandExchangeOffer[] { mockOffer };
+        Mockito.when(client.getGrandExchangeOffers()).thenReturn(offers);
+
+        ItemComposition comp = Mockito.mock(ItemComposition.class);
+        Mockito.when(comp.getName()).thenReturn("Prayer potion(4)");
+        Mockito.when(itemManager.getItemComposition(2434)).thenReturn(comp);
+
+        String json = aiService.executeGetPlayerGeOffers(new JsonObject());
+        Assert.assertNotNull(json);
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("success", root.get("status").getAsString());
+        Assert.assertEquals(1, root.get("activeOrCompletedOffersCount").getAsInt());
+        com.google.gson.JsonArray list = root.getAsJsonArray("offers");
+        Assert.assertEquals(1, list.size());
+        JsonObject offerObj = list.get(0).getAsJsonObject();
+        Assert.assertEquals("BUYING", offerObj.get("state").getAsString());
+        Assert.assertEquals("Prayer potion(4)", offerObj.get("itemName").getAsString());
+        Assert.assertEquals(50, offerObj.get("progressPercent").getAsInt());
+    }
+
+    @Test
+    public void testExecuteGetPlayerFarmingAndTimers() {
+        Mockito.when(client.getVarbitValue(6521)).thenReturn(1); // Meadow North
+        Mockito.when(client.getVarbitValue(7908)).thenReturn(7); // Hespori fully grown
+        Mockito.when(client.getVarpValue(452)).thenReturn(0); // TOG ready
+        Mockito.when(client.getVarpValue(73)).thenReturn(127); // 100% Kingdom favour
+        Mockito.when(client.getVarpValue(74)).thenReturn(5000000); // Kingdom coffer
+
+        String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
+        Assert.assertNotNull(json);
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("success", root.get("status").getAsString());
+        Assert.assertTrue(root.getAsJsonObject("tearsOfGuthix").get("ready").getAsBoolean());
+        Assert.assertEquals(100, root.getAsJsonObject("kingdomOfMiscellania").get("favourPercent").getAsInt());
+        Assert.assertEquals("Fully Grown / Ready to fight",
+                root.getAsJsonObject("hespori").get("status").getAsString());
+    }
+}

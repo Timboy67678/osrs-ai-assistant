@@ -424,6 +424,117 @@ final class LocationResolver {
         return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
     }
 
+    /** Well-known POI landmarks with surface coordinates. */
+    private static final Map<String, WorldPoint> POI_COORDINATES = new HashMap<>();
+
+    static {
+        // Cities & Banks
+        POI_COORDINATES.put("grand exchange", new WorldPoint(3164, 3487, 0));
+        POI_COORDINATES.put("varrock west bank", new WorldPoint(3183, 3441, 0));
+        POI_COORDINATES.put("varrock east bank", new WorldPoint(3253, 3420, 0));
+        POI_COORDINATES.put("edgeville bank", new WorldPoint(3096, 3494, 0));
+        POI_COORDINATES.put("lumbridge", new WorldPoint(3222, 3218, 0));
+        POI_COORDINATES.put("falador east bank", new WorldPoint(3012, 3355, 0));
+        POI_COORDINATES.put("falador west bank", new WorldPoint(2946, 3368, 0));
+        POI_COORDINATES.put("seers village bank", new WorldPoint(2725, 3492, 0));
+        POI_COORDINATES.put("catherby bank", new WorldPoint(2808, 3440, 0));
+        POI_COORDINATES.put("ardougne south bank", new WorldPoint(2658, 3283, 0));
+        POI_COORDINATES.put("ardougne north bank", new WorldPoint(2615, 3332, 0));
+        POI_COORDINATES.put("draynor bank", new WorldPoint(3092, 3244, 0));
+        POI_COORDINATES.put("al kharid bank", new WorldPoint(3270, 3166, 0));
+        POI_COORDINATES.put("hosidius bank", new WorldPoint(1676, 3617, 0));
+        POI_COORDINATES.put("shayzien bank", new WorldPoint(1488, 3592, 0));
+
+        // Guilds
+        POI_COORDINATES.put("farming guild", new WorldPoint(1248, 3726, 0));
+        POI_COORDINATES.put("woodcutting guild", new WorldPoint(1658, 3505, 0));
+        POI_COORDINATES.put("mining guild", new WorldPoint(3019, 3339, 0));
+        POI_COORDINATES.put("fishing guild", new WorldPoint(2611, 3393, 0));
+        POI_COORDINATES.put("crafting guild", new WorldPoint(2933, 3290, 0));
+        POI_COORDINATES.put("cooks guild", new WorldPoint(3143, 3442, 0));
+        POI_COORDINATES.put("hunter guild", new WorldPoint(1557, 3048, 0));
+        POI_COORDINATES.put("myths guild", new WorldPoint(2457, 2850, 0));
+        POI_COORDINATES.put("champions guild", new WorldPoint(3191, 3363, 0));
+        POI_COORDINATES.put("heroes guild", new WorldPoint(2902, 3510, 0));
+        POI_COORDINATES.put("legends guild", new WorldPoint(2728, 3377, 0));
+        POI_COORDINATES.put("wizards guild", new WorldPoint(2590, 3087, 0));
+        POI_COORDINATES.put("warriors guild", new WorldPoint(2843, 3543, 0));
+
+        // Minigames & Activities
+        POI_COORDINATES.put("wintertodt", new WorldPoint(1630, 3965, 0));
+        POI_COORDINATES.put("barrows", new WorldPoint(3565, 3298, 0));
+        POI_COORDINATES.put("ferox enclave", new WorldPoint(3135, 3628, 0));
+        POI_COORDINATES.put("blast furnace", new WorldPoint(2716, 3713, 0)); // Keldagrim entrance
+        POI_COORDINATES.put("motherlode mine", new WorldPoint(3059, 9764, 0)); // Falador mine entrance
+        POI_COORDINATES.put("barbarian assault", new WorldPoint(2526, 3577, 0));
+        POI_COORDINATES.put("nightmare zone", new WorldPoint(2609, 3115, 0));
+        POI_COORDINATES.put("tithe farm", new WorldPoint(1798, 3596, 0));
+        POI_COORDINATES.put("giants foundry", new WorldPoint(3361, 3147, 0));
+        POI_COORDINATES.put("guardians of the rift", new WorldPoint(3109, 3169, 0)); // Wizard cellar entrance
+        POI_COORDINATES.put("pest control", new WorldPoint(2659, 2676, 0));
+        POI_COORDINATES.put("tempoross", new WorldPoint(3155, 2835, 0));
+        POI_COORDINATES.put("tears of guthix", new WorldPoint(3169, 3173, 0)); // Lumbridge swamp entrance
+        POI_COORDINATES.put("mage arena", new WorldPoint(3095, 3957, 0));
+        POI_COORDINATES.put("chaos altar", new WorldPoint(2948, 3821, 0));
+        POI_COORDINATES.put("fortis colosseum", new WorldPoint(1800, 3105, 0));
+        POI_COORDINATES.put("perilous moons", new WorldPoint(1450, 3120, 0));
+
+        // Raids & Bosses (Surface Entrances)
+        POI_COORDINATES.put("chambers of xeric", new WorldPoint(1255, 3560, 0));
+        POI_COORDINATES.put("theatre of blood", new WorldPoint(3659, 3217, 0));
+        POI_COORDINATES.put("tombs of amascut", new WorldPoint(3356, 2698, 0));
+        POI_COORDINATES.put("chasm of fire", new WorldPoint(1435, 3671, 0));
+        POI_COORDINATES.put("vorkath", new WorldPoint(2640, 3693, 0)); // Rellekka boat
+        POI_COORDINATES.put("zulrah", new WorldPoint(2200, 3056, 0)); // Zul-Andra boat
+        POI_COORDINATES.put("muspah", new WorldPoint(2848, 3964, 0)); // Weiss
+        POI_COORDINATES.put("vardorvis", new WorldPoint(1220, 3420, 0));
+        POI_COORDINATES.put("duke sucellus", new WorldPoint(1560, 3780, 0));
+        POI_COORDINATES.put("the leviathan", new WorldPoint(2070, 6380, 0));
+        POI_COORDINATES.put("the whisperer", new WorldPoint(3000, 5800, 0));
+        POI_COORDINATES.put("tormented demons", new WorldPoint(2540, 3170, 0));
+        POI_COORDINATES.put("hueycoatl", new WorldPoint(1412, 3266, 0));
+        POI_COORDINATES.put("amoxliatl", new WorldPoint(1402, 3080, 0));
+        POI_COORDINATES.put("darkmeyer", new WorldPoint(3610, 3360, 0));
+        POI_COORDINATES.put("prifddinas", new WorldPoint(2240, 3260, 0));
+    }
+
+    /**
+     * Resolves a named POI query into a {@link WorldPoint} destination.
+     *
+     * @param query POI or landmark name
+     * @return matching {@link WorldPoint} or {@code null} if not found
+     */
+    public WorldPoint findCoordinatesByPoiName(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return null;
+        }
+
+        String cleaned = query.trim().toLowerCase().replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+
+        // Exact match on POI database
+        if (POI_COORDINATES.containsKey(cleaned)) {
+            return POI_COORDINATES.get(cleaned);
+        }
+
+        // Substring / partial match on POI database
+        for (Map.Entry<String, WorldPoint> entry : POI_COORDINATES.entrySet()) {
+            if (cleaned.contains(entry.getKey()) || entry.getKey().contains(cleaned)) {
+                return entry.getValue();
+            }
+        }
+
+        // Fallback: Check KNOWN_AREAS center point
+        for (NamedArea area : KNOWN_AREAS) {
+            String areaName = area.name.toLowerCase();
+            if (cleaned.contains(areaName) || areaName.contains(cleaned)) {
+                WorldArea wa = area.worldArea;
+                return new WorldPoint(wa.getX() + wa.getWidth() / 2, wa.getY() + wa.getHeight() / 2, wa.getPlane());
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Struct representing a named OSRS area paired with its {@link WorldArea}
      * bounding box.

@@ -6,6 +6,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,6 +29,14 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.InstanceTemplates;
 import net.runelite.api.Player;
+import net.runelite.api.NPC;
+import net.runelite.api.Tile;
+import net.runelite.api.TileItem;
+import net.runelite.api.GameObject;
+import net.runelite.api.Scene;
+import net.runelite.api.GrandExchangeOffer;
+import net.runelite.api.GrandExchangeOfferState;
+import net.runelite.api.ObjectComposition;
 import net.runelite.api.Skill;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
@@ -70,8 +82,16 @@ public class AiService {
     // Constants
     private static final int MAX_TOOLTIP_LENGTH = 150;
 
-    // URI Constants
-    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions"; // Ollama
+    // Surrounding Environment Scanning Constants
+    static final int DEFAULT_SURROUNDINGS_SCAN_RADIUS = 15;
+    static final int MAX_SURROUNDINGS_SCAN_RADIUS = 30;
+    static final int MIN_SURROUNDINGS_SCAN_RADIUS = 1;
+    static final int MAX_SURROUNDINGS_NPC_COUNT = 20;
+    static final int MAX_SURROUNDINGS_PLAYER_COUNT = 15;
+    static final int MAX_SURROUNDINGS_GROUND_ITEM_COUNT = 15;
+    static final int OBJECT_SCAN_MAX_RADIUS = 10;
+
+    private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions";
 
     // Global Constants
     static final int MAX_DEPTH_COUNT = 15;
@@ -134,6 +154,35 @@ public class AiService {
     // Coordinate & Map Navigation Constants
     private static final int MAX_SURFACE_WORLD_Y_COORDINATE = 5000;
     private static final int OSRS_UNDERGROUND_Y_OFFSET_STEP = 6400;
+
+    // Fossil Island Birdhouse Varbits
+    static final int VARBIT_BIRDHOUSE_MEADOW_NORTH = 6521;
+    static final int VARBIT_BIRDHOUSE_MEADOW_SOUTH = 6522;
+    static final int VARBIT_BIRDHOUSE_VALLEY_NORTH = 6523;
+    static final int VARBIT_BIRDHOUSE_VALLEY_SOUTH = 6524;
+
+    // Farming & Boss Growth Varbits
+    static final int VARBIT_HESPORI_GROWTH = 7908;
+    static final int HESPORI_STAGE_READY = 7;
+
+    // Activity & Tracker Varps
+    static final int VARP_TEARS_OF_GUTHIX_COOLDOWN = 452;
+    static final int VARP_KINGDOM_FAVOUR = 73;
+    static final int VARP_KINGDOM_COFFER = 74;
+    static final double KINGDOM_MAX_FAVOUR_SCALE = 127.0;
+
+    // Market, Prices & Alchemy Constants
+    static final int ITEM_ID_NATURE_RUNE = 561;
+    static final int DEFAULT_NATURE_RUNE_PRICE = 90;
+    static final double LOW_ALCH_MULTIPLIER = 0.6;
+
+    // Construction POH Level Thresholds
+    static final int POH_LEVEL_PORTAL_CHAMBER = 50;
+    static final int POH_LEVEL_PORTAL_NEXUS = 72;
+    static final int POH_LEVEL_BASIC_JEWELLERY_BOX = 81;
+    static final int POH_LEVEL_FAIRY_RING = 85;
+    static final int POH_LEVEL_ORNATE_JEWELLERY_BOX = 91;
+    static final int POH_LEVEL_SPIRIT_TREE = 95;
 
     private static final Map<Integer, String> CA_TIER_MAP = Map.of(
             CA_TIER_EASY_ENUM, "Easy",
@@ -201,6 +250,23 @@ public class AiService {
     private EventBus eventBus;
 
     private final LocationResolver locationResolver = new LocationResolver();
+
+    private final List<ItemContainerUtils.SimpleItem> cachedBankItems = new ArrayList<>();
+    private long cachedBankTimestamp = 0;
+
+    /**
+     * Updates the offline bank cache whenever the bank item container updates.
+     *
+     * @param bankContainer the bank {@link ItemContainer}
+     */
+    public synchronized void updateCachedBank(ItemContainer bankContainer) {
+        if (bankContainer != null) {
+            cachedBankItems.clear();
+            cachedBankItems.addAll(ItemContainerUtils.toSimpleItemList(bankContainer.getItems()));
+            cachedBankTimestamp = System.currentTimeMillis();
+            log.debug("Updated offline bank cache with {} items", cachedBankItems.size());
+        }
+    }
 
     private OkHttpClient aiClient;
     private OkHttpClient wikiClient;
@@ -761,9 +827,9 @@ public class AiService {
      */
     String executeSetShortestPathTarget(JsonObject args) {
         JsonObject result = new JsonObject();
-        if (args == null || !args.has("x") || !args.has("y")) {
+        if (args == null) {
             result.addProperty("status", "error");
-            result.addProperty("message", "Missing required parameters: x and y.");
+            result.addProperty("message", "Missing required parameters.");
             return result.toString();
         }
 
@@ -775,14 +841,37 @@ public class AiService {
                 return result.toString();
             }
 
-            int x = args.get("x").getAsInt();
-            int y = args.get("y").getAsInt();
-            int plane = (args.has("plane") && !args.get("plane").isJsonNull()) ? args.get("plane").getAsInt() : 0;
-            String locationName = (args.has("locationName") && !args.get("locationName").isJsonNull())
-                    ? args.get("locationName").getAsString()
-                    : "Destination";
+            WorldPoint targetPoint = null;
+            String locationName = "Destination";
 
-            WorldPoint targetPoint = new WorldPoint(x, y, plane);
+            if (args.has("x") && args.has("y") && !args.get("x").isJsonNull() && !args.get("y").isJsonNull()) {
+                int x = args.get("x").getAsInt();
+                int y = args.get("y").getAsInt();
+                int plane = (args.has("plane") && !args.get("plane").isJsonNull()) ? args.get("plane").getAsInt() : 0;
+                targetPoint = new WorldPoint(x, y, plane);
+                if (args.has("locationName") && !args.get("locationName").isJsonNull()) {
+                    locationName = args.get("locationName").getAsString();
+                }
+            } else {
+                String poiQuery = null;
+                if (args.has("poiName") && !args.get("poiName").isJsonNull()) {
+                    poiQuery = args.get("poiName").getAsString();
+                } else if (args.has("locationName") && !args.get("locationName").isJsonNull()) {
+                    poiQuery = args.get("locationName").getAsString();
+                }
+
+                if (poiQuery != null) {
+                    targetPoint = locationResolver.findCoordinatesByPoiName(poiQuery);
+                    locationName = poiQuery;
+                }
+            }
+
+            if (targetPoint == null) {
+                result.addProperty("status", "error");
+                result.addProperty("message",
+                        "Missing coordinates (x, y) or unknown POI name. Please provide valid coordinates or a known POI name.");
+                return result.toString();
+            }
 
             WorldPoint startPoint = null;
             if (args.has("startX") && args.has("startY") && !args.get("startX").isJsonNull()
@@ -1442,20 +1531,41 @@ public class AiService {
     String executeGetPlayerBank(JsonObject args) {
         JsonObject result = new JsonObject();
         ItemContainer bankContainer = client.getItemContainer(InventoryID.BANK);
-        if (bankContainer == null || bankContainer.getItems().length == 0) {
-            result.addProperty("status", "error");
-            result.addProperty("message",
-                    "The bank is not currently open. Ask the player to open their bank if they want you to check bank items.");
-        } else {
-            String filter = (args != null && args.has("filter")) ? args.get("filter").getAsString() : null;
-            int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
+        String filter = (args != null && args.has("filter")) ? args.get("filter").getAsString() : null;
+        int minValue = (args != null && args.has("minValue")) ? args.get("minValue").getAsInt() : 0;
+
+        if (bankContainer != null && bankContainer.getItems().length > 0) {
             result.addProperty("status", "success");
             result.addProperty("bankOpen", true);
+            result.addProperty("cached", false);
             if (filter != null) {
                 result.addProperty("filterApplied", filter);
             }
             result.add("items",
                     ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, bankContainer, filter, minValue));
+        } else {
+            synchronized (this) {
+                if (!cachedBankItems.isEmpty()) {
+                    result.addProperty("status", "success");
+                    result.addProperty("bankOpen", false);
+                    result.addProperty("cached", true);
+                    result.addProperty("cachedItemCount", cachedBankItems.size());
+                    long ageSeconds = cachedBankTimestamp > 0
+                            ? Math.max(0, (System.currentTimeMillis() - cachedBankTimestamp) / 1000)
+                            : 0;
+                    result.addProperty("cachedAgeSeconds", ageSeconds);
+                    if (filter != null) {
+                        result.addProperty("filterApplied", filter);
+                    }
+                    result.add("items",
+                            ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, cachedBankItems, filter,
+                                    minValue));
+                } else {
+                    result.addProperty("status", "error");
+                    result.addProperty("message",
+                            "The bank is not currently open and no bank cache is available. Ask the player to open their bank if they want you to check bank items.");
+                }
+            }
         }
         return gson.toJson(result);
     }
@@ -1619,7 +1729,8 @@ public class AiService {
         String cleanedQuery = WikiSearchUtil.extractSearchQuery(query).trim();
         String activeTaskName = getConfigValue("slayer", "taskName");
 
-        if (activeTaskName != null && !activeTaskName.isEmpty() && !cleanedQuery.toLowerCase().startsWith("slayer task/")) {
+        if (activeTaskName != null && !activeTaskName.isEmpty()
+                && !cleanedQuery.toLowerCase().startsWith("slayer task/")) {
             if (isQueryRelatedToSlayerTask(cleanedQuery, activeTaskName)) {
                 String slayerTaskQuery = "Slayer task/" + activeTaskName;
                 log.info("Slayer task detected. Attempting wiki search for: {}", slayerTaskQuery);
@@ -1628,7 +1739,8 @@ public class AiService {
                 if (!isNotFoundResult(slayerResult)) {
                     return slayerResult;
                 }
-                log.info("Slayer task page not found for '{}'. Falling back to original query: {}", slayerTaskQuery, query);
+                log.info("Slayer task page not found for '{}'. Falling back to original query: {}", slayerTaskQuery,
+                        query);
             }
         }
 
@@ -2363,12 +2475,12 @@ public class AiService {
         JsonObject pohObj = new JsonObject();
         int conLevel = client.getRealSkillLevel(Skill.CONSTRUCTION);
         pohObj.addProperty("constructionLevel", conLevel);
-        pohObj.addProperty("portalChamberUnlocked", conLevel >= 50);
-        pohObj.addProperty("portalNexusUnlocked", conLevel >= 72);
-        pohObj.addProperty("basicJewelleryBoxUnlocked", conLevel >= 81);
-        pohObj.addProperty("ornateJewelleryBoxUnlocked", conLevel >= 91);
-        pohObj.addProperty("pohFairyRingUnlocked", conLevel >= 85);
-        pohObj.addProperty("pohSpiritTreeUnlocked", conLevel >= 95);
+        pohObj.addProperty("portalChamberUnlocked", conLevel >= POH_LEVEL_PORTAL_CHAMBER);
+        pohObj.addProperty("portalNexusUnlocked", conLevel >= POH_LEVEL_PORTAL_NEXUS);
+        pohObj.addProperty("basicJewelleryBoxUnlocked", conLevel >= POH_LEVEL_BASIC_JEWELLERY_BOX);
+        pohObj.addProperty("ornateJewelleryBoxUnlocked", conLevel >= POH_LEVEL_ORNATE_JEWELLERY_BOX);
+        pohObj.addProperty("pohFairyRingUnlocked", conLevel >= POH_LEVEL_FAIRY_RING);
+        pohObj.addProperty("pohSpiritTreeUnlocked", conLevel >= POH_LEVEL_SPIRIT_TREE);
         result.add("constructionAndPoh", pohObj);
 
         // 4. Available Teleport Items in Inventory, Equipment, and Bank
@@ -2450,7 +2562,1184 @@ public class AiService {
                 }
             }
         }
+
+        // Also check cached bank items if live bank is closed
+        if (client.getItemContainer(InventoryID.BANK) == null && !cachedBankItems.isEmpty()) {
+            for (ItemContainerUtils.SimpleItem item : cachedBankItems) {
+                if (item == null || item.getId() <= 0)
+                    continue;
+
+                String name = null;
+                if (itemManager != null) {
+                    try {
+                        net.runelite.api.ItemComposition comp = itemManager.getItemComposition(item.getId());
+                        if (comp != null && comp.getName() != null) {
+                            name = comp.getName();
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (name == null)
+                    continue;
+
+                String lowerName = name.toLowerCase();
+                for (String kw : keywords) {
+                    if (lowerName.contains(kw) && !uniqueFoundNames.contains(name)) {
+                        uniqueFoundNames.add(name);
+                        JsonObject itemObj = new JsonObject();
+                        itemObj.addProperty("name", name);
+                        itemObj.addProperty("location", "bank (cached)");
+                        found.add(itemObj);
+                        break;
+                    }
+                }
+            }
+        }
         return found;
+    }
+
+    String executeGetSurroundingEnvironment(JsonObject args) {
+        JsonObject result = new JsonObject();
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer == null) {
+            result.addProperty("status", "error");
+            result.addProperty("message", "Player is not currently logged in.");
+            return gson.toJson(result);
+        }
+
+        WorldPoint playerLoc = localPlayer.getWorldLocation();
+        int radius = (args != null && args.has("radius") && !args.get("radius").isJsonNull())
+                ? Math.min(MAX_SURROUNDINGS_SCAN_RADIUS,
+                        Math.max(MIN_SURROUNDINGS_SCAN_RADIUS, args.get("radius").getAsInt()))
+                : DEFAULT_SURROUNDINGS_SCAN_RADIUS;
+
+        result.addProperty("status", "success");
+        result.addProperty("playerLocation",
+                playerLoc.getX() + ", " + playerLoc.getY() + ", Plane " + playerLoc.getPlane());
+        result.addProperty("scanRadiusTiles", radius);
+
+        WorldView wv = client.getTopLevelWorldView();
+
+        // 1. Nearby NPCs & Monsters
+        JsonArray npcList = new JsonArray();
+        Iterable<? extends NPC> npcs = wv != null ? wv.npcs() : client.getNpcs();
+        if (npcs != null) {
+            List<NPC> sortedNpcs = new ArrayList<>();
+            for (NPC npc : npcs) {
+                if (npc == null || npc.getName() == null || npc.getName().trim().isEmpty()) {
+                    continue;
+                }
+                WorldPoint npcLoc = npc.getWorldLocation();
+                if (npcLoc != null && playerLoc.distanceTo(npcLoc) <= radius) {
+                    sortedNpcs.add(npc);
+                }
+            }
+            sortedNpcs.sort(Comparator.comparingInt(n -> playerLoc.distanceTo(n.getWorldLocation())));
+
+            int count = 0;
+            for (NPC npc : sortedNpcs) {
+                if (count >= MAX_SURROUNDINGS_NPC_COUNT) {
+                    break;
+                }
+                JsonObject obj = new JsonObject();
+                obj.addProperty("name", npc.getName());
+                obj.addProperty("id", npc.getId());
+                obj.addProperty("combatLevel", npc.getCombatLevel());
+                obj.addProperty("distance", playerLoc.distanceTo(npc.getWorldLocation()));
+                if (npc.getHealthScale() > 0 && npc.getHealthRatio() >= 0) {
+                    int healthPct = (int) Math.round(((double) npc.getHealthRatio() / npc.getHealthScale()) * 100.0);
+                    obj.addProperty("healthPercent", healthPct);
+                }
+                if (npc.getInteracting() != null && npc.getInteracting().getName() != null) {
+                    obj.addProperty("target", npc.getInteracting().getName());
+                }
+                if (npc.getAnimation() != -1) {
+                    obj.addProperty("animating", true);
+                }
+                npcList.add(obj);
+                count++;
+            }
+        }
+        result.add("nearbyNpcs", npcList);
+
+        // 2. Nearby Players (Wilderness / Threat Awareness)
+        JsonArray playerList = new JsonArray();
+        Iterable<? extends Player> players = wv != null ? wv.players() : client.getPlayers();
+        if (players != null) {
+            List<Player> sortedPlayers = new ArrayList<>();
+            for (Player p : players) {
+                if (p == null || p == localPlayer || p.getName() == null) {
+                    continue;
+                }
+                WorldPoint pLoc = p.getWorldLocation();
+                if (pLoc != null && playerLoc.distanceTo(pLoc) <= radius) {
+                    sortedPlayers.add(p);
+                }
+            }
+            sortedPlayers.sort(Comparator.comparingInt(p -> playerLoc.distanceTo(p.getWorldLocation())));
+
+            int pCount = 0;
+            for (Player p : sortedPlayers) {
+                if (pCount >= MAX_SURROUNDINGS_PLAYER_COUNT) {
+                    break;
+                }
+                JsonObject pObj = new JsonObject();
+                pObj.addProperty("name", p.getName());
+                pObj.addProperty("combatLevel", p.getCombatLevel());
+                pObj.addProperty("distance", playerLoc.distanceTo(p.getWorldLocation()));
+                pObj.addProperty("skulled", p.getSkullIcon() != -1);
+                if (p.getInteracting() != null && p.getInteracting().getName() != null) {
+                    pObj.addProperty("interactingWith", p.getInteracting().getName());
+                }
+                playerList.add(pObj);
+                pCount++;
+            }
+        }
+        result.add("nearbyPlayers", playerList);
+
+        // 3. Ground Items in render distance
+        JsonArray groundItemList = new JsonArray();
+        Scene scene = (wv != null && wv.getScene() != null) ? wv.getScene() : client.getScene();
+        if (scene != null && scene.getTiles() != null) {
+            int plane = playerLoc.getPlane();
+            Tile[][][] tiles = scene.getTiles();
+            if (plane >= 0 && plane < tiles.length && tiles[plane] != null) {
+                LocalPoint localPoint = localPlayer.getLocalLocation();
+                if (localPoint != null) {
+                    int centerTileX = localPoint.getSceneX();
+                    int centerTileY = localPoint.getSceneY();
+                    int minX = Math.max(0, centerTileX - radius);
+                    int maxX = Math.min(tiles[plane].length - 1, centerTileX + radius);
+                    int minY = Math.max(0, centerTileY - radius);
+                    int maxY = Math.min(tiles[plane][0].length - 1, centerTileY + radius);
+
+                    List<JsonObject> groundItemsFound = new ArrayList<>();
+                    for (int x = minX; x <= maxX; x++) {
+                        for (int y = minY; y <= maxY; y++) {
+                            Tile tile = tiles[plane][x][y];
+                            if (tile == null) {
+                                continue;
+                            }
+                            List<TileItem> items = tile.getGroundItems();
+                            if (items != null) {
+                                for (TileItem item : items) {
+                                    if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                                        continue;
+                                    }
+                                    ItemComposition comp = null;
+                                    try {
+                                        comp = itemManager.getItemComposition(item.getId());
+                                    } catch (Exception ignored) {
+                                    }
+                                    String itemName = (comp != null && comp.getName() != null) ? comp.getName()
+                                            : "Item " + item.getId();
+                                    int gePrice = itemManager != null ? itemManager.getItemPrice(item.getId()) : 0;
+                                    int haPrice = comp != null ? comp.getHaPrice() : 0;
+                                    int dist = Math.max(Math.abs(x - centerTileX), Math.abs(y - centerTileY));
+
+                                    JsonObject gObj = new JsonObject();
+                                    gObj.addProperty("name", itemName);
+                                    gObj.addProperty("id", item.getId());
+                                    gObj.addProperty("quantity", item.getQuantity());
+                                    gObj.addProperty("gePrice", gePrice);
+                                    gObj.addProperty("haPrice", haPrice);
+                                    gObj.addProperty("distance", dist);
+                                    groundItemsFound.add(gObj);
+                                }
+                            }
+                        }
+                    }
+                    groundItemsFound.sort((a, b) -> {
+                        int valA = Math.max(a.get("gePrice").getAsInt(), a.get("haPrice").getAsInt())
+                                * a.get("quantity").getAsInt();
+                        int valB = Math.max(b.get("gePrice").getAsInt(), b.get("haPrice").getAsInt())
+                                * b.get("quantity").getAsInt();
+                        return Integer.compare(valB, valA);
+                    });
+                    int giCount = 0;
+                    for (JsonObject gObj : groundItemsFound) {
+                        if (giCount >= MAX_SURROUNDINGS_GROUND_ITEM_COUNT) {
+                            break;
+                        }
+                        groundItemList.add(gObj);
+                        giCount++;
+                    }
+                }
+            }
+        }
+        result.add("nearbyGroundItems", groundItemList);
+
+        // 4. Notable Nearby Game Objects
+        JsonArray objectList = new JsonArray();
+        if (scene != null && scene.getTiles() != null) {
+            int plane = playerLoc.getPlane();
+            Tile[][][] tiles = scene.getTiles();
+            if (plane >= 0 && plane < tiles.length && tiles[plane] != null) {
+                LocalPoint localPoint = localPlayer.getLocalLocation();
+                if (localPoint != null) {
+                    int centerTileX = localPoint.getSceneX();
+                    int centerTileY = localPoint.getSceneY();
+                    int minX = Math.max(0, centerTileX - Math.min(OBJECT_SCAN_MAX_RADIUS, radius));
+                    int maxX = Math.min(tiles[plane].length - 1,
+                            centerTileX + Math.min(OBJECT_SCAN_MAX_RADIUS, radius));
+                    int minY = Math.max(0, centerTileY - Math.min(OBJECT_SCAN_MAX_RADIUS, radius));
+                    int maxY = Math.min(tiles[plane][0].length - 1,
+                            centerTileY + Math.min(OBJECT_SCAN_MAX_RADIUS, radius));
+
+                    Set<String> seenObjects = new HashSet<>();
+                    for (int x = minX; x <= maxX; x++) {
+                        for (int y = minY; y <= maxY; y++) {
+                            Tile tile = tiles[plane][x][y];
+                            if (tile == null) {
+                                continue;
+                            }
+                            GameObject[] gameObjs = tile.getGameObjects();
+                            if (gameObjs != null) {
+                                for (GameObject go : gameObjs) {
+                                    if (go == null) {
+                                        continue;
+                                    }
+                                    try {
+                                        ObjectComposition oc = client.getObjectDefinition(go.getId());
+                                        if (oc != null && oc.getName() != null && !oc.getName().trim().isEmpty()
+                                                && !"null".equalsIgnoreCase(oc.getName())) {
+                                            String name = oc.getName();
+                                            String lower = name.toLowerCase();
+                                            if (lower.contains("altar") || lower.contains("bank")
+                                                    || lower.contains("booth")
+                                                    || lower.contains("chest") || lower.contains("portal")
+                                                    || lower.contains("fairy ring")
+                                                    || lower.contains("furnace") || lower.contains("anvil")
+                                                    || lower.contains("range")
+                                                    || lower.contains("ladder") || lower.contains("trapdoor")
+                                                    || lower.contains("stairs")
+                                                    || lower.contains("shortcut") || lower.contains("tree")
+                                                    || lower.contains("crevice")
+                                                    || lower.contains("barrier") || lower.contains("entrance")
+                                                    || lower.contains("tunnel")) {
+                                                if (seenObjects.add(name)) {
+                                                    int dist = Math.max(Math.abs(x - centerTileX),
+                                                            Math.abs(y - centerTileY));
+                                                    JsonObject oObj = new JsonObject();
+                                                    oObj.addProperty("name", name);
+                                                    oObj.addProperty("distance", dist);
+                                                    objectList.add(oObj);
+                                                }
+                                            }
+                                        }
+                                    } catch (Exception ignored) {
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        result.add("nearbyNotableObjects", objectList);
+
+        return gson.toJson(result);
+    }
+
+    String executeGetPlayerGeOffers(JsonObject args) {
+        JsonObject result = new JsonObject();
+        GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+        if (offers == null || offers.length == 0) {
+            result.addProperty("status", "empty");
+            result.addProperty("message", "No Grand Exchange offer data available.");
+            return gson.toJson(result);
+        }
+
+        result.addProperty("status", "success");
+        JsonArray offerList = new JsonArray();
+        int activeCount = 0;
+
+        for (int i = 0; i < offers.length; i++) {
+            GrandExchangeOffer offer = offers[i];
+            if (offer == null || offer.getState() == GrandExchangeOfferState.EMPTY) {
+                continue;
+            }
+            JsonObject obj = new JsonObject();
+            obj.addProperty("slot", i + 1);
+            obj.addProperty("state", offer.getState().name());
+
+            int itemId = offer.getItemId();
+            obj.addProperty("itemId", itemId);
+            String itemName = "Item " + itemId;
+            if (itemManager != null) {
+                try {
+                    ItemComposition comp = itemManager.getItemComposition(itemId);
+                    if (comp != null && comp.getName() != null) {
+                        itemName = comp.getName();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            obj.addProperty("itemName", itemName);
+            obj.addProperty("offerPrice", offer.getPrice());
+            obj.addProperty("totalQuantity", offer.getTotalQuantity());
+            obj.addProperty("transferredQuantity", offer.getQuantitySold());
+            obj.addProperty("spentOrReceivedGp", offer.getSpent());
+
+            int total = offer.getTotalQuantity();
+            int transferred = offer.getQuantitySold();
+            int pct = total > 0 ? (int) Math.round(((double) transferred / total) * 100.0) : 0;
+            obj.addProperty("progressPercent", pct);
+
+            offerList.add(obj);
+            activeCount++;
+        }
+
+        result.addProperty("activeOrCompletedOffersCount", activeCount);
+        result.add("offers", offerList);
+        return gson.toJson(result);
+    }
+
+    String executeGetMarketPrices(JsonObject args) {
+        JsonObject result = new JsonObject();
+        JsonObject itemsData = new JsonObject();
+
+        int natureRunePrice = 0;
+        try {
+            natureRunePrice = itemManager != null ? itemManager.getItemPrice(ITEM_ID_NATURE_RUNE)
+                    : DEFAULT_NATURE_RUNE_PRICE;
+        } catch (Exception ignored) {
+        }
+        if (natureRunePrice <= 0) {
+            natureRunePrice = DEFAULT_NATURE_RUNE_PRICE;
+        }
+        result.addProperty("natureRuneCost", natureRunePrice);
+
+        List<Integer> targetItemIds = new ArrayList<>();
+        if (args != null) {
+            if (args.has("itemIds")) {
+                JsonArray ids = args.getAsJsonArray("itemIds");
+                for (int i = 0; i < ids.size(); i++) {
+                    targetItemIds.add(ids.get(i).getAsInt());
+                }
+            }
+            if (args.has("itemNames")) {
+                JsonArray names = args.getAsJsonArray("itemNames");
+                for (int i = 0; i < names.size(); i++) {
+                    String name = names.get(i).getAsString();
+                    Integer foundId = ItemContainerUtils.findItemIdInContainers(client, itemManager, name);
+                    if (foundId != null) {
+                        targetItemIds.add(foundId);
+                    } else {
+                        JsonObject notFound = new JsonObject();
+                        notFound.addProperty("error", "Item '" + name + "' not found in game database.");
+                        itemsData.add(name, notFound);
+                    }
+                }
+            }
+        }
+
+        for (int itemId : targetItemIds) {
+            ItemComposition comp = null;
+            try {
+                comp = itemManager != null ? itemManager.getItemComposition(itemId) : null;
+            } catch (Exception ignored) {
+            }
+            String itemName = (comp != null && comp.getName() != null) ? comp.getName() : "Item " + itemId;
+            int gePrice = itemManager != null ? itemManager.getItemPrice(itemId) : 0;
+            int haPrice = comp != null ? comp.getHaPrice() : 0;
+            int lowAlchPrice = comp != null ? (int) Math.floor(haPrice * LOW_ALCH_MULTIPLIER) : 0;
+            int alchProfit = (haPrice > 0 && gePrice > 0) ? (haPrice - (gePrice + natureRunePrice)) : 0;
+
+            JsonObject itemObj = new JsonObject();
+            itemObj.addProperty("itemId", itemId);
+            itemObj.addProperty("itemName", itemName);
+            itemObj.addProperty("gePrice", gePrice);
+            itemObj.addProperty("highAlchValue", haPrice);
+            itemObj.addProperty("lowAlchValue", lowAlchPrice);
+            itemObj.addProperty("highAlchProfitPerItem", alchProfit);
+            itemObj.addProperty("isAlchProfitable", alchProfit > 0);
+
+            itemsData.add(itemName, itemObj);
+        }
+
+        result.add("items", itemsData);
+        return gson.toJson(result);
+    }
+
+    String executeGetPlayerFarmingAndTimers(JsonObject args) {
+        JsonObject result = new JsonObject();
+        result.addProperty("status", "success");
+
+        long nowSec = System.currentTimeMillis() / 1000L;
+
+        // 1. Birdhouse run states (Fossil Island - live varbits + Time Tracking cache)
+        JsonObject birdhouses = new JsonObject();
+        int bh1 = client.getVarbitValue(VARBIT_BIRDHOUSE_MEADOW_NORTH);
+        int bh2 = client.getVarbitValue(VARBIT_BIRDHOUSE_MEADOW_SOUTH);
+        int bh3 = client.getVarbitValue(VARBIT_BIRDHOUSE_VALLEY_NORTH);
+        int bh4 = client.getVarbitValue(VARBIT_BIRDHOUSE_VALLEY_SOUTH);
+
+        String bhVal1 = getConfigValue("timetracking", "birdhouse.1626");
+        String bhVal2 = getConfigValue("timetracking", "birdhouse.1627");
+        String bhVal3 = getConfigValue("timetracking", "birdhouse.1628");
+        String bhVal4 = getConfigValue("timetracking", "birdhouse.1629");
+
+        long bhTime1 = parseTimestampOrDuration(bhVal1);
+        long bhTime2 = parseTimestampOrDuration(bhVal2);
+        long bhTime3 = parseTimestampOrDuration(bhVal3);
+        long bhTime4 = parseTimestampOrDuration(bhVal4);
+
+        boolean bh1Ready = (bh1 >= 3) || (bhVal1 != null
+                && (bhVal1.contains("done") || bhVal1.contains("ready") || (bhTime1 > 0 && bhTime1 <= nowSec)));
+        boolean bh2Ready = (bh2 >= 3) || (bhVal2 != null
+                && (bhVal2.contains("done") || bhVal2.contains("ready") || (bhTime2 > 0 && bhTime2 <= nowSec)));
+        boolean bh3Ready = (bh3 >= 3) || (bhVal3 != null
+                && (bhVal3.contains("done") || bhVal3.contains("ready") || (bhTime3 > 0 && bhTime3 <= nowSec)));
+        boolean bh4Ready = (bh4 >= 3) || (bhVal4 != null
+                && (bhVal4.contains("done") || bhVal4.contains("ready") || (bhTime4 > 0 && bhTime4 <= nowSec)));
+
+        int readyBhCount = (bh1Ready ? 1 : 0) + (bh2Ready ? 1 : 0) + (bh3Ready ? 1 : 0) + (bh4Ready ? 1 : 0);
+        int activeBhCount = ((bh1 > 0 || bhTime1 > 0) ? 1 : 0) + ((bh2 > 0 || bhTime2 > 0) ? 1 : 0)
+                + ((bh3 > 0 || bhTime3 > 0) ? 1 : 0) + ((bh4 > 0 || bhTime4 > 0) ? 1 : 0);
+
+        birdhouses.addProperty("meadowNorth", bh1Ready ? "Done / Ready to harvest"
+                : (bhTime1 > nowSec ? "Growing (" + Math.max(1, (bhTime1 - nowSec) / 60) + "m remaining)"
+                        : "Empty / not built"));
+        birdhouses.addProperty("meadowSouth", bh2Ready ? "Done / Ready to harvest"
+                : (bhTime2 > nowSec ? "Growing (" + Math.max(1, (bhTime2 - nowSec) / 60) + "m remaining)"
+                        : "Empty / not built"));
+        birdhouses.addProperty("valleyNorth", bh3Ready ? "Done / Ready to harvest"
+                : (bhTime3 > nowSec ? "Growing (" + Math.max(1, (bhTime3 - nowSec) / 60) + "m remaining)"
+                        : "Empty / not built"));
+        birdhouses.addProperty("valleySouth", bh4Ready ? "Done / Ready to harvest"
+                : (bhTime4 > nowSec ? "Growing (" + Math.max(1, (bhTime4 - nowSec) / 60) + "m remaining)"
+                        : "Empty / not built"));
+        birdhouses.addProperty("readyCount", readyBhCount);
+        birdhouses.addProperty("ready", readyBhCount > 0);
+        if (readyBhCount == 4) {
+            birdhouses.addProperty("summary",
+                    "All 4 birdhouse traps are full and ready to harvest (Mushroom Meadow North/South, Verdant Valley Northeast/Southwest)");
+        } else if (readyBhCount > 0) {
+            birdhouses.addProperty("summary", readyBhCount + " of 4 birdhouse traps are ready to harvest");
+        } else if (activeBhCount > 0) {
+            birdhouses.addProperty("summary", activeBhCount + " birdhouses are currently catching birds");
+        } else {
+            birdhouses.addProperty("summary", "Empty / not built");
+        }
+        result.add("birdhouses", birdhouses);
+
+        // 2. Hespori Boss Growth
+        JsonObject hespori = new JsonObject();
+        int hesporiVar = client.getVarbitValue(VARBIT_HESPORI_GROWTH);
+        hespori.addProperty("stateVarbit", hesporiVar);
+        hespori.addProperty("status", hesporiVar >= HESPORI_STAGE_READY ? "Fully Grown / Ready to fight"
+                : (hesporiVar > 0 ? "Growing" : "Empty / Cleared"));
+        result.add("hespori", hespori);
+
+        // 3. Tears of Guthix Cooldown
+        JsonObject tog = new JsonObject();
+        int togCooldown = client.getVarpValue(VARP_TEARS_OF_GUTHIX_COOLDOWN);
+        tog.addProperty("cooldownVarp", togCooldown);
+        tog.addProperty("ready", togCooldown <= 0);
+        result.add("tearsOfGuthix", tog);
+
+        // 4. Kingdom of Miscellania
+        JsonObject kingdom = new JsonObject();
+        int rawFavour = client.getVarpValue(VARP_KINGDOM_FAVOUR);
+        int rawCoffer = client.getVarpValue(VARP_KINGDOM_COFFER);
+
+        Integer cachedFavour = null;
+        Integer cachedCoffer = null;
+        Instant lastChangedInstant = null;
+
+        if (configManager != null) {
+            String profileKey = configManager.getRSProfileKey();
+            try {
+                Object lastChangedObj = configManager.getRSProfileConfiguration("kingdomofmiscellania", "lastChanged",
+                        Instant.class);
+                if (lastChangedObj instanceof Instant) {
+                    lastChangedInstant = (Instant) lastChangedObj;
+                }
+            } catch (Throwable ignored) {
+            }
+
+            String[] kingdomGroups = new String[] { "kingdomofmiscellania", "kingdom", "miscellania",
+                    "dailytaskindicators", "dailytasks" };
+            for (String group : kingdomGroups) {
+                if (cachedFavour == null) {
+                    String val = getConfigValue(group, "approval", "lastApproval", "favor", "favour", "lastFavor",
+                            "lastFavour", "approvalPercent");
+                    if (val != null) {
+                        try {
+                            cachedFavour = Integer.parseInt(val.replaceAll("[^0-9]", ""));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                if (cachedCoffer == null) {
+                    String val = getConfigValue(group, "coffer", "lastCoffer", "coffers", "lastCoffers",
+                            "cofferAmount");
+                    if (val != null) {
+                        try {
+                            cachedCoffer = Integer.parseInt(val.replaceAll("[^0-9]", ""));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                if (lastChangedInstant == null) {
+                    String lastChangedStr = getConfigValue(group, "lastChanged", "lastCheck", "lastVisit",
+                            "lastTimestamp");
+                    if (lastChangedStr != null && !lastChangedStr.isEmpty()) {
+                        try {
+                            lastChangedInstant = Instant.parse(lastChangedStr.trim());
+                        } catch (Exception e1) {
+                            try {
+                                long epoch = Long.parseLong(lastChangedStr.replaceAll("[^0-9]", ""));
+                                if (epoch > 1_000_000_000_000L) {
+                                    lastChangedInstant = Instant.ofEpochMilli(epoch);
+                                } else if (epoch > 1_000_000_000L) {
+                                    lastChangedInstant = Instant.ofEpochSecond(epoch);
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
+                }
+                if (profileKey != null
+                        && (cachedFavour == null || cachedCoffer == null || lastChangedInstant == null)) {
+                    List<String> keys = configManager.getRSProfileConfigurationKeys(group, profileKey, "");
+                    if (keys != null) {
+                        for (String key : keys) {
+                            String lower = key.toLowerCase();
+                            String val = configManager.getRSProfileConfiguration(group, key);
+                            if (val != null && !val.isEmpty()) {
+                                if ((lower.contains("approval") || lower.contains("favor") || lower.contains("favour"))
+                                        && cachedFavour == null) {
+                                    try {
+                                        cachedFavour = Integer.parseInt(val.replaceAll("[^0-9]", ""));
+                                    } catch (Exception ignored) {
+                                    }
+                                } else if (lower.contains("coffer") && cachedCoffer == null) {
+                                    try {
+                                        cachedCoffer = Integer.parseInt(val.replaceAll("[^0-9]", ""));
+                                    } catch (Exception ignored) {
+                                    }
+                                } else if (lower.contains("lastchanged") && lastChangedInstant == null) {
+                                    try {
+                                        lastChangedInstant = Instant.parse(val.trim());
+                                    } catch (Exception ignored) {
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        boolean royalTroubleCompleted = (getQuestStateSafe(Quest.ROYAL_TROUBLE) == QuestState.FINISHED);
+        int daysPassed = 0;
+        if (lastChangedInstant != null) {
+            try {
+                Instant truncatedLast = lastChangedInstant.truncatedTo(ChronoUnit.DAYS);
+                Instant truncatedNow = Instant.now().truncatedTo(ChronoUnit.DAYS);
+                daysPassed = Math.max(0, (int) ChronoUnit.DAYS.between(truncatedLast, truncatedNow));
+            } catch (Exception ignored) {
+            }
+        }
+
+        int finalFavour;
+        int finalCoffer;
+        String source;
+
+        if (rawFavour > 0 || rawCoffer > 0) {
+            finalFavour = rawFavour;
+            finalCoffer = rawCoffer;
+            source = "live (in Miscellania)";
+        } else if (cachedFavour != null || cachedCoffer != null) {
+            int estimatedApproval = cachedFavour != null ? cachedFavour : 0;
+            int estimatedCoffer = cachedCoffer != null ? cachedCoffer : 0;
+
+            if (daysPassed > 0) {
+                int maxWithdrawal = royalTroubleCompleted ? 75000 : 50000;
+                int threshold = maxWithdrawal * 10;
+                for (int i = 0; i < daysPassed; i++) {
+                    int withdrawal = (estimatedCoffer > threshold) ? maxWithdrawal : (estimatedCoffer / 10);
+                    estimatedCoffer = Math.max(0, estimatedCoffer - withdrawal);
+                }
+
+                float decrement = royalTroubleCompleted ? 0.01f : 0.025f;
+                int reduction = (int) (daysPassed * decrement * 127.0f);
+                estimatedApproval = Math.max(0, estimatedApproval - reduction);
+            }
+
+            finalFavour = estimatedApproval;
+            finalCoffer = estimatedCoffer;
+            source = "cached & estimated (RuneLite Kingdom tracker, " + daysPassed + " day"
+                    + (daysPassed == 1 ? "" : "s") + " elapsed)";
+        } else {
+            finalFavour = 0;
+            finalCoffer = 0;
+            source = "unavailable (not yet recorded by client)";
+        }
+
+        int favourPct = 0;
+        if (finalFavour > 0) {
+            favourPct = Math.min(100, Math.max(0, (finalFavour * 100) / 127));
+        }
+
+        kingdom.addProperty("favourPercent", favourPct);
+        kingdom.addProperty("cofferGp", finalCoffer);
+        kingdom.addProperty("cofferFormatted",
+                String.format(Locale.US, "%,d gp (%.2fM)", finalCoffer, finalCoffer / 1_000_000.0));
+        kingdom.addProperty("daysSinceLastVisit", daysPassed);
+        if (lastChangedInstant != null) {
+            kingdom.addProperty("lastRecordedTime", lastChangedInstant.toString());
+        }
+        kingdom.addProperty("royalTroubleCompleted", royalTroubleCompleted);
+        kingdom.addProperty("source", source);
+        if (finalFavour == 0 && finalCoffer == 0 && (cachedFavour == null && cachedCoffer == null)) {
+            kingdom.addProperty("note",
+                    "Kingdom data is recorded by RuneLite when visiting Miscellania or opening the kingdom management interface.");
+        } else {
+            kingdom.addProperty("summary", String.format(Locale.US, "Approval: %d%%, Coffer: %,d gp (%.2fM) [%s]",
+                    favourPct, finalCoffer, finalCoffer / 1_000_000.0, source));
+        }
+        result.add("kingdomOfMiscellania", kingdom);
+
+        // 5. Daily Task Collectibles (Zaff Battlestaves, etc.)
+        JsonObject dailyTasks = new JsonObject();
+        int varrockDiaryEasy = client.getVarbitValue(Varbits.DIARY_VARROCK_EASY);
+        int varrockDiaryMed = client.getVarbitValue(Varbits.DIARY_VARROCK_MEDIUM);
+        int varrockDiaryHard = client.getVarbitValue(Varbits.DIARY_VARROCK_HARD);
+        int varrockDiaryElite = client.getVarbitValue(Varbits.DIARY_VARROCK_ELITE);
+
+        int zaffDailyCount = 0;
+        if (varrockDiaryElite >= 5) {
+            zaffDailyCount = 120;
+        } else if (varrockDiaryHard >= 10) {
+            zaffDailyCount = 60;
+        } else if (varrockDiaryMed >= 13) {
+            zaffDailyCount = 30;
+        } else if (varrockDiaryEasy >= 14) {
+            zaffDailyCount = 15;
+        }
+
+        if (zaffDailyCount > 0) {
+            JsonObject zaff = new JsonObject();
+            zaff.addProperty("discountBattlestavesAvailablePerDay", zaffDailyCount);
+            zaff.addProperty("location", "Zaff's staff shop in Varrock center (north-west corner of square)");
+            zaff.addProperty("note", "Buy for 7,000 gp each and craft/alch or resell for profit.");
+            dailyTasks.add("zaffBattlestaves", zaff);
+        }
+        result.add("dailyTaskCollectibles", dailyTasks);
+
+        // 6. Active InfoBox Timers & Boosts (Filter out empty/zero template indicators)
+        JsonArray infoBoxList = new JsonArray();
+        if (infoBoxManager != null && infoBoxManager.getInfoBoxes() != null) {
+            for (InfoBox ib : infoBoxManager.getInfoBoxes()) {
+                if (ib == null) {
+                    continue;
+                }
+                String text = ib.getText();
+                String tooltip = ib.getTooltip();
+                if (text == null || text.trim().isEmpty() || "0".equals(text.trim()) || "?".equals(text.trim())
+                        || "-1".equals(text.trim()) || "0/0".equals(text.trim())) {
+                    continue;
+                }
+                JsonObject ibObj = new JsonObject();
+                if (ib.getName() != null) {
+                    ibObj.addProperty("name", ib.getName());
+                }
+                ibObj.addProperty("text", text.trim());
+                if (tooltip != null && !tooltip.trim().isEmpty()) {
+                    String cleanTooltip = PATTERN_HTML_TAGS.matcher(tooltip).replaceAll("").trim();
+                    if (!cleanTooltip.isEmpty()) {
+                        ibObj.addProperty("tooltip", cleanTooltip);
+                    }
+                }
+                infoBoxList.add(ibObj);
+            }
+        }
+        if (infoBoxList.size() > 0) {
+            result.add("activeInfoBoxesAndTimers", infoBoxList);
+        }
+
+        // 7. RuneLite Time Tracking Plugin Patches (Herbs, Trees, Fruit Trees, Hespori,
+        // Hardwood, etc.)
+        JsonObject farmingPatches = new JsonObject();
+        JsonArray readyHerbs = new JsonArray();
+        JsonArray growingHerbs = new JsonArray();
+        JsonArray readyHardwoodTrees = new JsonArray();
+        JsonArray growingHardwoodTrees = new JsonArray();
+        JsonArray readyTrees = new JsonArray();
+        JsonArray growingTrees = new JsonArray();
+        JsonArray readyFruitTrees = new JsonArray();
+        JsonArray growingFruitTrees = new JsonArray();
+        JsonArray specialPatches = new JsonArray();
+        Boolean cachedHesporiReady = null;
+
+        if (configManager != null) {
+            for (FarmingPatchDef patchDef : getKnownFarmingPatches()) {
+                String val = getConfigValue("timetracking", patchDef.configKey);
+                if (val == null || val.isEmpty()) {
+                    val = getConfigValue("farmingtracker", patchDef.configKey);
+                }
+                if (val == null || val.trim().isEmpty() || "0".equals(val.trim())) {
+                    continue;
+                }
+
+                JsonObject patchObj = parseFarmingPatchState(patchDef, val, nowSec);
+                if (patchObj == null) {
+                    continue;
+                }
+
+                String patchType = patchDef.patchType;
+                boolean isReady = patchObj.has("ready") && patchObj.get("ready").getAsBoolean();
+                String produce = patchObj.has("produce") ? patchObj.get("produce").getAsString() : patchType;
+                String loc = patchDef.locationName;
+                String statusStr = patchObj.has("status") ? patchObj.get("status").getAsString() : "";
+                String displaySummary = loc + " (" + produce
+                        + (statusStr.contains("Check health") ? " - Check health ready" : "") + ")";
+
+                if ("Hespori".equalsIgnoreCase(patchType)) {
+                    cachedHesporiReady = isReady;
+                    specialPatches.add(patchObj);
+                } else if ("Herb".equalsIgnoreCase(patchType)) {
+                    if (isReady) {
+                        readyHerbs.add(displaySummary);
+                    } else {
+                        growingHerbs.add(patchObj);
+                    }
+                } else if ("Hardwood Tree".equalsIgnoreCase(patchType)) {
+                    if (isReady) {
+                        readyHardwoodTrees.add(displaySummary);
+                    } else {
+                        growingHardwoodTrees.add(patchObj);
+                    }
+                } else if ("Fruit Tree".equalsIgnoreCase(patchType)) {
+                    if (isReady) {
+                        readyFruitTrees.add(displaySummary);
+                    } else {
+                        growingFruitTrees.add(patchObj);
+                    }
+                } else if ("Tree".equalsIgnoreCase(patchType)) {
+                    if (isReady) {
+                        readyTrees.add(displaySummary);
+                    } else {
+                        growingTrees.add(patchObj);
+                    }
+                } else {
+                    specialPatches.add(patchObj);
+                }
+            }
+        }
+
+        // Re-evaluate Hespori with cached status if varbit was 0 outside Farming Guild
+        if (cachedHesporiReady != null) {
+            hespori.addProperty("ready", cachedHesporiReady);
+            hespori.addProperty("status", cachedHesporiReady ? "Fully Grown / Ready to fight" : "Growing");
+            hespori.addProperty("source", "Time Tracking plugin cache");
+        }
+
+        farmingPatches.add("readyHerbPatches", readyHerbs);
+        if (growingHerbs.size() > 0) {
+            farmingPatches.add("growingHerbPatches", growingHerbs);
+        }
+        if (readyHardwoodTrees.size() > 0) {
+            farmingPatches.add("readyHardwoodTrees", readyHardwoodTrees);
+        }
+        if (growingHardwoodTrees.size() > 0) {
+            farmingPatches.add("growingHardwoodTrees", growingHardwoodTrees);
+        }
+        if (readyTrees.size() > 0) {
+            farmingPatches.add("readyTreePatches", readyTrees);
+        }
+        if (growingTrees.size() > 0) {
+            farmingPatches.add("growingTreePatches", growingTrees);
+        }
+        if (readyFruitTrees.size() > 0) {
+            farmingPatches.add("readyFruitTreePatches", readyFruitTrees);
+        }
+        if (growingFruitTrees.size() > 0) {
+            farmingPatches.add("growingFruitTreePatches", growingFruitTrees);
+        }
+        if (specialPatches.size() > 0) {
+            farmingPatches.add("specialPatches", specialPatches);
+        }
+        result.add("farmingPatchesAndCrops", farmingPatches);
+
+        return gson.toJson(result);
+    }
+
+    private static class FarmingPatchDef {
+        final String configKey;
+        final String locationName;
+        final String patchType;
+        final Object farmingPatch;
+        final Object patchImplementation;
+        final boolean healthCheckRequired;
+
+        FarmingPatchDef(String configKey, String locationName, String patchType, Object farmingPatch,
+                Object patchImplementation, boolean healthCheckRequired) {
+            this.configKey = configKey;
+            this.locationName = locationName;
+            this.patchType = patchType;
+            this.farmingPatch = farmingPatch;
+            this.patchImplementation = patchImplementation;
+            this.healthCheckRequired = healthCheckRequired;
+        }
+    }
+
+    private static List<FarmingPatchDef> cachedFarmingPatches = null;
+    private Object farmingTracker = null;
+    private Method farmingTrackerPredictMethod = null;
+
+    private synchronized Object getFarmingTracker() {
+        if (farmingTracker == null && configManager != null) {
+            try {
+                Class<?> ftClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingTracker");
+                Class<?> fwClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingWorld");
+                java.lang.reflect.Constructor<?> fwCtor = fwClass.getDeclaredConstructor();
+                fwCtor.setAccessible(true);
+                Object fw = fwCtor.newInstance();
+
+                java.lang.reflect.Constructor<?>[] ctors = ftClass.getDeclaredConstructors();
+                java.lang.reflect.Constructor<?> ftCtor = ctors[0];
+                ftCtor.setAccessible(true);
+                Class<?>[] paramTypes = ftCtor.getParameterTypes();
+                Object[] args = new Object[paramTypes.length];
+                for (int i = 0; i < paramTypes.length; i++) {
+                    if (paramTypes[i].equals(Client.class) || paramTypes[i].getName().endsWith(".Client")) {
+                        args[i] = client;
+                    } else if (paramTypes[i].equals(net.runelite.client.config.ConfigManager.class)
+                            || paramTypes[i].getName().endsWith(".ConfigManager")) {
+                        args[i] = configManager;
+                    } else if (paramTypes[i].equals(fwClass)) {
+                        args[i] = fw;
+                    } else {
+                        args[i] = null;
+                    }
+                }
+                farmingTracker = ftCtor.newInstance(args);
+
+                farmingTrackerPredictMethod = ftClass.getDeclaredMethod("predictPatch",
+                        Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingPatch"), String.class);
+                farmingTrackerPredictMethod.setAccessible(true);
+            } catch (Throwable t) {
+                log.debug("Could not initialize direct FarmingTracker reflection: {}", t.getMessage());
+            }
+        }
+        return farmingTracker;
+    }
+
+    private static synchronized List<FarmingPatchDef> getKnownFarmingPatches() {
+        if (cachedFarmingPatches != null) {
+            return cachedFarmingPatches;
+        }
+        List<FarmingPatchDef> list = new ArrayList<>();
+        Set<String> seenKeys = new HashSet<>();
+
+        try {
+            Class<?> fwClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingWorld");
+            java.lang.reflect.Constructor<?> ctor = fwClass.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            Object fw = ctor.newInstance();
+            Field regionsField = fwClass.getDeclaredField("regions");
+            regionsField.setAccessible(true);
+            com.google.common.collect.Multimap<?, ?> regions = (com.google.common.collect.Multimap<?, ?>) regionsField
+                    .get(fw);
+
+            Class<?> regionClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingRegion");
+            Method getName = regionClass.getDeclaredMethod("getName");
+            getName.setAccessible(true);
+            Method getPatches = regionClass.getDeclaredMethod("getPatches");
+            getPatches.setAccessible(true);
+
+            Class<?> patchClass = Class.forName("net.runelite.client.plugins.timetracking.farming.FarmingPatch");
+            Method getImplementation = patchClass.getDeclaredMethod("getImplementation");
+            getImplementation.setAccessible(true);
+            Method configKeyMethod = patchClass.getDeclaredMethod("configKey");
+            configKeyMethod.setAccessible(true);
+
+            Class<?> piClass = Class.forName("net.runelite.client.plugins.timetracking.farming.PatchImplementation");
+            Method isHealthCheckRequiredMethod = piClass.getDeclaredMethod("isHealthCheckRequired");
+            isHealthCheckRequiredMethod.setAccessible(true);
+
+            for (Object region : regions.values()) {
+                String rName = (String) getName.invoke(region);
+                Object[] patches = (Object[]) getPatches.invoke(region);
+                for (Object patch : patches) {
+                    Enum<?> imp = (Enum<?>) getImplementation.invoke(patch);
+                    String cKey = (String) configKeyMethod.invoke(patch);
+                    if (cKey == null || seenKeys.contains(cKey)) {
+                        continue;
+                    }
+                    seenKeys.add(cKey);
+
+                    boolean healthCheck = (Boolean) isHealthCheckRequiredMethod.invoke(imp);
+                    String pType = formatPatchTypeName(imp.name());
+                    list.add(new FarmingPatchDef(cKey, rName, pType, patch, imp, healthCheck));
+                }
+            }
+        } catch (Throwable t) {
+            // Fallback list of key patches if reflection fails
+        }
+        cachedFarmingPatches = list;
+        return cachedFarmingPatches;
+    }
+
+    private static String formatPatchTypeName(String enumName) {
+        if (enumName == null)
+            return "General";
+        switch (enumName) {
+            case "HERB":
+                return "Herb";
+            case "HARDWOOD_TREE":
+                return "Hardwood Tree";
+            case "FRUIT_TREE":
+                return "Fruit Tree";
+            case "TREE":
+                return "Tree";
+            case "SEAWEED":
+                return "Seaweed";
+            case "HESPORI":
+                return "Hespori";
+            case "REDWOOD":
+                return "Redwood";
+            case "CALQUAT":
+                return "Calquat";
+            case "CELASTRUS":
+                return "Celastrus";
+            case "SPIRIT_TREE":
+                return "Spirit Tree";
+            case "BUSH":
+                return "Bush";
+            case "CACTUS":
+                return "Cactus";
+            case "BELLADONNA":
+                return "Belladonna";
+            case "MUSHROOM":
+                return "Mushroom";
+            case "ALLOTMENT":
+                return "Allotment";
+            case "FLOWER":
+                return "Flower";
+            case "HOPS":
+                return "Hops";
+            case "GRAPES":
+                return "Grapes";
+            case "CRYSTAL_TREE":
+                return "Crystal Tree";
+            case "ANIMA":
+                return "Anima";
+            default:
+                return enumName;
+        }
+    }
+
+    private JsonObject parseFarmingPatchState(FarmingPatchDef patchDef, String val, long nowSec) {
+        if (patchDef == null || val == null || val.trim().isEmpty()) {
+            return null;
+        }
+
+        // 1. Try RuneLite's native FarmingTracker prediction first
+        Object ft = getFarmingTracker();
+        if (ft != null && farmingTrackerPredictMethod != null && patchDef.farmingPatch != null) {
+            try {
+                String profileKey = configManager != null ? configManager.getRSProfileKey() : null;
+                Object prediction = farmingTrackerPredictMethod.invoke(ft, patchDef.farmingPatch, profileKey);
+                if (prediction != null) {
+                    Class<?> predClass = prediction.getClass();
+                    Method getProduce = predClass.getDeclaredMethod("getProduce");
+                    getProduce.setAccessible(true);
+                    Method getCropState = predClass.getDeclaredMethod("getCropState");
+                    getCropState.setAccessible(true);
+                    Method getDoneEstimate = predClass.getDeclaredMethod("getDoneEstimate");
+                    getDoneEstimate.setAccessible(true);
+                    Method getStage = predClass.getDeclaredMethod("getStage");
+                    getStage.setAccessible(true);
+                    Method getStages = predClass.getDeclaredMethod("getStages");
+                    getStages.setAccessible(true);
+
+                    Enum<?> cropState = (Enum<?>) getCropState.invoke(prediction);
+                    Object produceObj = getProduce.invoke(prediction);
+
+                    if (cropState == null || "EMPTY".equals(cropState.name()) || produceObj == null
+                            || "WEEDS".equalsIgnoreCase(((Enum<?>) produceObj).name())) {
+                        return null; // Empty patch or weeds, do not report
+                    }
+
+                    Method getProduceNameMethod = produceObj.getClass().getDeclaredMethod("getName");
+                    getProduceNameMethod.setAccessible(true);
+                    String produceName = (String) getProduceNameMethod.invoke(produceObj);
+
+                    long doneEstimate = (Long) getDoneEstimate.invoke(prediction);
+                    int stage = (Integer) getStage.invoke(prediction);
+                    int stages = (Integer) getStages.invoke(prediction);
+
+                    boolean isReady = false;
+                    String status = "Growing";
+                    int minutesRemaining = 0;
+
+                    if ("HARVESTABLE".equals(cropState.name())) {
+                        status = patchDef.healthCheckRequired ? "Check health ready" : "Ready to harvest";
+                        isReady = true;
+                    } else if ("GROWING".equals(cropState.name())) {
+                        if ((doneEstimate > 0 && doneEstimate <= nowSec) || (stages > 0 && stage >= stages - 1)) {
+                            status = patchDef.healthCheckRequired ? "Check health ready" : "Ready to harvest";
+                            isReady = true;
+                        } else {
+                            if (doneEstimate > nowSec) {
+                                minutesRemaining = (int) Math.max(1, (doneEstimate - nowSec) / 60);
+                                status = "Growing (" + minutesRemaining + " mins remaining)";
+                            } else {
+                                status = "Growing";
+                            }
+                            isReady = false;
+                        }
+                    } else if ("DISEASED".equals(cropState.name())) {
+                        status = "Diseased";
+                        isReady = false;
+                    } else if ("DEAD".equals(cropState.name())) {
+                        status = "Dead";
+                        isReady = false;
+                    } else if ("FILLING".equals(cropState.name())) {
+                        status = "Composting / Filling";
+                        isReady = false;
+                    }
+
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("location", patchDef.locationName);
+                    obj.addProperty("type", patchDef.patchType);
+                    obj.addProperty("produce", produceName != null ? produceName : patchDef.patchType);
+                    obj.addProperty("status", status);
+                    obj.addProperty("ready", isReady);
+                    if (minutesRemaining > 0) {
+                        obj.addProperty("minutesRemaining", minutesRemaining);
+                    }
+                    return obj;
+                }
+            } catch (Throwable t) {
+                log.debug("FarmingTracker prediction reflection failed for {}: {}", patchDef.configKey, t.getMessage());
+            }
+        }
+
+        // 2. Fallback to manual varbit + tick computation if FarmingTracker prediction
+        // wasn't available
+        String[] parts = val.split("[:;,|]");
+        int varbitValue = 0;
+        try {
+            varbitValue = Integer.parseInt(parts[0].trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        if (varbitValue <= 0) {
+            return null; // Empty patch or cleared weeds
+        }
+
+        long timestamp = 0;
+        if (parts.length > 1) {
+            timestamp = parseTimestampOrDuration(parts[1]);
+        }
+
+        try {
+            Method forVarbitValueMethod = patchDef.patchImplementation.getClass().getDeclaredMethod("forVarbitValue",
+                    int.class);
+            forVarbitValueMethod.setAccessible(true);
+            Object patchState = forVarbitValueMethod.invoke(patchDef.patchImplementation, varbitValue);
+            if (patchState == null) {
+                return null;
+            }
+
+            Class<?> psClass = patchState.getClass();
+            Method getProduce = psClass.getDeclaredMethod("getProduce");
+            getProduce.setAccessible(true);
+            Method getCropState = psClass.getDeclaredMethod("getCropState");
+            getCropState.setAccessible(true);
+            Method getStage = psClass.getDeclaredMethod("getStage");
+            getStage.setAccessible(true);
+            Method getStages = psClass.getDeclaredMethod("getStages");
+            getStages.setAccessible(true);
+            Method getTickRate = psClass.getDeclaredMethod("getTickRate");
+            getTickRate.setAccessible(true);
+
+            Enum<?> cropState = (Enum<?>) getCropState.invoke(patchState);
+            if (cropState == null || "EMPTY".equals(cropState.name())) {
+                return null; // CropState.EMPTY = not planted
+            }
+
+            Object produceObj = getProduce.invoke(patchState);
+            String produceName = patchDef.patchType;
+            if (produceObj != null) {
+                Method getNameMethod = produceObj.getClass().getDeclaredMethod("getName");
+                getNameMethod.setAccessible(true);
+                produceName = (String) getNameMethod.invoke(produceObj);
+            }
+
+            boolean isReady = false;
+            String status = "Growing";
+            int minutesRemaining = 0;
+
+            if ("HARVESTABLE".equals(cropState.name())) {
+                status = patchDef.healthCheckRequired ? "Check health ready" : "Ready to harvest";
+                isReady = true;
+            } else if ("GROWING".equals(cropState.name())) {
+                int stage = (Integer) getStage.invoke(patchState);
+                int stages = (Integer) getStages.invoke(patchState);
+                int tickRate = (Integer) getTickRate.invoke(patchState);
+                int remainingStages = Math.max(0, stages - stage);
+                long totalGrowSeconds = (long) remainingStages * tickRate * 60L;
+                long doneTime = timestamp + totalGrowSeconds;
+
+                if (doneTime <= nowSec || remainingStages == 0) {
+                    status = patchDef.healthCheckRequired ? "Check health ready" : "Ready to harvest";
+                    isReady = true;
+                } else {
+                    minutesRemaining = (int) Math.max(1, (doneTime - nowSec) / 60);
+                    status = "Growing (" + minutesRemaining + " mins remaining)";
+                    isReady = false;
+                }
+            } else if ("DISEASED".equals(cropState.name())) {
+                status = "Diseased";
+                isReady = false;
+            } else if ("DEAD".equals(cropState.name())) {
+                status = "Dead";
+                isReady = false;
+            } else if ("FILLING".equals(cropState.name())) {
+                status = "Composting / Filling";
+                isReady = false;
+            }
+
+            JsonObject obj = new JsonObject();
+            obj.addProperty("location", patchDef.locationName);
+            obj.addProperty("type", patchDef.patchType);
+            obj.addProperty("produce", produceName);
+            obj.addProperty("status", status);
+            obj.addProperty("ready", isReady);
+            if (minutesRemaining > 0) {
+                obj.addProperty("minutesRemaining", minutesRemaining);
+            }
+            return obj;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private long parseTimestampOrDuration(String val) {
+        if (val == null || val.trim().isEmpty()) {
+            return 0;
+        }
+        String[] parts = val.split("[:;,|]");
+        for (String part : parts) {
+            try {
+                long num = Long.parseLong(part.trim());
+                if (num > 1000000000000L) {
+                    return num / 1000L;
+                } else if (num > 1000000000L) {
+                    return num;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return 0;
     }
 
     private String buildGameContext() {

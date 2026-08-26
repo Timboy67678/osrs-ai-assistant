@@ -119,10 +119,17 @@ public class OsrsToolRegistry {
                                 true, true, AiService::executeGetPlayerTransportation));
 
                 registry.add(new AiService.ToolDefinition("set_shortest_path_target",
-                                "Set a destination coordinate (X, Y, Plane) in the player's Shortest Path plugin to draw a route overlay on their game screen via cross-plugin communication. IMPORTANT: Always specify surface entrance coordinates (Y < 5000) for dungeons, caves, or underground locations (e.g. Chasm of Fire entrance at X=1435, Y=3671 instead of internal underground offset Y=10077) so the pathfinder draws a valid route on the world map. Supports optional custom start coordinates and pathfinding config overrides (e.g. avoidWilderness). Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
+                                "Set a destination coordinate (X, Y, Plane) or named POI in the player's Shortest Path plugin to draw a route overlay on their game screen via cross-plugin communication. IMPORTANT: Always specify surface entrance coordinates (Y < 5000) for dungeons, caves, or underground locations (e.g. Chasm of Fire entrance at X=1435, Y=3671 instead of internal underground offset Y=10077) so the pathfinder draws a valid route on the world map. Supports optional custom start coordinates and pathfinding config overrides (e.g. avoidWilderness). Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
                                 true, true, AiService::executeSetShortestPathTarget)
-                                .addParam("x", "integer", "The target X coordinate (WorldPoint x, e.g. 3200).", true)
-                                .addParam("y", "integer", "The target Y coordinate (WorldPoint y, e.g. 3400).", true)
+                                .addParam("poiName", "string",
+                                                "Optional well-known landmark, guild, boss entrance, or city name (e.g. 'Farming Guild', 'Grand Exchange', 'Chasm of Fire', 'Barrows', 'Zulrah', 'Myth's Guild'). If provided, coordinates will be automatically resolved.",
+                                                false)
+                                .addParam("x", "integer",
+                                                "The target X coordinate (WorldPoint x, e.g. 3200). Optional if poiName is provided.",
+                                                false)
+                                .addParam("y", "integer",
+                                                "The target Y coordinate (WorldPoint y, e.g. 3400). Optional if poiName is provided.",
+                                                false)
                                 .addParam("plane", "integer",
                                                 "The target plane (0 for ground level, 1 for first floor, etc. Default is 0).",
                                                 false)
@@ -148,6 +155,31 @@ public class OsrsToolRegistry {
                                 .addParam("includeCargo", "boolean",
                                                 "Optional. Set to false to exclude ship cargo hold item listing (default is true).",
                                                 false));
+
+                registry.add(new AiService.ToolDefinition("get_surrounding_environment",
+                                "Retrieve real-time situational details about the player's immediate surrounding game environment within render distance, including nearby NPCs and monsters (names, combat levels, distance, health, interaction), nearby players (names, combat levels, skulls, Wilderness threat status), valuable unlooted ground items, and notable interactable game objects (altars, bank booths, fairy rings, portals, stairs, ladders, furnaces). Call when asked about nearby monsters, boss spawns, PKers in the Wilderness, unlooted ground drops, or local surroundings.",
+                                true, true, AiService::executeGetSurroundingEnvironment)
+                                .addParam("radius", "integer",
+                                                "Optional tile radius to scan around the player (default is 15 tiles, max 30).",
+                                                false));
+
+                registry.add(new AiService.ToolDefinition("get_player_ge_offers",
+                                "Retrieve the player's Grand Exchange offer slots (active, completed, or collecting buy/sell orders, item names, prices, quantity filled vs total, spent/received GP). Call whenever the player asks about their GE transactions, trade history, or buy/sell offer status.",
+                                true, true, AiService::executeGetPlayerGeOffers));
+
+                registry.add(new AiService.ToolDefinition("get_market_prices",
+                                "Retrieve live Grand Exchange prices, High Alchemy values, Nature Rune costs, and calculated High Alchemy profit margins for specified item names or item IDs. Call whenever the player asks about item values, flipping margins, or profitable items to High Alch.",
+                                true, true, AiService::executeGetMarketPrices)
+                                .addParam("itemNames", "array_string",
+                                                "Optional list of item names to look up live market and alch data for.",
+                                                false)
+                                .addParam("itemIds", "array_integer",
+                                                "Optional list of item IDs to look up live market and alch data for.",
+                                                false));
+
+                registry.add(new AiService.ToolDefinition("get_player_farming_and_timers",
+                                "Retrieve the player's active farming patch growth stages, harvest readiness, birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, and active infobox activity timers. Call when asked if crops/herbs/birdhouses are ready or about activity cooldowns.",
+                                true, true, AiService::executeGetPlayerFarmingAndTimers));
 
                 for (AiService.ToolDefinition def : registry) {
                         map.put(def.name, def);

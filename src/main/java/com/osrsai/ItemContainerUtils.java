@@ -35,6 +35,46 @@ public class ItemContainerUtils {
     }
 
     /**
+     * Data structure representing a lightweight item identifier and quantity.
+     */
+    public static class SimpleItem {
+        private final int id;
+        private final int quantity;
+
+        public SimpleItem(int id, int quantity) {
+            this.id = id;
+            this.quantity = quantity;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public int getQuantity() {
+            return quantity;
+        }
+    }
+
+    /**
+     * Converts an array of RuneLite {@link Item}s into a list of
+     * {@link SimpleItem}s.
+     *
+     * @param items array of items
+     * @return list of non-empty {@link SimpleItem} objects
+     */
+    public static List<SimpleItem> toSimpleItemList(Item[] items) {
+        List<SimpleItem> list = new ArrayList<>();
+        if (items != null) {
+            for (Item item : items) {
+                if (item != null && item.getId() > 0 && item.getQuantity() > 0) {
+                    list.add(new SimpleItem(item.getId(), item.getQuantity()));
+                }
+            }
+        }
+        return list;
+    }
+
+    /**
      * Aggregates items in an {@link ItemContainer}, resolving item names, stack
      * quantities, Grand Exchange prices,
      * and High Alchemy values. Applies optional name filters and minimum stack
@@ -52,7 +92,31 @@ public class ItemContainerUtils {
      */
     public static JsonObject aggregateItemsWithPrices(Client client, ItemManager itemManager, ItemContainer container,
             String filter, int minValue) {
+        if (container == null) {
+            return new JsonObject();
+        }
+        return aggregateItemsWithPrices(client, itemManager, toSimpleItemList(container.getItems()), filter, minValue);
+    }
+
+    /**
+     * Aggregates items from a list of {@link SimpleItem}s, resolving item names,
+     * stack
+     * quantities, Grand Exchange prices, and High Alchemy values.
+     *
+     * @param client      RuneLite {@link Client} instance
+     * @param itemManager RuneLite {@link ItemManager} instance
+     * @param items       the list of {@link SimpleItem}s
+     * @param filter      optional search filter expression
+     * @param minValue    optional minimum total stack value filter
+     * @return {@link JsonObject} mapping item names to item detail objects
+     */
+    public static JsonObject aggregateItemsWithPrices(Client client, ItemManager itemManager, List<SimpleItem> items,
+            String filter, int minValue) {
         JsonObject result = new JsonObject();
+        if (items == null || items.isEmpty()) {
+            return result;
+        }
+
         Map<String, Long> quantities = new LinkedHashMap<>();
         Map<String, Integer> itemIds = new HashMap<>();
         Map<String, Integer> itemHaPrices = new HashMap<>();
@@ -64,7 +128,7 @@ public class ItemContainerUtils {
         }
         boolean isIron = isIronman(client);
 
-        for (Item item : container.getItems()) {
+        for (SimpleItem item : items) {
             if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
                 continue;
             }

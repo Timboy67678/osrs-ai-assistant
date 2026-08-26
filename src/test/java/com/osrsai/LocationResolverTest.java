@@ -140,4 +140,31 @@ public class LocationResolverTest {
         // Underground fallback (e.g. desert dungeon)
         Assert.assertEquals("Kharidian Desert (underground)", locationResolver.describe(new WorldPoint(3200, 2700 + 6400, 0), false, null));
     }
+
+    @Test
+    public void resolvesNamedPoiCoordinates() {
+        WorldPoint ge = locationResolver.findCoordinatesByPoiName("Grand Exchange");
+        Assert.assertNotNull(ge);
+        Assert.assertEquals(3164, ge.getX());
+        Assert.assertEquals(3487, ge.getY());
+
+        WorldPoint farmGuild = locationResolver.findCoordinatesByPoiName("farming guild");
+        Assert.assertNotNull(farmGuild);
+        Assert.assertEquals(1248, farmGuild.getX());
+        Assert.assertEquals(3726, farmGuild.getY());
+
+        WorldPoint chasm = locationResolver.findCoordinatesByPoiName("chasm of fire");
+        Assert.assertNotNull(chasm);
+        Assert.assertEquals(1435, chasm.getX());
+        Assert.assertEquals(3671, chasm.getY());
+
+        WorldPoint barrows = locationResolver.findCoordinatesByPoiName("Barrows");
+        Assert.assertNotNull(barrows);
+        Assert.assertEquals(3565, barrows.getX());
+        Assert.assertEquals(3298, barrows.getY());
+
+        Assert.assertNull(locationResolver.findCoordinatesByPoiName("non_existent_place_xyz"));
+        Assert.assertNull(locationResolver.findCoordinatesByPoiName(null));
+        Assert.assertNull(locationResolver.findCoordinatesByPoiName("   "));
+    }
 }
