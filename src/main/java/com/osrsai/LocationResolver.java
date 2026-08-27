@@ -18,7 +18,7 @@ import net.runelite.api.coords.WorldPoint;
  * region IDs, instance templates, and underground offsets into human-readable
  * area names.
  */
-final class LocationResolver {
+public final class LocationResolver {
     private static final int[] UNDERGROUND_Y_OFFSETS = { 6400, 12800 };
     private static final String REGION_ALIAS_RESOURCE = "/com/osrsai/region-aliases.properties";
 
@@ -169,7 +169,7 @@ final class LocationResolver {
      * @param instanceTemplate the active {@link InstanceTemplates} if instanced
      * @return AI prompt location string
      */
-    String describeForAi(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
+    public String describeForAi(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, true);
     }
 

@@ -1128,6 +1128,29 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testScanVesselWidgetsIgnoresChatboxAndPlayerNameContainingBoat() {
+        net.runelite.api.Player mockPlayer = Mockito.mock(net.runelite.api.Player.class);
+        Mockito.when(mockPlayer.getName()).thenReturn("iron timboat");
+        Mockito.when(client.getLocalPlayer()).thenReturn(mockPlayer);
+
+        net.runelite.api.widgets.Widget chatboxWidget = Mockito.mock(net.runelite.api.widgets.Widget.class);
+        Mockito.when(chatboxWidget.getId()).thenReturn(162 << 16); // Chatbox group
+        Mockito.when(chatboxWidget.getText()).thenReturn("[07:45:AM] iron timboat: hello world");
+
+        net.runelite.api.widgets.Widget genericChatWidget = Mockito.mock(net.runelite.api.widgets.Widget.class);
+        Mockito.when(genericChatWidget.getId()).thenReturn(0);
+        Mockito.when(genericChatWidget.getText()).thenReturn("[07:45:AM] iron timboat:");
+
+        Mockito.when(client.getWidgetRoots()).thenReturn(new net.runelite.api.widgets.Widget[] { chatboxWidget, genericChatWidget });
+
+        com.osrsai.context.GameContextBuilder contextBuilder = aiService.getGameContextBuilder();
+        com.osrsai.context.GameContextBuilder.VesselWidgetData vData = contextBuilder.scanVesselWidgets();
+
+        Assert.assertFalse("Should not detect vessel UI from chat messages or player name containing boat", vData.foundVesselUi);
+        Assert.assertNull(vData.shipName);
+    }
+
+    @Test
     public void testGetPlayerSlayerTaskIncludesLocationAndMaster() {
         ConfigManager mockConfig = Mockito.mock(ConfigManager.class);
         Mockito.when(mockConfig.getRSProfileConfiguration("slayer", "taskName")).thenReturn("Dagannoth");
