@@ -137,67 +137,6 @@ public class PromptUtils {
      * @return truncated notification summary string
      */
     public static String truncateForNotification(String text) {
-        if (text == null) {
-            return "";
-        }
-        if (text.length() <= MAX_NOTIFICATION_LENGTH) {
-            return text;
-        }
-        return text.substring(0, MAX_NOTIFICATION_LENGTH - 3) + "...";
-    }
-
-    /**
-     * Converts RuneLite's ACCOUNT_TYPE varbit integer value into a human-readable
-     * account type string.
-     *
-     * @param accountTypeVarbit varbit integer (0=Normal, 1=Ironman, 2=UIM, 3=HCIM,
-     *                          4=GIM, 5=HGIM, 6=UGIM)
-     * @return account type display name
-     */
-    public static String describeAccountType(Integer accountTypeVarbit) {
-        if (accountTypeVarbit == null) {
-            return "Unknown";
-        }
-
-        switch (accountTypeVarbit) {
-            case 1:
-                return "Ironman";
-            case 2:
-                return "Ultimate Ironman (UIM)";
-            case 3:
-                return "Hardcore Ironman (HCIM)";
-            case 4:
-                return "Group Ironman (GIM)";
-            case 5:
-                return "Hardcore Group Ironman (HGIM)";
-            case 6:
-                return "Unranked Group Ironman (UGIM)";
-            case 0:
-            default:
-                return "Normal";
-        }
-    }
-
-    /**
-     * Converts RuneLite's active spellbook varbit integer into a human-readable
-     * spellbook name.
-     *
-     * @param val spellbook integer ID (0=Standard, 1=Ancient Magicks, 2=Lunar,
-     *            3=Arceuus)
-     * @return spellbook name string
-     */
-    public static String describeSpellbook(int val) {
-        switch (val) {
-            case 0:
-                return "Standard";
-            case 1:
-                return "Ancient Magicks";
-            case 2:
-                return "Lunar";
-            case 3:
-                return "Arceuus";
-            default:
-                return "Unknown (" + val + ")";
-        }
+        return Utilities.truncate(text, MAX_NOTIFICATION_LENGTH);
     }
 }

@@ -6,7 +6,6 @@ import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
-import net.runelite.api.Varbits;
 import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemEquipmentStats;
 import net.runelite.http.api.item.ItemPrice;
@@ -126,7 +125,7 @@ public class ItemContainerUtils {
         if (search != null) {
             tokens = OR_SPLIT_PATTERN.split(search);
         }
-        boolean isIron = isIronman(client);
+        boolean isIron = Utilities.isIronman(client);
 
         for (SimpleItem item : items) {
             if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
@@ -361,25 +360,6 @@ public class ItemContainerUtils {
     }
 
     /**
-     * Checks if the currently logged-in player is on an Ironman account mode
-     * (Ironman, UIM, HCIM, GIM, HGIM, UGIM).
-     *
-     * @param client RuneLite {@link Client} instance
-     * @return {@code true} if an Ironman mode is active; {@code false} otherwise
-     */
-    public static boolean isIronman(Client client) {
-        if (client == null) {
-            return false;
-        }
-        try {
-            int accountType = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
-            return accountType >= 1 && accountType <= 6;
-        } catch (Exception ex) {
-            return false;
-        }
-    }
-
-    /**
      * Builds a detailed JSON representation of an item's equipment statistics,
      * prices, weight, GE limits, and slot bonuses.
      *
@@ -544,40 +524,4 @@ public class ItemContainerUtils {
         }
     }
 
-    /**
-     * Converts an equipment slot index integer into a human-readable equipment slot
-     * name.
-     *
-     * @param index slot index (0=Head, 1=Cape, 2=Amulet, 3=Weapon, 4=Body,
-     *              5=Shield, 6=Legs, 7=Gloves, 8=Boots, 9=Ring, 10=Ammo)
-     * @return equipment slot display name
-     */
-    public static String getSlotName(int index) {
-        switch (index) {
-            case 0:
-                return "Head";
-            case 1:
-                return "Cape";
-            case 2:
-                return "Amulet";
-            case 3:
-                return "Weapon";
-            case 4:
-                return "Body";
-            case 5:
-                return "Shield";
-            case 6:
-                return "Legs";
-            case 7:
-                return "Gloves";
-            case 8:
-                return "Boots";
-            case 9:
-                return "Ring";
-            case 10:
-                return "Ammo";
-            default:
-                return "Unknown (" + index + ")";
-        }
-    }
 }

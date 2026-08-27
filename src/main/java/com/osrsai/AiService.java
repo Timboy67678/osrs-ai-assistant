@@ -1038,7 +1038,7 @@ public class AiService {
                         ? comp.getName()
                         : "Item " + item.getId();
 
-                String slotName = ItemContainerUtils.getSlotName(i);
+                String slotName = Utilities.getSlotName(i);
                 JsonObject itemDetail = new JsonObject();
                 itemDetail.addProperty("id", item.getId());
                 itemDetail.addProperty("name", itemName);
@@ -2379,7 +2379,7 @@ public class AiService {
             spellbookVal = client.getVarbitValue(VARBIT_SPELLBOOK);
         } catch (Exception ignored) {
         }
-        String spellbookName = PromptUtils.describeSpellbook(spellbookVal);
+        String spellbookName = Utilities.describeSpellbook(spellbookVal);
         magicObj.addProperty("currentSpellbook", spellbookName);
 
         int magicLevel = client.getRealSkillLevel(Skill.MAGIC);
@@ -3764,7 +3764,7 @@ public class AiService {
         if (client.getLocalPlayer() != null) {
             accountTypeVarbit = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
         }
-        sb.append("Account Type: ").append(PromptUtils.describeAccountType(accountTypeVarbit)).append("\n");
+        sb.append("Account Type: ").append(Utilities.describeAccountTypeFromVarbit(accountTypeVarbit)).append("\n");
         sb.append("World: ").append(client.getWorld()).append("\n");
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
         sb.append("Combat & Key Skills: ")
@@ -3777,7 +3777,7 @@ public class AiService {
                 .append("Hitpoints ").append(client.getRealSkillLevel(Skill.HITPOINTS)).append(", ")
                 .append("Slayer ").append(client.getRealSkillLevel(Skill.SLAYER)).append("\n");
         int spellbookVar = client.getVarbitValue(VARBIT_SPELLBOOK);
-        sb.append("Active Spellbook: ").append(PromptUtils.describeSpellbook(spellbookVar)).append("\n");
+        sb.append("Active Spellbook: ").append(Utilities.describeSpellbook(spellbookVar)).append("\n");
         sb.append("Hitpoints: Current ")
                 .append(client.getBoostedSkillLevel(Skill.HITPOINTS))
                 .append(" (Base Level ")
@@ -3899,21 +3899,7 @@ public class AiService {
     }
 
     private String getDiaryStatus(int varbitId, int maxTasks) {
-        if (client == null) {
-            return "Not Started";
-        }
-        try {
-            int val = client.getVarbitValue(varbitId);
-            if (val <= 0) {
-                return "Not Started";
-            }
-            if (val >= maxTasks) {
-                return "Completed";
-            }
-            return "In Progress (" + val + "/" + maxTasks + " tasks)";
-        } catch (Exception ignored) {
-            return "Not Started";
-        }
+        return Utilities.getDiaryStatus(client, varbitId, maxTasks);
     }
 
     private JsonObject createDiaryProgress(
@@ -3936,12 +3922,12 @@ public class AiService {
 
     @SuppressWarnings("unused")
     private String describeAccountType(Integer accountTypeVarbit) {
-        return PromptUtils.describeAccountType(accountTypeVarbit);
+        return Utilities.describeAccountTypeFromVarbit(accountTypeVarbit);
     }
 
     @SuppressWarnings("unused")
     private String describeSpellbook(int val) {
-        return PromptUtils.describeSpellbook(val);
+        return Utilities.describeSpellbook(val);
     }
 
     @SuppressWarnings("unused")
