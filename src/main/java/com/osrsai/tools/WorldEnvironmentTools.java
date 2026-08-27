@@ -3,9 +3,9 @@ package com.osrsai.tools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.osrsai.ItemContainerUtils;
-import com.osrsai.LocationResolver;
-import com.osrsai.Utilities;
+import com.osrsai.util.ItemContainerUtils;
+import com.osrsai.util.LocationResolver;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
@@ -16,8 +16,10 @@ import java.util.*;
 import java.util.function.Supplier;
 
 /**
- * Tool implementations for world environment scanning (NPCs, other players, ground items,
- * interactive objects), location details, and transportation / teleportation networks.
+ * Tool implementations for world environment scanning (NPCs, other players,
+ * ground items,
+ * interactive objects), location details, and transportation / teleportation
+ * networks.
  */
 @Slf4j
 public class WorldEnvironmentTools {
@@ -46,7 +48,7 @@ public class WorldEnvironmentTools {
     private final Supplier<List<ItemContainerUtils.SimpleItem>> cachedBankSupplier;
 
     public WorldEnvironmentTools(Client client, ItemManager itemManager, LocationResolver locationResolver,
-                                 Gson gson, Supplier<List<ItemContainerUtils.SimpleItem>> cachedBankSupplier) {
+            Gson gson, Supplier<List<ItemContainerUtils.SimpleItem>> cachedBankSupplier) {
         this.client = client;
         this.itemManager = itemManager;
         this.locationResolver = locationResolver;
@@ -240,7 +242,8 @@ public class WorldEnvironmentTools {
                                     }
                                     ItemComposition comp = null;
                                     try {
-                                        comp = itemManager != null ? itemManager.getItemComposition(item.getId()) : null;
+                                        comp = itemManager != null ? itemManager.getItemComposition(item.getId())
+                                                : null;
                                     } catch (Exception ignored) {
                                     }
                                     String itemName = (comp != null && comp.getName() != null) ? comp.getName()
@@ -379,7 +382,9 @@ public class WorldEnvironmentTools {
             WorldPoint wp = localPlayer.getWorldLocation();
             if (wp != null) {
                 InstanceTemplates instanceTemplate = getInstanceTemplate(localPlayer, wp);
-                String locName = locationResolver != null ? locationResolver.describeForAi(wp, inInstance, instanceTemplate) : "Unknown";
+                String locName = locationResolver != null
+                        ? locationResolver.describeForAi(wp, inInstance, instanceTemplate)
+                        : "Unknown";
                 result.addProperty("locationName", locName);
                 result.addProperty("coordinates", wp.getX() + ", " + wp.getY() + ", " + wp.getPlane());
                 result.addProperty("regionId", wp.getRegionID());

@@ -1,4 +1,4 @@
-package com.osrsai;
+package com.osrsai.util;
 
 /**
  * Utility class providing system prompt assembly, prompt character budgeting,

@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.ui.OsrsAiPanel;
 import java.lang.reflect.Method;
 import org.junit.Assert;
 import org.junit.Test;

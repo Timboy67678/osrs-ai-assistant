@@ -21,7 +21,8 @@ import java.util.regex.Pattern;
 
 /**
  * Tool implementations for time tracking, birdhouse traps, Hespori growth,
- * Tears of Guthix cooldown, Kingdom of Miscellania calculation, daily task collectibles,
+ * Tears of Guthix cooldown, Kingdom of Miscellania calculation, daily task
+ * collectibles,
  * and RuneLite FarmingTracker patch prediction reflection.
  */
 @Slf4j
@@ -50,7 +51,7 @@ public class FarmingAndTimerTools {
     private Method farmingTrackerPredictMethod = null;
 
     public FarmingAndTimerTools(Client client, ConfigManager configManager,
-                                InfoBoxManager infoBoxManager, Gson gson) {
+            InfoBoxManager infoBoxManager, Gson gson) {
         this.client = client;
         this.configManager = configManager;
         this.infoBoxManager = infoBoxManager;
@@ -497,7 +498,7 @@ public class FarmingAndTimerTools {
         public final boolean healthCheckRequired;
 
         public FarmingPatchDef(String configKey, String locationName, String patchType, Object farmingPatch,
-                               Object patchImplementation, boolean healthCheckRequired) {
+                Object patchImplementation, boolean healthCheckRequired) {
             this.configKey = configKey;
             this.locationName = locationName;
             this.patchType = patchType;

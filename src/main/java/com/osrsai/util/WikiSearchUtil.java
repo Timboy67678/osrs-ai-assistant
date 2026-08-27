@@ -1,4 +1,4 @@
-package com.osrsai;
+package com.osrsai.util;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;

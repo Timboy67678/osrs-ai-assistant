@@ -3,7 +3,7 @@ package com.osrsai.tools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.osrsai.ItemContainerUtils;
+import com.osrsai.util.ItemContainerUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.client.game.ItemManager;
@@ -14,8 +14,10 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * Tool implementations for player economy: bank querying (live & offline cache),
- * item stats lookup, Grand Exchange offers, and market prices / High Alchemy profits.
+ * Tool implementations for player economy: bank querying (live & offline
+ * cache),
+ * item stats lookup, Grand Exchange offers, and market prices / High Alchemy
+ * profits.
  */
 @Slf4j
 public class EconomyTools {
@@ -30,8 +32,8 @@ public class EconomyTools {
     private final LongSupplier cachedBankTimestampSupplier;
 
     public EconomyTools(Client client, ItemManager itemManager, Gson gson,
-                        Supplier<List<ItemContainerUtils.SimpleItem>> cachedBankSupplier,
-                        LongSupplier cachedBankTimestampSupplier) {
+            Supplier<List<ItemContainerUtils.SimpleItem>> cachedBankSupplier,
+            LongSupplier cachedBankTimestampSupplier) {
         this.client = client;
         this.itemManager = itemManager;
         this.gson = gson;
@@ -55,7 +57,8 @@ public class EconomyTools {
             result.add("items",
                     ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, bankContainer, filter, minValue));
         } else {
-            List<ItemContainerUtils.SimpleItem> cachedBank = cachedBankSupplier != null ? cachedBankSupplier.get() : null;
+            List<ItemContainerUtils.SimpleItem> cachedBank = cachedBankSupplier != null ? cachedBankSupplier.get()
+                    : null;
             long cachedTimestamp = cachedBankTimestampSupplier != null ? cachedBankTimestampSupplier.getAsLong() : 0;
 
             if (cachedBank != null && !cachedBank.isEmpty()) {

@@ -1,5 +1,6 @@
-package com.osrsai;
+package com.osrsai.tools;
 
+import com.osrsai.AiService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;

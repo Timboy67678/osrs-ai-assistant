@@ -1,8 +1,9 @@
-package com.osrsai;
+package com.osrsai.provider;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.osrsai.AiService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -11,10 +12,13 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 
 /**
- * Implementation of {@link ProviderHandler} for Google's Gemini REST API (v1beta).
+ * Implementation of {@link ProviderHandler} for Google's Gemini REST API
+ * (v1beta).
  * <p>
- * Formats requests using Gemini's contents/parts and functionDeclarations schema,
- * handles tool call response structures (functionCall/functionResponse), and constructs URL endpoint requests.
+ * Formats requests using Gemini's contents/parts and functionDeclarations
+ * schema,
+ * handles tool call response structures (functionCall/functionResponse), and
+ * constructs URL endpoint requests.
  */
 public class GeminiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
@@ -54,7 +58,8 @@ public class GeminiProviderHandler implements ProviderHandler {
     /**
      * Builds Gemini tool definitions from registered plugin tools.
      *
-     * @param shareCharInfo {@code true} if character-specific tools should be included
+     * @param shareCharInfo {@code true} if character-specific tools should be
+     *                      included
      * @return {@link JsonArray} of tools formatted with Gemini functionDeclarations
      */
     private JsonArray buildGeminiTools(boolean shareCharInfo) {

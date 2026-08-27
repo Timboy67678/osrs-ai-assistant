@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.util.Utilities;
 import net.runelite.api.Client;
 import net.runelite.api.Varbits;
 import org.junit.Assert;

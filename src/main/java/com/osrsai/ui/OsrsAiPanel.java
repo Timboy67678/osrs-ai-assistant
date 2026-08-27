@@ -1,5 +1,8 @@
-package com.osrsai;
+package com.osrsai.ui;
 
+import com.osrsai.OsrsAiPlugin;
+import com.osrsai.provider.AiProfile;
+import com.osrsai.provider.AiProvider;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.config.ConfigManager;

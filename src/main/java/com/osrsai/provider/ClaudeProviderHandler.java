@@ -1,7 +1,8 @@
-package com.osrsai;
+package com.osrsai.provider;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.osrsai.AiService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -12,7 +13,8 @@ import okhttp3.RequestBody;
 /**
  * Implementation of {@link ProviderHandler} for Anthropic's Claude API.
  * <p>
- * Formats requests using Anthropic's Messages API specification (system prompt, messages array, tool definitions with input_schema)
+ * Formats requests using Anthropic's Messages API specification (system prompt,
+ * messages array, tool definitions with input_schema)
  * and parses response structures for tool use blocks and text content.
  */
 public class ClaudeProviderHandler implements ProviderHandler {
@@ -44,8 +46,10 @@ public class ClaudeProviderHandler implements ProviderHandler {
     /**
      * Builds Anthropic tool definitions from registered plugin tools.
      *
-     * @param shareCharInfo {@code true} if character-specific tools should be included
-     * @return {@link JsonArray} of tool definitions formatted with JSON Schema input schemas
+     * @param shareCharInfo {@code true} if character-specific tools should be
+     *                      included
+     * @return {@link JsonArray} of tool definitions formatted with JSON Schema
+     *         input schemas
      */
     private JsonArray buildClaudeTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();

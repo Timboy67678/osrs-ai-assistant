@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.util.ItemContainerUtils;
 import org.junit.Assert;
 import org.junit.Test;
 

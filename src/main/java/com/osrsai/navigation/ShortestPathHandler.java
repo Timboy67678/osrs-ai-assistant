@@ -1,8 +1,8 @@
 package com.osrsai.navigation;
 
 import com.google.gson.JsonObject;
-import com.osrsai.LocationResolver;
 import com.osrsai.OsrsAiConfig;
+import com.osrsai.util.LocationResolver;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.eventbus.EventBus;
@@ -12,7 +12,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Handles navigation communication with the RuneLite Shortest Path plugin via PluginMessage events,
+ * Handles navigation communication with the RuneLite Shortest Path plugin via
+ * PluginMessage events,
  * coordinate normalization for underground maps, and target marker dispatch.
  */
 @Slf4j
@@ -32,8 +33,10 @@ public class ShortestPathHandler {
 
     /**
      * Normalizes a WorldPoint coordinate for ShortestPath pathfinding.
-     * If the Y coordinate is an underground offset (y >= MAX_SURFACE_WORLD_Y_COORDINATE),
-     * normalizes it down to the corresponding surface level coordinate so that the map
+     * If the Y coordinate is an underground offset (y >=
+     * MAX_SURFACE_WORLD_Y_COORDINATE),
+     * normalizes it down to the corresponding surface level coordinate so that the
+     * map
      * overlay draws correctly on the surface world map.
      *
      * @param point coordinate to normalize
@@ -61,12 +64,14 @@ public class ShortestPathHandler {
     /**
      * Dispatches a target coordinate to the Shortest Path plugin.
      *
-     * @param targetPoint destination coordinate
-     * @param startPoint optional custom start coordinate
+     * @param targetPoint     destination coordinate
+     * @param startPoint      optional custom start coordinate
      * @param configOverrides optional configuration overrides
-     * @return {@code true} if event was posted successfully; {@code false} otherwise
+     * @return {@code true} if event was posted successfully; {@code false}
+     *         otherwise
      */
-    public boolean setShortestPathTarget(WorldPoint targetPoint, WorldPoint startPoint, Map<String, Object> configOverrides) {
+    public boolean setShortestPathTarget(WorldPoint targetPoint, WorldPoint startPoint,
+            Map<String, Object> configOverrides) {
         try {
             if (eventBus != null && targetPoint != null) {
                 targetPoint = normalizeShortestPathPoint(targetPoint);
@@ -98,7 +103,8 @@ public class ShortestPathHandler {
     /**
      * Clears any active route overlay in the Shortest Path plugin.
      *
-     * @return {@code true} if event was posted successfully; {@code false} otherwise
+     * @return {@code true} if event was posted successfully; {@code false}
+     *         otherwise
      */
     public boolean clearShortestPathTarget() {
         try {

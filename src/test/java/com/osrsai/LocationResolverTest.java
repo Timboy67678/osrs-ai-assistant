@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.util.LocationResolver;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import net.runelite.api.InstanceTemplates;
@@ -109,15 +110,18 @@ public class LocationResolverTest {
     @Test
     public void describesVarlamoreAreas() {
         // Civitas illa Fortis
-        Assert.assertEquals("Civitas illa Fortis", locationResolver.describe(new WorldPoint(1690, 3130, 0), false, null));
+        Assert.assertEquals("Civitas illa Fortis",
+                locationResolver.describe(new WorldPoint(1690, 3130, 0), false, null));
         // Hunter Guild
-        Assert.assertEquals("Varlamore Hunter Guild", locationResolver.describe(new WorldPoint(1560, 3435, 0), false, null));
+        Assert.assertEquals("Varlamore Hunter Guild",
+                locationResolver.describe(new WorldPoint(1560, 3435, 0), false, null));
         // Generic Varlamore fallback
         Assert.assertEquals("Varlamore", locationResolver.describe(new WorldPoint(1300, 2800, 0), false, null));
         // Dragon's Nest (underground region 5012)
         Assert.assertEquals("Dragon's Nest", locationResolver.describe(new WorldPoint(1241, 9488, 0), false, null));
         // General Varlamore dungeon falling back to Varlamore (underground)
-        Assert.assertEquals("Varlamore (underground)", locationResolver.describe(new WorldPoint(1300, 9200, 0), false, null));
+        Assert.assertEquals("Varlamore (underground)",
+                locationResolver.describe(new WorldPoint(1300, 9200, 0), false, null));
     }
 
     @Test
@@ -133,12 +137,14 @@ public class LocationResolverTest {
         // Morytania rural (near Slepe)
         Assert.assertEquals("Morytania", locationResolver.describe(new WorldPoint(3600, 3200, 0), false, null));
         // Fremennik Province rural (south of Rellekka)
-        Assert.assertEquals("Fremennik Province", locationResolver.describe(new WorldPoint(2750, 3570, 0), false, null));
+        Assert.assertEquals("Fremennik Province",
+                locationResolver.describe(new WorldPoint(2750, 3570, 0), false, null));
         // Tirannwn rural
         Assert.assertEquals("Tirannwn", locationResolver.describe(new WorldPoint(2200, 3150, 0), false, null));
 
         // Underground fallback (e.g. desert dungeon)
-        Assert.assertEquals("Kharidian Desert (underground)", locationResolver.describe(new WorldPoint(3200, 2700 + 6400, 0), false, null));
+        Assert.assertEquals("Kharidian Desert (underground)",
+                locationResolver.describe(new WorldPoint(3200, 2700 + 6400, 0), false, null));
     }
 
     @Test

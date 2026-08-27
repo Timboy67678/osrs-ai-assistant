@@ -3,7 +3,7 @@ package com.osrsai.tools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.osrsai.Utilities;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Quest;
@@ -15,7 +15,8 @@ import net.runelite.client.config.ConfigManager;
 import java.util.*;
 
 /**
- * Tool implementations for Quest progression, Achievement Diaries, and Combat Achievements.
+ * Tool implementations for Quest progression, Achievement Diaries, and Combat
+ * Achievements.
  */
 @Slf4j
 public class QuestAndDiaryTools {

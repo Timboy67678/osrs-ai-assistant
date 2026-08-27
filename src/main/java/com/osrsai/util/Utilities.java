@@ -1,4 +1,4 @@
-package com.osrsai;
+package com.osrsai.util;
 
 import net.runelite.api.Client;
 import net.runelite.api.Varbits;

@@ -9,7 +9,8 @@ import net.runelite.client.config.Range;
 /**
  * Configuration interface for the OSRS AI Assistant plugin.
  * <p>
- * Defines config options managed by RuneLite's ConfigManager, including tool execution depth,
+ * Defines config options managed by RuneLite's ConfigManager, including tool
+ * execution depth,
  * pathfinding integration, profile persistence, and data sharing options.
  */
 @ConfigGroup(OsrsAiPlugin.CONFIG_GROUP)
@@ -23,7 +24,8 @@ public interface OsrsAiConfig extends Config {
         String sharingSection = "sharing";
 
         /**
-         * Gets the maximum search depth (recursive tool calls / wiki lookups) allowed per question.
+         * Gets the maximum search depth (recursive tool calls / wiki lookups) allowed
+         * per question.
          *
          * @return max search depth count
          */
@@ -34,9 +36,11 @@ public interface OsrsAiConfig extends Config {
         }
 
         /**
-         * Indicates whether the AI is permitted to set route overlays using the Shortest Path plugin.
+         * Indicates whether the AI is permitted to set route overlays using the
+         * Shortest Path plugin.
          *
-         * @return {@code true} if Shortest Path integration is enabled; {@code false} otherwise
+         * @return {@code true} if Shortest Path integration is enabled; {@code false}
+         *         otherwise
          */
         @ConfigItem(keyName = "useShortestPath", name = "Use Shortest Path Plugin", description = "Allow the AI to set path destinations using the Shortest Path plugin if it is installed and enabled.", position = 2, section = generalSection)
         default boolean useShortestPath() {
@@ -44,7 +48,8 @@ public interface OsrsAiConfig extends Config {
         }
 
         /**
-         * Hidden configuration entry storing serialized AI profiles as a JSON array string.
+         * Hidden configuration entry storing serialized AI profiles as a JSON array
+         * string.
          *
          * @return JSON string of AI profiles
          */
@@ -64,9 +69,11 @@ public interface OsrsAiConfig extends Config {
         }
 
         /**
-         * Indicates whether in-game player context (stats, inventory, bank, location, etc.) is sent to the AI provider.
+         * Indicates whether in-game player context (stats, inventory, bank, location,
+         * etc.) is sent to the AI provider.
          *
-         * @return {@code true} if character information is shared; {@code false} otherwise
+         * @return {@code true} if character information is shared; {@code false}
+         *         otherwise
          */
         @ConfigItem(keyName = "shareCharacterInfo", name = "Share Character Info", description = "WARNING: When enabled, this option will send your in-game stats, location, active task, inventory, equipment, quests, achievement diaries, and bank contents to the external AI provider whenever you submit a query.", position = 11, section = sharingSection)
         default boolean shareCharacterInfo() {
@@ -74,7 +81,8 @@ public interface OsrsAiConfig extends Config {
         }
 
         /**
-         * Indicates whether a RuneScape sound effect and notification are played when an AI response completes.
+         * Indicates whether a RuneScape sound effect and notification are played when
+         * an AI response completes.
          *
          * @return {@code true} if notifications are enabled; {@code false} otherwise
          */
@@ -86,7 +94,8 @@ public interface OsrsAiConfig extends Config {
         // --- Hidden window persistence entries (not shown in config UI) ---
 
         /**
-         * Indicates whether the plugin UI panel is currently detached into its own window frame.
+         * Indicates whether the plugin UI panel is currently detached into its own
+         * window frame.
          *
          * @return {@code true} if detached; {@code false} if docked in sidebar
          */

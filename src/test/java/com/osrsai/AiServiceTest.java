@@ -1141,12 +1141,14 @@ public class AiServiceTest {
         Mockito.when(genericChatWidget.getId()).thenReturn(0);
         Mockito.when(genericChatWidget.getText()).thenReturn("[07:45:AM] iron timboat:");
 
-        Mockito.when(client.getWidgetRoots()).thenReturn(new net.runelite.api.widgets.Widget[] { chatboxWidget, genericChatWidget });
+        Mockito.when(client.getWidgetRoots())
+                .thenReturn(new net.runelite.api.widgets.Widget[] { chatboxWidget, genericChatWidget });
 
         com.osrsai.context.GameContextBuilder contextBuilder = aiService.getGameContextBuilder();
         com.osrsai.context.GameContextBuilder.VesselWidgetData vData = contextBuilder.scanVesselWidgets();
 
-        Assert.assertFalse("Should not detect vessel UI from chat messages or player name containing boat", vData.foundVesselUi);
+        Assert.assertFalse("Should not detect vessel UI from chat messages or player name containing boat",
+                vData.foundVesselUi);
         Assert.assertNull(vData.shipName);
     }
 

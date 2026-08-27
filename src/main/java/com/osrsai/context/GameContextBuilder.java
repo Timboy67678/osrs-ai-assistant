@@ -1,9 +1,9 @@
 package com.osrsai.context;
 
-import com.osrsai.LocationResolver;
 import com.osrsai.OsrsAiConfig;
-import com.osrsai.PromptUtils;
-import com.osrsai.Utilities;
+import com.osrsai.util.LocationResolver;
+import com.osrsai.util.PromptUtils;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
@@ -134,7 +134,9 @@ public class GameContextBuilder {
             if (wp != null) {
                 InstanceTemplates instanceTemplate = getInstanceTemplate(localPlayer, wp);
                 boolean inInstance = isInInstance(localPlayer);
-                String locName = locationResolver != null ? locationResolver.describeForAi(wp, inInstance, instanceTemplate) : "Unknown";
+                String locName = locationResolver != null
+                        ? locationResolver.describeForAi(wp, inInstance, instanceTemplate)
+                        : "Unknown";
                 sb.append("Location Name: ").append(locName).append("\n");
                 sb.append("Coordinates: ").append(wp.getX()).append(", ").append(wp.getY()).append(", Plane ")
                         .append(wp.getPlane()).append("\n");
@@ -149,7 +151,8 @@ public class GameContextBuilder {
     }
 
     private static final int VARBIT_SAILING_STATE = 15200;
-    private static final Pattern PATTERN_TIMESTAMP = Pattern.compile("^\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM|am|pm)?\\]");
+    private static final Pattern PATTERN_TIMESTAMP = Pattern
+            .compile("^\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM|am|pm)?\\]");
     private static final Pattern PATTERN_SHIP_TYPE = Pattern.compile(
             "\\b(clipper|sloop|skiff|brig|frigate|galleon|raft|caravel|dhow|catamaran)\\b",
             Pattern.CASE_INSENSITIVE);
@@ -160,7 +163,7 @@ public class GameContextBuilder {
             164, // Chat channel
             149, // Inventory
             387, // Equipment
-            84,  // Equipment screen
+            84, // Equipment screen
             320, // Skills
             399, // Quest list
             629, // Achievement Diary
@@ -169,16 +172,16 @@ public class GameContextBuilder {
             218, // Spellbook
             429, // Friends
             432, // Ignore
-            7,   // Clan
+            7, // Clan
             693, // Friends Chat
             239, // Music
             116, // Settings
             261, // Options
             216, // Emotes
             182, // Logout
-            69,  // World switcher
+            69, // World switcher
             160, // Minimap / orbs
-            12,  // Bank
+            12, // Bank
             213, // Bank pin
             192, // Deposit box
             465, // Grand Exchange
@@ -186,7 +189,7 @@ public class GameContextBuilder {
             231, // Player dialogue
             193, // Options dialogue
             229, // Message dialogue
-            219  // Dialogues
+            219 // Dialogues
     );
 
     /**
@@ -333,8 +336,9 @@ public class GameContextBuilder {
      * Resolves the instance template chunk match for an instanced coordinate.
      *
      * @param localPlayer player reference
-     * @param worldPoint current world coordinate
-     * @return matching {@link InstanceTemplates}, or {@code null} if not in an instance
+     * @param worldPoint  current world coordinate
+     * @return matching {@link InstanceTemplates}, or {@code null} if not in an
+     *         instance
      */
     public InstanceTemplates getInstanceTemplate(Player localPlayer, WorldPoint worldPoint) {
         if (localPlayer == null || worldPoint == null) {

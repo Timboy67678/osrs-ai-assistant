@@ -3,8 +3,8 @@ package com.osrsai.tools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.osrsai.LocationResolver;
 import com.osrsai.context.GameContextBuilder;
+import com.osrsai.util.LocationResolver;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
@@ -35,7 +35,7 @@ public class ActivityTrackerTools {
     private final Gson gson;
 
     public ActivityTrackerTools(Client client, ItemManager itemManager, PluginManager pluginManager,
-                                LocationResolver locationResolver, GameContextBuilder gameContextBuilder, Gson gson) {
+            LocationResolver locationResolver, GameContextBuilder gameContextBuilder, Gson gson) {
         this.client = client;
         this.itemManager = itemManager;
         this.pluginManager = pluginManager;
@@ -120,7 +120,7 @@ public class ActivityTrackerTools {
     }
 
     private JsonArray formatClueDetails(net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue,
-                                        net.runelite.client.plugins.cluescrolls.ClueScrollPlugin cluePlugin) {
+            net.runelite.client.plugins.cluescrolls.ClueScrollPlugin cluePlugin) {
         net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
         clue.makeOverlayHint(panel, cluePlugin);
 
@@ -244,8 +244,11 @@ public class ActivityTrackerTools {
             WorldPoint wp = localPlayer.getWorldLocation();
             if (wp != null) {
                 boolean inInstance = gameContextBuilder != null && gameContextBuilder.isInInstance(localPlayer);
-                InstanceTemplates template = gameContextBuilder != null ? gameContextBuilder.getInstanceTemplate(localPlayer, wp) : null;
-                String locName = locationResolver != null ? locationResolver.describeForAi(wp, inInstance, template) : "Unknown";
+                InstanceTemplates template = gameContextBuilder != null
+                        ? gameContextBuilder.getInstanceTemplate(localPlayer, wp)
+                        : null;
+                String locName = locationResolver != null ? locationResolver.describeForAi(wp, inInstance, template)
+                        : "Unknown";
                 locObj.addProperty("locationName", locName);
                 locObj.addProperty("regionId", wp.getRegionID());
                 locObj.addProperty("coordinates", wp.getX() + ", " + wp.getY() + ", " + wp.getPlane());
@@ -261,7 +264,8 @@ public class ActivityTrackerTools {
                 if (inv != null) {
                     for (Item item : inv.getItems()) {
                         if (item != null && item.getId() > 0) {
-                            ItemComposition comp = itemManager != null ? itemManager.getItemComposition(item.getId()) : null;
+                            ItemComposition comp = itemManager != null ? itemManager.getItemComposition(item.getId())
+                                    : null;
                             if (comp != null && comp.getName() != null) {
                                 String lower = comp.getName().toLowerCase();
                                 if (lower.contains("plank") || lower.contains("sail") || lower.contains("cannon")

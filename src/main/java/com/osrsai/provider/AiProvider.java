@@ -1,10 +1,13 @@
-package com.osrsai;
+package com.osrsai.provider;
 
 /**
- * Enumeration of supported AI service providers and their default model identifiers.
+ * Enumeration of supported AI service providers and their default model
+ * identifiers.
  * <p>
- * Maps each provider type (Gemini, OpenAI, Claude, Grok, Custom) to its default model ID
- * and provides factory logic to retrieve the appropriate {@link ProviderHandler} instance.
+ * Maps each provider type (Gemini, OpenAI, Claude, Grok, Custom) to its default
+ * model ID
+ * and provides factory logic to retrieve the appropriate
+ * {@link ProviderHandler} instance.
  */
 public enum AiProvider {
     /** Google Gemini provider (default: gemini-2.5-flash). */
@@ -39,7 +42,7 @@ public enum AiProvider {
     /**
      * Constructs an {@code AiProvider} entry.
      *
-     * @param name human-readable display name
+     * @param name    human-readable display name
      * @param modelId default API model identifier
      */
     AiProvider(String name, String modelId) {
@@ -68,7 +71,8 @@ public enum AiProvider {
     /**
      * Gets the {@link ProviderHandler} instance configured for this provider.
      *
-     * @param customEndpoint custom HTTP API endpoint URL (used when provider is {@link #CUSTOM})
+     * @param customEndpoint custom HTTP API endpoint URL (used when provider is
+     *                       {@link #CUSTOM})
      * @return the {@link ProviderHandler} implementation
      * @throws IllegalStateException if an unexpected provider is encountered
      */

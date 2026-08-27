@@ -1,8 +1,9 @@
-package com.osrsai;
+package com.osrsai.provider;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.osrsai.AiService;
 import java.util.ArrayList;
 import java.util.List;
 import okhttp3.MediaType;
@@ -10,9 +11,11 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 
 /**
- * Implementation of {@link ProviderHandler} for OpenAI-compatible chat completion APIs (OpenAI, Grok, Custom endpoints).
+ * Implementation of {@link ProviderHandler} for OpenAI-compatible chat
+ * completion APIs (OpenAI, Grok, Custom endpoints).
  * <p>
- * Supports standard OpenAI JSON schema for messages, system prompt, max token caps (including reasoning models),
+ * Supports standard OpenAI JSON schema for messages, system prompt, max token
+ * caps (including reasoning models),
  * function calling tools, and HTTP Authorization header authentication.
  */
 public class OpenAiProviderHandler implements ProviderHandler {
@@ -21,9 +24,11 @@ public class OpenAiProviderHandler implements ProviderHandler {
     private final String apiUrl;
 
     /**
-     * Constructs an {@code OpenAiProviderHandler} for a specific target API endpoint URL.
+     * Constructs an {@code OpenAiProviderHandler} for a specific target API
+     * endpoint URL.
      *
-     * @param apiUrl target endpoint URL (e.g. OpenAI chat completions or Grok endpoint)
+     * @param apiUrl target endpoint URL (e.g. OpenAI chat completions or Grok
+     *               endpoint)
      */
     public OpenAiProviderHandler(String apiUrl) {
         this.apiUrl = apiUrl;
@@ -39,8 +44,8 @@ public class OpenAiProviderHandler implements ProviderHandler {
         String lowerModel = modelId != null ? modelId.toLowerCase() : "";
         boolean isReasoningModel = lowerModel.startsWith("o1")
                 || lowerModel.startsWith("o3")
-        		|| lowerModel.contains("reasoning")
-        		|| lowerModel.contains("r1");
+                || lowerModel.contains("reasoning")
+                || lowerModel.contains("r1");
         if (isReasoningModel) {
             bodyObj.addProperty("max_completion_tokens", 16384);
         } else {
@@ -69,7 +74,8 @@ public class OpenAiProviderHandler implements ProviderHandler {
     /**
      * Builds OpenAI tool definitions from registered plugin tools.
      *
-     * @param shareCharInfo {@code true} if character-specific tools should be included
+     * @param shareCharInfo {@code true} if character-specific tools should be
+     *                      included
      * @return {@link JsonArray} of function tool declarations
      */
     protected JsonArray buildOpenAiTools(boolean shareCharInfo) {
@@ -120,7 +126,8 @@ public class OpenAiProviderHandler implements ProviderHandler {
     }
 
     /**
-     * Helper method to extract the assistant message object from the response choices array or outputs array.
+     * Helper method to extract the assistant message object from the response
+     * choices array or outputs array.
      *
      * @param responseRoot API response JSON object
      * @return assistant message {@link JsonObject}, or {@code null} if not found

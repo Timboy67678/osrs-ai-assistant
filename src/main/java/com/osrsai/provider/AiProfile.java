@@ -1,4 +1,4 @@
-package com.osrsai;
+package com.osrsai.provider;
 
 import java.util.UUID;
 

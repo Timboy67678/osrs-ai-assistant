@@ -1,4 +1,4 @@
-package com.osrsai;
+package com.osrsai.util;
 
 import java.util.*;
 
@@ -156,7 +156,7 @@ public final class LocationResolver {
      * @param instanceTemplate the active {@link InstanceTemplates} if instanced
      * @return display location string
      */
-    String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
+    public String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
         return resolveLocation(worldPoint, inInstance, instanceTemplate, false);
     }
 

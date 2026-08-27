@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.util.PromptUtils;
 import org.junit.Assert;
 import org.junit.Test;
 

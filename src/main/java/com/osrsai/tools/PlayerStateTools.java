@@ -3,8 +3,8 @@ package com.osrsai.tools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.osrsai.ItemContainerUtils;
-import com.osrsai.Utilities;
+import com.osrsai.util.ItemContainerUtils;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.gameval.VarPlayerID;
@@ -19,7 +19,8 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * Tool implementations for player character state: skills, inventory, worn equipment,
+ * Tool implementations for player character state: skills, inventory, worn
+ * equipment,
  * combat status/vitals, currencies/points, and Slayer tasks.
  */
 @Slf4j
@@ -76,7 +77,7 @@ public class PlayerStateTools {
     private final Gson gson;
 
     public PlayerStateTools(Client client, ItemManager itemManager, ConfigManager configManager,
-                            InfoBoxManager infoBoxManager, Gson gson) {
+            InfoBoxManager infoBoxManager, Gson gson) {
         this.client = client;
         this.itemManager = itemManager;
         this.configManager = configManager;

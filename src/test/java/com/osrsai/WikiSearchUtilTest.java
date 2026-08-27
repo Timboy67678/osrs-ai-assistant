@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.util.WikiSearchUtil;
 import com.google.gson.Gson;
 import okhttp3.OkHttpClient;
 import org.junit.Assert;
@@ -26,7 +27,8 @@ public class WikiSearchUtilTest {
         Assert.assertEquals("blood runes", WikiSearchUtil.extractSearchQuery("where can i buy blood runes"));
         Assert.assertEquals("fire rune", WikiSearchUtil.extractSearchQuery("how to get a fire rune drop rate"));
         Assert.assertEquals("myths' guild", WikiSearchUtil.extractSearchQuery("Myths' Guild location coordinates"));
-        Assert.assertEquals("dragon slayer ii", WikiSearchUtil.extractSearchQuery("Dragon Slayer II quest requirements"));
+        Assert.assertEquals("dragon slayer ii",
+                WikiSearchUtil.extractSearchQuery("Dragon Slayer II quest requirements"));
         Assert.assertEquals("rune pouch", WikiSearchUtil.extractSearchQuery("rune pouch slayer points cost"));
     }
 
@@ -108,7 +110,8 @@ public class WikiSearchUtilTest {
         Gson gson = new Gson();
         String result = WikiSearchUtil.executeWikiSearch(client, gson, "Suqah teeth");
         Assert.assertNotNull(result);
-        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"not_found\"") || result.contains("\"status\":\"error\""));
+        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"not_found\"")
+                || result.contains("\"status\":\"error\""));
     }
 
     @Test
@@ -116,7 +119,7 @@ public class WikiSearchUtilTest {
         WikiSearchUtil.clearCache();
         OkHttpClient client = new OkHttpClient();
         Gson gson = new Gson();
-        
+
         long start1 = System.currentTimeMillis();
         String res1 = WikiSearchUtil.executeWikiSearch(client, gson, "Abyssal whip");
         long duration1 = System.currentTimeMillis() - start1;
@@ -126,6 +129,8 @@ public class WikiSearchUtilTest {
         long duration2 = System.currentTimeMillis() - start2;
 
         Assert.assertEquals(res1, res2);
-        Assert.assertTrue("Cached search should be under 50ms (uncached: " + duration1 + "ms, cached: " + duration2 + "ms)", duration2 < 50);
+        Assert.assertTrue(
+                "Cached search should be under 50ms (uncached: " + duration1 + "ms, cached: " + duration2 + "ms)",
+                duration2 < 50);
     }
 }

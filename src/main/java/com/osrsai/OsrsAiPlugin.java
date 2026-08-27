@@ -1,6 +1,7 @@
 package com.osrsai;
 
 import com.google.inject.Provides;
+import com.osrsai.ui.OsrsAiPanel;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;

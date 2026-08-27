@@ -1,4 +1,4 @@
-package com.osrsai;
+package com.osrsai.util;
 
 import com.google.gson.JsonObject;
 import net.runelite.api.Client;

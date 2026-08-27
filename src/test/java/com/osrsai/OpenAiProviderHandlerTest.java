@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.osrsai.provider.OpenAiProviderHandler;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.junit.Assert;
