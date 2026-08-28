@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PlayerStateTools {
     private static final int MAX_TOOLTIP_LENGTH = 150;
-    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]*>");
+
     private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
 
     private static final int VARP_SPECIAL_ATTACK_PERCENT = 300;
@@ -85,21 +85,7 @@ public class PlayerStateTools {
         this.gson = gson;
     }
 
-    private String getConfigValue(String group, String... keys) {
-        if (configManager == null) {
-            return null;
-        }
-        for (String key : keys) {
-            String val = configManager.getRSProfileConfiguration(group, key);
-            if (val == null || val.isEmpty()) {
-                val = configManager.getConfiguration(group, key);
-            }
-            if (val != null && !val.isEmpty()) {
-                return val;
-            }
-        }
-        return null;
-    }
+
 
     public String normalizeSkillName(String input) {
         if (input == null) {
@@ -395,7 +381,7 @@ public class PlayerStateTools {
 
                     String tooltip = box.getTooltip();
                     if (tooltip != null && !tooltip.trim().isEmpty()) {
-                        String noHtml = PATTERN_HTML_TAGS.matcher(tooltip).replaceAll(" ");
+                        String noHtml = Utilities.PATTERN_HTML_TAGS.matcher(tooltip).replaceAll(" ");
                         String cleanTooltip = PATTERN_WHITESPACE.matcher(noHtml).replaceAll(" ").trim();
                         if (cleanTooltip.length() > MAX_TOOLTIP_LENGTH) {
                             cleanTooltip = cleanTooltip.substring(0, MAX_TOOLTIP_LENGTH - 3) + "...";
@@ -493,11 +479,11 @@ public class PlayerStateTools {
         }
 
         try {
-            String pts = getConfigValue("slayer", "points");
+            String pts = Utilities.getConfigValue(configManager, "slayer", "points");
             if (pts != null && !pts.isEmpty()) {
                 points.addProperty("slayerPoints", Integer.parseInt(pts));
             }
-            String strk = getConfigValue("slayer", "streak");
+            String strk = Utilities.getConfigValue(configManager, "slayer", "streak");
             if (strk != null && !strk.isEmpty()) {
                 points.addProperty("slayerStreak", Integer.parseInt(strk));
             }
@@ -556,12 +542,12 @@ public class PlayerStateTools {
 
     public String executeGetPlayerSlayerTask(JsonObject args) {
         JsonObject result = new JsonObject();
-        String taskName = getConfigValue("slayer", "taskName");
-        String amount = getConfigValue("slayer", "amount");
-        String taskLocation = getConfigValue("slayer", "taskLocation", "location");
-        String slayerMaster = getConfigValue("slayer", "slayerMaster", "masterName", "master", "taskMaster");
-        String pointsStr = getConfigValue("slayer", "points");
-        String streakStr = getConfigValue("slayer", "streak");
+        String taskName = Utilities.getConfigValue(configManager, "slayer", "taskName");
+        String amount = Utilities.getConfigValue(configManager, "slayer", "amount");
+        String taskLocation = Utilities.getConfigValue(configManager, "slayer", "taskLocation", "location");
+        String slayerMaster = Utilities.getConfigValue(configManager, "slayer", "slayerMaster", "masterName", "master", "taskMaster");
+        String pointsStr = Utilities.getConfigValue(configManager, "slayer", "points");
+        String streakStr = Utilities.getConfigValue(configManager, "slayer", "streak");
 
         int pointsVal = 0;
         if (pointsStr != null && !pointsStr.isEmpty()) {

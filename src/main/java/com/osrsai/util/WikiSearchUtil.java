@@ -68,17 +68,39 @@ public class WikiSearchUtil {
     /** Maximum search candidates to retrieve from MediaWiki search API. */
     public static final int WIKI_SEARCH_SRLIMIT = 5;
 
+    /** Cache TTL in seconds (30 minutes). Stale entries are silently re-fetched. */
+    private static final long CACHE_TTL_SECONDS = 30 * 60;
+
     /** Maximum number of entries retained in the synchronized search cache. */
     private static final int CACHE_MAX_ENTRIES = 500;
 
     /**
-     * LRU cache storing recent wiki query results to prevent redundant HTTP network
-     * calls.
+     * Immutable wrapper pairing a wiki result JSON string with the epoch-second
+     * timestamp at which it was cached, used to enforce the {@link #CACHE_TTL_SECONDS}
+     * expiry policy.
      */
-    private static final Map<String, String> SEARCH_CACHE = Collections.synchronizedMap(
+    private static final class CacheEntry {
+        final String result;
+        final long cachedAt;
+
+        CacheEntry(String result) {
+            this.result = result;
+            this.cachedAt = System.currentTimeMillis() / 1000L;
+        }
+
+        boolean isExpired() {
+            return (System.currentTimeMillis() / 1000L) - cachedAt > CACHE_TTL_SECONDS;
+        }
+    }
+
+    /**
+     * LRU cache storing recent wiki query results to prevent redundant HTTP network
+     * calls. Values are wrapped in {@link CacheEntry} to support TTL expiry.
+     */
+    private static final Map<String, CacheEntry> SEARCH_CACHE = Collections.synchronizedMap(
             new LinkedHashMap<>(CACHE_MAX_ENTRIES, 0.75f, true) {
                 @Override
-                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
                     return size() > CACHE_MAX_ENTRIES;
                 }
             });
@@ -134,8 +156,12 @@ public class WikiSearchUtil {
         String cacheKey = cleanedQuery.trim().toLowerCase();
 
         if (SEARCH_CACHE.containsKey(cacheKey)) {
-            log.debug("Wiki search cache hit for: {}", cacheKey);
-            return SEARCH_CACHE.get(cacheKey);
+            CacheEntry cached = SEARCH_CACHE.get(cacheKey);
+            if (cached != null && !cached.isExpired()) {
+                log.debug("Wiki search cache hit for: {}", cacheKey);
+                return cached.result;
+            }
+            log.debug("Wiki search cache expired for: {}", cacheKey);
         }
 
         // 1. Direct title parse fetch via MediaWiki action=parse
@@ -146,7 +172,7 @@ public class WikiSearchUtil {
         }
 
         if (result != null) {
-            SEARCH_CACHE.put(cacheKey, result);
+            SEARCH_CACHE.put(cacheKey, new CacheEntry(result));
             return result;
         }
 
@@ -155,7 +181,7 @@ public class WikiSearchUtil {
         err.addProperty("message", "No OSRS wiki article found for query '" + query
                 + "'. This entity, reward, or feature does NOT exist in OSRS (it may be a hallucination, RS3 content, or invalid terminology). Do NOT fabricate mechanics or quest rewards.");
         String errJson = gson.toJson(err);
-        SEARCH_CACHE.put(cacheKey, errJson);
+        SEARCH_CACHE.put(cacheKey, new CacheEntry(errJson));
         return errJson;
     }
 
@@ -254,6 +280,8 @@ public class WikiSearchUtil {
                 " spawn location",
                 " shop locations",
                 " shop location",
+                " drop sources",
+                " drop source",
                 " map location",
                 " slayer points",
                 " requirements",
@@ -269,6 +297,8 @@ public class WikiSearchUtil {
                 " locations",
                 " location",
                 " weakness",
+                " sources",
+                " source",
                 " recipe",
                 " spawns",
                 " coords",
@@ -436,8 +466,15 @@ public class WikiSearchUtil {
      */
     public static String searchWikiTopResult(OkHttpClient wikiClient, Gson gson, String query) {
         String directTitle = resolveTitleDirectly(wikiClient, gson, query);
-        if (directTitle != null) {
+        // Guard against the MediaWiki API resolving a query to a completely unrelated
+        // page (e.g. "dragon platelegs drop sources" resolving to "Uri transform").
+        // Only trust the direct-resolve result if the returned title shares at least
+        // one meaningful keyword (3+ chars, ignoring common stop words) with the query.
+        if (directTitle != null && isTitleRelevantToQuery(directTitle, query)) {
             return directTitle;
+        } else if (directTitle != null) {
+            log.info("Direct title resolve '{}' deemed irrelevant to query '{}'; falling back to full-text search",
+                    directTitle, query);
         }
 
         try {
@@ -483,6 +520,47 @@ public class WikiSearchUtil {
             log.warn("Wiki search failed for: {}", query, e);
             return null;
         }
+    }
+
+    /**
+     * Checks whether a resolved wiki article title is relevant to the original search
+     * query by testing for at least one shared keyword of 3+ characters, ignoring
+     * common English and OSRS stop words.
+     *
+     * @param title resolved article title from the MediaWiki API
+     * @param query original cleaned search query
+     * @return {@code true} if the title appears related to the query
+     */
+    static boolean isTitleRelevantToQuery(String title, String query) {
+        if (title == null || query == null || title.isEmpty() || query.isEmpty()) {
+            return false;
+        }
+        // Common stop words to exclude from keyword matching
+        java.util.Set<String> stopWords = new java.util.HashSet<>(java.util.Arrays.asList(
+                "the", "and", "for", "from", "with", "that", "this", "how", "what",
+                "where", "when", "can", "you", "are", "not", "osrs", "wiki",
+                "get", "has", "its", "your", "their", "they", "have", "been"));
+
+        String titleLower = title.toLowerCase(java.util.Locale.ROOT);
+        String queryLower = query.toLowerCase(java.util.Locale.ROOT);
+
+        // Tokenise both strings on non-alpha characters
+        String[] queryTokens = queryLower.split("[^a-z]+");
+        String[] titleTokens = titleLower.split("[^a-z]+");
+
+        java.util.Set<String> titleWords = new java.util.HashSet<>();
+        for (String t : titleTokens) {
+            if (t.length() >= 3 && !stopWords.contains(t)) {
+                titleWords.add(t);
+            }
+        }
+
+        for (String q : queryTokens) {
+            if (q.length() >= 3 && !stopWords.contains(q) && titleWords.contains(q)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -612,8 +690,13 @@ public class WikiSearchUtil {
                     String val = PATTERN_EDIT_BUTTONS.matcher(cells.text().trim()).replaceAll("").trim();
                     key = PATTERN_MOID_NOISE.matcher(key).replaceAll("").trim();
                     val = PATTERN_MOID_NOISE.matcher(val).replaceAll("").trim();
+                    // Skip rows where the key is a raw numeric stat token (e.g. "+60", "+0")
+                    // rather than a human-readable label — these are rendering artefacts
+                    // from the OSRS wiki NPC combat-stats infobox and produce garbled
+                    // output like "- **+60**: 50% weakness" that can mislead the AI.
                     if (!key.isEmpty() && !val.isEmpty() && !key.equalsIgnoreCase("Image")
                             && !key.equalsIgnoreCase("Caption")
+                            && !isRawStatKey(key)
                             && !val.equalsIgnoreCase("Not alchemisable") && !val.equalsIgnoreCase("Not sold")
                             && !val.equalsIgnoreCase("No data to display")) {
                         sb.append("- **").append(key).append("**: ").append(val).append("\n");
@@ -624,6 +707,7 @@ public class WikiSearchUtil {
                     key = PATTERN_MOID_NOISE.matcher(key).replaceAll("").trim();
                     val = PATTERN_MOID_NOISE.matcher(val).replaceAll("").trim();
                     if (!key.isEmpty() && !val.isEmpty() && !key.equalsIgnoreCase("Image")
+                            && !isRawStatKey(key)
                             && !val.equalsIgnoreCase("Not alchemisable") && !val.equalsIgnoreCase("Not sold")
                             && !val.equalsIgnoreCase("No data to display")) {
                         sb.append("- **").append(key).append("**: ").append(val).append("\n");
@@ -640,6 +724,27 @@ public class WikiSearchUtil {
             infobox.remove();
         }
         return sb.toString().trim();
+    }
+
+    /**
+     * Returns {@code true} if the given infobox key looks like a raw numeric stat
+     * token rather than a human-readable label.
+     * <p>
+     * The OSRS wiki NPC infobox renders combat bonuses (e.g. attack/defence/ranged
+     * bonuses) as bare cells like "+60" or "+0" without semantic column headers,
+     * which our parser naively promotes to key/value pairs such as
+     * {@code "- **+60**: 50% weakness"}. These entries are meaningless out of
+     * context and can mislead the AI into inventing incorrect monster weaknesses.
+     *
+     * @param key infobox key string to test
+     * @return {@code true} if the key should be suppressed
+     */
+    static boolean isRawStatKey(String key) {
+        if (key == null || key.isEmpty()) {
+            return false;
+        }
+        // Matches tokens like "+0", "+60", "-10", "0", "100", "100%", "+100%"
+        return key.matches("[+\\-]?\\d+%?");
     }
 
     private static String extractLeadSummary(Element root) {

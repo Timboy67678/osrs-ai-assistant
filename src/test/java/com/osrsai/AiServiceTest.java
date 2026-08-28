@@ -24,6 +24,11 @@ import net.runelite.api.Skill;
 import net.runelite.api.Experience;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.config.ConfigManager;
+import com.osrsai.provider.AiProfile;
+import com.osrsai.provider.AiProvider;
+import com.osrsai.util.ItemContainerUtils;
+import com.osrsai.util.Utilities;
+import com.osrsai.util.WikiSearchUtil;
 import java.util.Arrays;
 import java.util.List;
 
@@ -408,30 +413,41 @@ public class AiServiceTest {
         okHttpClientField.setAccessible(true);
         okHttpClientField.set(aiService, new OkHttpClient());
 
-        Method executeWikiSearch = AiService.class.getDeclaredMethod("executeWikiSearch", String.class);
-        executeWikiSearch.setAccessible(true);
-
         System.out.println("Running executeWikiSearch...");
-        String result = (String) executeWikiSearch.invoke(aiService, "Suqah teeth");
+        String result = WikiSearchUtil.executeWikiSearch(aiService.getWikiClient(), new Gson(), "Suqah teeth");
         System.out.println("Result: " + result);
         Assert.assertNotNull(result);
         // Resilient to offline environments - allow "status":"error" OR matching result
-        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"error\""));
+        Assert.assertTrue(result.contains("Suqah") || result.contains("\"status\":\"error\"") || result.contains("\"status\":\"not_found\""));
     }
 
     @Test
-    public void describeAccountTypeIncludesIronmanVariants() throws Exception {
-        Method describeAccountType = AiService.class.getDeclaredMethod("describeAccountType", Integer.class);
-        describeAccountType.setAccessible(true);
+    public void testLegacyProfileDeserialization() {
+        Gson g = new Gson();
 
-        Assert.assertEquals("Ironman", describeAccountType.invoke(aiService, 1));
-        Assert.assertEquals("Ultimate Ironman (UIM)", describeAccountType.invoke(aiService, 2));
-        Assert.assertEquals("Hardcore Ironman (HCIM)", describeAccountType.invoke(aiService, 3));
-        Assert.assertEquals("Group Ironman (GIM)", describeAccountType.invoke(aiService, 4));
-        Assert.assertEquals("Hardcore Group Ironman (HGIM)", describeAccountType.invoke(aiService, 5));
-        Assert.assertEquals("Unranked Group Ironman (UGIM)", describeAccountType.invoke(aiService, 6));
-        Assert.assertEquals("Normal", describeAccountType.invoke(aiService, 0));
-        Assert.assertEquals("Unknown", describeAccountType.invoke(aiService, new Object[] { null }));
+        String legacyGrokJson = "{\"id\":\"1\",\"name\":\"My Grok\",\"provider\":\"GROK\",\"apiKey\":\"test\"}";
+        AiProfile p1 = g.fromJson(legacyGrokJson, AiProfile.class);
+        Assert.assertEquals(AiProvider.GROK_4_3, p1.getProvider());
+
+        String legacyGeminiJson = "{\"id\":\"2\",\"name\":\"My Gemini\",\"provider\":\"GEMINI\",\"apiKey\":\"test\"}";
+        AiProfile p2 = g.fromJson(legacyGeminiJson, AiProfile.class);
+        Assert.assertEquals(AiProvider.GEMINI_2_5_FLASH, p2.getProvider());
+
+        String legacyClaudeJson = "{\"id\":\"3\",\"name\":\"My Claude\",\"provider\":\"CLAUDE\",\"apiKey\":\"test\"}";
+        AiProfile p3 = g.fromJson(legacyClaudeJson, AiProfile.class);
+        Assert.assertEquals(AiProvider.CLAUDE_3_7, p3.getProvider());
+    }
+
+    @Test
+    public void describeAccountTypeIncludesIronmanVariants() {
+        Assert.assertEquals("Ironman", Utilities.describeAccountTypeFromVarbit(1));
+        Assert.assertEquals("Ultimate Ironman (UIM)", Utilities.describeAccountTypeFromVarbit(2));
+        Assert.assertEquals("Hardcore Ironman (HCIM)", Utilities.describeAccountTypeFromVarbit(3));
+        Assert.assertEquals("Group Ironman (GIM)", Utilities.describeAccountTypeFromVarbit(4));
+        Assert.assertEquals("Hardcore Group Ironman (HGIM)", Utilities.describeAccountTypeFromVarbit(5));
+        Assert.assertEquals("Unranked Group Ironman (UGIM)", Utilities.describeAccountTypeFromVarbit(6));
+        Assert.assertEquals("Normal", Utilities.describeAccountTypeFromVarbit(0));
+        Assert.assertEquals("Unknown", Utilities.describeAccountTypeFromVarbit(null));
     }
 
     @Test
@@ -515,19 +531,16 @@ public class AiServiceTest {
     }
 
     @Test
-    public void describeSpellbookIncludesAllSpellbooks() throws Exception {
-        Method describeSpellbook = AiService.class.getDeclaredMethod("describeSpellbook", int.class);
-        describeSpellbook.setAccessible(true);
-
-        Assert.assertEquals("Standard", describeSpellbook.invoke(aiService, 0));
-        Assert.assertEquals("Ancient Magicks", describeSpellbook.invoke(aiService, 1));
-        Assert.assertEquals("Lunar", describeSpellbook.invoke(aiService, 2));
-        Assert.assertEquals("Arceuus", describeSpellbook.invoke(aiService, 3));
-        Assert.assertEquals("Unknown (4)", describeSpellbook.invoke(aiService, 4));
+    public void describeSpellbookIncludesAllSpellbooks() {
+        Assert.assertEquals("Standard", Utilities.describeSpellbook(0));
+        Assert.assertEquals("Ancient Magicks", Utilities.describeSpellbook(1));
+        Assert.assertEquals("Lunar", Utilities.describeSpellbook(2));
+        Assert.assertEquals("Arceuus", Utilities.describeSpellbook(3));
+        Assert.assertEquals("Unknown (4)", Utilities.describeSpellbook(4));
     }
 
     @Test
-    public void aggregateItemsWithPricesSupportsMultiFilters() throws Exception {
+    public void aggregateItemsWithPricesSupportsMultiFilters() {
         // Create mock ItemContainer
         ItemContainer mockContainer = Mockito.mock(ItemContainer.class);
         Mockito.when(mockContainer.getItems()).thenReturn(new Item[] {
@@ -536,14 +549,9 @@ public class AiServiceTest {
                 new Item(560, 20) // Death rune -> "Item 560"
         });
 
-        // Get private method aggregateItemsWithPrices
-        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
-                ItemContainer.class, String.class, int.class);
-        aggregateItemsWithPrices.setAccessible(true);
-
         // Run multi-filter with "995 OR 560"
-        com.google.gson.JsonObject result = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "995 OR 560", 0);
+        com.google.gson.JsonObject result = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "995 OR 560", 0);
 
         Assert.assertNotNull(result);
         Assert.assertTrue(result.has("Item 995"));
@@ -551,31 +559,31 @@ public class AiServiceTest {
         Assert.assertFalse(result.has("Item 556"));
 
         // Run multi-filter with comma: "556, 560"
-        com.google.gson.JsonObject resultComma = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "556, 560", 0);
+        com.google.gson.JsonObject resultComma = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "556, 560", 0);
 
         Assert.assertTrue(resultComma.has("Item 556"));
         Assert.assertTrue(resultComma.has("Item 560"));
         Assert.assertFalse(resultComma.has("Item 995"));
 
         // Run multi-filter with AND: "Item AND 560"
-        com.google.gson.JsonObject resultAnd = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "Item AND 560", 0);
+        com.google.gson.JsonObject resultAnd = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "Item AND 560", 0);
 
         Assert.assertTrue(resultAnd.has("Item 560"));
         Assert.assertFalse(resultAnd.has("Item 995"));
         Assert.assertFalse(resultAnd.has("Item 556"));
 
         // Run multi-filter with &: "Item & 556"
-        com.google.gson.JsonObject resultAmp = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "Item & 556", 0);
+        com.google.gson.JsonObject resultAmp = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "Item & 556", 0);
 
         Assert.assertTrue(resultAmp.has("Item 556"));
         Assert.assertFalse(resultAmp.has("Item 560"));
 
         // Run DNF query: "995 & Item OR 560 & Item"
-        com.google.gson.JsonObject resultDnf = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "995 & Item OR 560 & Item", 0);
+        com.google.gson.JsonObject resultDnf = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "995 & Item OR 560 & Item", 0);
 
         Assert.assertTrue(resultDnf.has("Item 995"));
         Assert.assertTrue(resultDnf.has("Item 560"));
@@ -583,7 +591,7 @@ public class AiServiceTest {
     }
 
     @Test
-    public void aggregateItemsWithPricesFiltersOutPlaceholders() throws Exception {
+    public void aggregateItemsWithPricesFiltersOutPlaceholders() {
         // Mock normal item composition
         ItemComposition normalItem = Mockito.mock(ItemComposition.class);
         Mockito.when(normalItem.getName()).thenReturn("Coins");
@@ -603,13 +611,8 @@ public class AiServiceTest {
                 new Item(4152, 1) // Abyssal whip (placeholder)
         });
 
-        // Invoke aggregateItemsWithPrices
-        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
-                ItemContainer.class, String.class, int.class);
-        aggregateItemsWithPrices.setAccessible(true);
-
-        com.google.gson.JsonObject result = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, null, 0);
+        com.google.gson.JsonObject result = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, null, 0);
 
         Assert.assertNotNull(result);
         Assert.assertTrue(result.has("Coins"));
@@ -617,7 +620,7 @@ public class AiServiceTest {
     }
 
     @Test
-    public void aggregateItemsWithPricesPrioritizesEquipableGearOverCommodities() throws Exception {
+    public void aggregateItemsWithPricesPrioritizesEquipableGearOverCommodities() {
         ItemComposition torsoComp = Mockito.mock(ItemComposition.class);
         Mockito.when(torsoComp.getName()).thenReturn("Fighter torso");
         Mockito.when(torsoComp.getPlaceholderTemplateId()).thenReturn(-1);
@@ -636,12 +639,8 @@ public class AiServiceTest {
                 new Item(10551, 1) // 1 Fighter torso (0 HA)
         });
 
-        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
-                ItemContainer.class, String.class, int.class);
-        aggregateItemsWithPrices.setAccessible(true);
-
-        com.google.gson.JsonObject result = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, null, 0);
+        com.google.gson.JsonObject result = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, null, 0);
 
         Assert.assertNotNull(result);
         Assert.assertTrue(result.has("Fighter torso"));
@@ -653,7 +652,7 @@ public class AiServiceTest {
     }
 
     @Test
-    public void aggregateItemsWithPricesSupportsCategoryFiltering() throws Exception {
+    public void aggregateItemsWithPricesSupportsCategoryFiltering() {
         ItemComposition scimComp = Mockito.mock(ItemComposition.class);
         Mockito.when(scimComp.getName()).thenReturn("Dragon scimitar");
         Mockito.when(scimComp.getPlaceholderTemplateId()).thenReturn(-1);
@@ -670,17 +669,13 @@ public class AiServiceTest {
                 new Item(2434, 10)
         });
 
-        Method aggregateItemsWithPrices = AiService.class.getDeclaredMethod("aggregateItemsWithPrices",
-                ItemContainer.class, String.class, int.class);
-        aggregateItemsWithPrices.setAccessible(true);
-
-        com.google.gson.JsonObject gearResult = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "gear", 0);
+        com.google.gson.JsonObject gearResult = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "gear", 0);
         Assert.assertTrue(gearResult.has("Dragon scimitar"));
         Assert.assertFalse(gearResult.has("Prayer potion(4)"));
 
-        com.google.gson.JsonObject potionResult = (com.google.gson.JsonObject) aggregateItemsWithPrices.invoke(
-                aiService, mockContainer, "potions", 0);
+        com.google.gson.JsonObject potionResult = ItemContainerUtils.aggregateItemsWithPrices(
+                client, itemManager, mockContainer, "potions", 0);
         Assert.assertTrue(potionResult.has("Prayer potion(4)"));
         Assert.assertFalse(potionResult.has("Dragon scimitar"));
     }

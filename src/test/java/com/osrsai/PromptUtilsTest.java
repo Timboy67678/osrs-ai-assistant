@@ -21,14 +21,12 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("Distinguish general readiness"));
         Assert.assertTrue(prompt.contains("get_player_skills"));
         Assert.assertTrue(prompt.contains("RS3 Bloodwood trees"));
-        Assert.assertTrue(prompt.contains("NOT present in OSRS"));
+        Assert.assertTrue(prompt.contains("does not exist in OSRS"));
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
         Assert.assertTrue(prompt.contains("get_player_transportation"));
-        Assert.assertTrue(prompt.contains("ITEM DROP SOURCES & SHOPS"));
-        Assert.assertTrue(prompt.contains("GEAR STATS, COSTS & UPGRADE PATHS"));
-        Assert.assertTrue(prompt.contains("MONSTER BEHAVIOR & SLAYER REQUIREMENTS"));
-        Assert.assertTrue(prompt.contains("MAP OBJECTS & DUNGEON MECHANICS"));
+        Assert.assertTrue(prompt.contains("MANDATORY WIKI VERIFICATION"));
         Assert.assertTrue(prompt.contains("USER COUNTER-CLAIMS & OVERRIDING MISTAKES"));
+        Assert.assertTrue(prompt.contains("DRAGON COMBAT & DRAGONFIRE PROTECTION"));
     }
 
     @Test

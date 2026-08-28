@@ -39,7 +39,6 @@ public class OpenAiProviderHandler implements ProviderHandler {
             boolean shareCharInfo) {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
-        bodyObj.addProperty("temperature", LOW_TEMPERATURE);
 
         String lowerModel = modelId != null ? modelId.toLowerCase() : "";
         boolean isReasoningModel = lowerModel.startsWith("o1")
@@ -49,6 +48,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
         if (isReasoningModel) {
             bodyObj.addProperty("max_completion_tokens", 16384);
         } else {
+            bodyObj.addProperty("temperature", LOW_TEMPERATURE);
             bodyObj.addProperty("max_tokens", 8192);
             bodyObj.addProperty("max_completion_tokens", 8192);
         }
@@ -218,6 +218,11 @@ public class OpenAiProviderHandler implements ProviderHandler {
             toolMsg.addProperty("content", res.resultJson);
             messages.add(toolMsg);
         }
+    }
+
+    @Override
+    public void disableToolCalling(JsonObject requestBody) {
+        requestBody.addProperty("tool_choice", "none");
     }
 
     @Override

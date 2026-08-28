@@ -164,9 +164,10 @@ public class GeminiProviderHandler implements ProviderHandler {
         modelMsg.add("parts", assistantParts);
         contents.add(modelMsg);
 
-        // Add function message containing the function responses
+        // Add user message containing the function responses (Gemini v1beta expects
+        // role "user" with functionResponse parts, not the deprecated "function" role)
         JsonObject functionMsg = new JsonObject();
-        functionMsg.addProperty("role", "function");
+        functionMsg.addProperty("role", "user");
         JsonArray partsArray = new JsonArray();
         for (AiService.ToolResult res : results) {
             JsonObject part = new JsonObject();
@@ -178,6 +179,15 @@ public class GeminiProviderHandler implements ProviderHandler {
         }
         functionMsg.add("parts", partsArray);
         contents.add(functionMsg);
+    }
+
+    @Override
+    public void disableToolCalling(JsonObject requestBody) {
+        JsonObject toolConfig = new JsonObject();
+        JsonObject funcCallingConfig = new JsonObject();
+        funcCallingConfig.addProperty("mode", "NONE");
+        toolConfig.add("functionCallingConfig", funcCallingConfig);
+        requestBody.add("toolConfig", toolConfig);
     }
 
     @Override

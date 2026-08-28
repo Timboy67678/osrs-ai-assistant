@@ -76,21 +76,6 @@ public class QuestAndDiaryTools {
         this.gson = gson;
     }
 
-    private String getConfigValue(String group, String... keys) {
-        if (configManager == null) {
-            return null;
-        }
-        for (String key : keys) {
-            String val = configManager.getRSProfileConfiguration(group, key);
-            if (val == null || val.isEmpty()) {
-                val = configManager.getConfiguration(group, key);
-            }
-            if (val != null && !val.isEmpty()) {
-                return val;
-            }
-        }
-        return null;
-    }
 
     public int getQuestStageValue(Quest quest) {
         if (client == null || quest == null) {
@@ -348,7 +333,7 @@ public class QuestAndDiaryTools {
                     if (filterBoss != null && !key.toLowerCase().contains(filterBoss)) {
                         continue;
                     }
-                    String valueStr = getConfigValue("killcount", key);
+                    String valueStr = Utilities.getConfigValue(configManager, "killcount", key);
                     if (valueStr != null) {
                         try {
                             int count = Integer.parseInt(valueStr);

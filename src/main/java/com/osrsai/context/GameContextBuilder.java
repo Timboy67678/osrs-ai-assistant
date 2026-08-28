@@ -15,12 +15,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+
+
 /**
  * Builds the initial real-time player and game context snapshot for AI prompts.
  */
 @Slf4j
 public class GameContextBuilder {
-    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]*>");
+
     private static final int VARBIT_SPELLBOOK = 4070;
 
     private final Client client;
@@ -242,7 +244,7 @@ public class GameContextBuilder {
 
         String text = widget.getText();
         if (text != null && !text.isEmpty()) {
-            String cleanText = PATTERN_HTML_TAGS.matcher(text).replaceAll("").trim();
+            String cleanText = Utilities.PATTERN_HTML_TAGS.matcher(text).replaceAll("").trim();
             if (!cleanText.isEmpty() && !isIgnoredText(cleanText, localPlayerName)) {
                 if (cleanText.matches("^\\d{1,4}\\s*/\\s*\\d{1,4}$")) {
                     String[] parts = cleanText.split("/");

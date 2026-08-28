@@ -21,13 +21,12 @@ public class AiProfile {
 
     /**
      * Constructs a new {@code AiProfile} initialized with a random UUID, default
-     * name,
-     * and default provider (Gemini).
+     * name, and default provider (Grok).
      */
     public AiProfile() {
         this.id = UUID.randomUUID().toString();
         this.name = "New Profile";
-        this.provider = AiProvider.GROK;
+        this.provider = AiProvider.GROK_4_3;
         this.apiKey = "";
         this.clientId = "";
         this.customModel = "";

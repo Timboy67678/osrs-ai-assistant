@@ -153,6 +153,13 @@ public class ClaudeProviderHandler implements ProviderHandler {
     }
 
     @Override
+    public void disableToolCalling(JsonObject requestBody) {
+        JsonObject toolChoice = new JsonObject();
+        toolChoice.addProperty("type", "none");
+        requestBody.add("tool_choice", toolChoice);
+    }
+
+    @Override
     public String extractResponseText(JsonObject responseRoot) {
         if (responseRoot != null && responseRoot.has("content")) {
             JsonArray content = responseRoot.getAsJsonArray("content");

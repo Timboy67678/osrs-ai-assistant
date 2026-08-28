@@ -2,6 +2,9 @@ package com.osrsai.util;
 
 import net.runelite.api.Client;
 import net.runelite.api.Varbits;
+import net.runelite.client.config.ConfigManager;
+
+import java.util.regex.Pattern;
 
 /**
  * General utility class providing shared OSRS game state decoders, account type
@@ -11,8 +14,43 @@ import net.runelite.api.Varbits;
  */
 public class Utilities {
 
+    /**
+     * Shared compiled pattern for stripping HTML tags (e.g. from RuneLite tooltip
+     * strings). Defined once here to avoid duplicate {@code Pattern.compile} calls
+     * across {@code GameContextBuilder}, {@code PlayerStateTools}, and
+     * {@code FarmingAndTimerTools}.
+     */
+    public static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]*>");
+
     private Utilities() {
         // Utility class
+    }
+
+    /**
+     * Looks up a configuration value by trying the RS profile scope first, then
+     * falling back to the global config scope. Accepts multiple key aliases so
+     * callers can tolerate varying key names across different RuneLite plugin
+     * versions.
+     *
+     * @param configManager RuneLite {@link ConfigManager} instance
+     * @param group         configuration group name (e.g. "slayer", "timetracking")
+     * @param keys          one or more key names to attempt in order
+     * @return first non-empty value found, or {@code null} if none match
+     */
+    public static String getConfigValue(ConfigManager configManager, String group, String... keys) {
+        if (configManager == null) {
+            return null;
+        }
+        for (String key : keys) {
+            String val = configManager.getRSProfileConfiguration(group, key);
+            if (val == null || val.isEmpty()) {
+                val = configManager.getConfiguration(group, key);
+            }
+            if (val != null && !val.isEmpty()) {
+                return val;
+            }
+        }
+        return null;
     }
 
     /**

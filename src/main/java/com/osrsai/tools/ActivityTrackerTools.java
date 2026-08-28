@@ -44,7 +44,7 @@ public class ActivityTrackerTools {
         this.gson = gson;
     }
 
-    public String executeGetPlayerClues(JsonObject args) throws Exception {
+    public String executeGetPlayerClues(JsonObject args) {
         JsonObject result = new JsonObject();
         result.add("inventoryClues", extractClueItems(InventoryID.INVENTORY, "Inventory"));
         result.add("bankClues", extractClueItems(InventoryID.BANK, "Bank"));

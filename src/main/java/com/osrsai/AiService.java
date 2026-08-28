@@ -11,6 +11,7 @@ import com.osrsai.provider.ProviderHandler;
 import com.osrsai.tools.*;
 import com.osrsai.ui.OsrsAiPanel;
 import com.osrsai.util.*;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemContainer;
@@ -110,35 +111,35 @@ public class AiService {
     private ActivityTrackerTools activityTrackerTools;
     private FarmingAndTimerTools farmingAndTimerTools;
 
-    public ShortestPathHandler getShortestPathHandler() {
+    public synchronized ShortestPathHandler getShortestPathHandler() {
         if (shortestPathHandler == null) {
             shortestPathHandler = new ShortestPathHandler(eventBus, config, locationResolver);
         }
         return shortestPathHandler;
     }
 
-    public GameContextBuilder getGameContextBuilder() {
+    public synchronized GameContextBuilder getGameContextBuilder() {
         if (gameContextBuilder == null) {
             gameContextBuilder = new GameContextBuilder(client, config, locationResolver);
         }
         return gameContextBuilder;
     }
 
-    public PlayerStateTools getPlayerStateTools() {
+    public synchronized PlayerStateTools getPlayerStateTools() {
         if (playerStateTools == null) {
             playerStateTools = new PlayerStateTools(client, itemManager, configManager, infoBoxManager, gson);
         }
         return playerStateTools;
     }
 
-    public QuestAndDiaryTools getQuestAndDiaryTools() {
+    public synchronized QuestAndDiaryTools getQuestAndDiaryTools() {
         if (questAndDiaryTools == null) {
             questAndDiaryTools = new QuestAndDiaryTools(client, configManager, gson);
         }
         return questAndDiaryTools;
     }
 
-    public WorldEnvironmentTools getWorldEnvironmentTools() {
+    public synchronized WorldEnvironmentTools getWorldEnvironmentTools() {
         if (worldEnvironmentTools == null) {
             worldEnvironmentTools = new WorldEnvironmentTools(client, itemManager, locationResolver, gson,
                     () -> Collections.unmodifiableList(cachedBankItems));
@@ -146,7 +147,7 @@ public class AiService {
         return worldEnvironmentTools;
     }
 
-    public EconomyTools getEconomyTools() {
+    public synchronized EconomyTools getEconomyTools() {
         if (economyTools == null) {
             economyTools = new EconomyTools(client, itemManager, gson,
                     () -> Collections.unmodifiableList(cachedBankItems),
@@ -155,7 +156,7 @@ public class AiService {
         return economyTools;
     }
 
-    public ActivityTrackerTools getActivityTrackerTools() {
+    public synchronized ActivityTrackerTools getActivityTrackerTools() {
         if (activityTrackerTools == null) {
             activityTrackerTools = new ActivityTrackerTools(client, itemManager, pluginManager, locationResolver,
                     getGameContextBuilder(), gson);
@@ -163,7 +164,7 @@ public class AiService {
         return activityTrackerTools;
     }
 
-    public FarmingAndTimerTools getFarmingAndTimerTools() {
+    public synchronized FarmingAndTimerTools getFarmingAndTimerTools() {
         if (farmingAndTimerTools == null) {
             farmingAndTimerTools = new FarmingAndTimerTools(client, configManager, infoBoxManager, gson);
         }
@@ -376,8 +377,8 @@ public class AiService {
                         return;
                     }
                     String responseBody = resp.body().string();
-                    log.info("Received response from AI provider {}: {}", provider, responseBody);
                     JsonObject root = gson.fromJson(responseBody, JsonObject.class);
+                    log.info("Received response from AI provider {}: {}", provider, root != null ? root.toString() : responseBody.replaceAll("\\s+", " ").trim());
 
                     boolean hasToolCalls = false;
                     List<ToolCall> toolCalls = new ArrayList<>();
@@ -402,7 +403,7 @@ public class AiService {
                             handler.updateRequestWithToolResults(requestBody, root, results);
 
                             if (depth + 1 >= maxDepth) {
-                                requestBody.remove("tools");
+                                handler.disableToolCalling(requestBody);
                             }
 
                             executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, depth + 1,
@@ -412,8 +413,10 @@ public class AiService {
                         String aiResponseText = handler.extractResponseText(root);
                         String cleanResponse = aiResponseText.trim();
 
-                        if (cleanResponse.isEmpty() && handler.hasToolCalls(root)) {
-                            cleanResponse = "I reached my search limit while trying to gather details. Please try rephrasing your question or checking that the required game screen is open.";
+                        if (cleanResponse.isEmpty() || cleanResponse.startsWith("No content returned by")) {
+                            if (handler.hasToolCalls(root) || depth >= maxDepth) {
+                                cleanResponse = "I reached my search limit while trying to gather details. Please try rephrasing your question or checking that the required game screen is open.";
+                            }
                         }
 
                         final String finalResponse = cleanResponse;
@@ -662,7 +665,7 @@ public class AiService {
         return getEconomyTools().executeGetMarketPrices(args);
     }
 
-    public String executeGetPlayerClues(JsonObject args) throws Exception {
+    public String executeGetPlayerClues(JsonObject args) {
         return getActivityTrackerTools().executeGetPlayerClues(args);
     }
 
@@ -693,7 +696,7 @@ public class AiService {
         }
 
         String cleanedQuery = WikiSearchUtil.extractSearchQuery(query).trim();
-        String activeTaskName = getConfigValue("slayer", "taskName");
+        String activeTaskName = Utilities.getConfigValue(configManager, "slayer", "taskName");
 
         if (activeTaskName != null && !activeTaskName.isEmpty()
                 && !cleanedQuery.toLowerCase().startsWith("slayer task/")) {
@@ -713,21 +716,6 @@ public class AiService {
         return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
     }
 
-    private String getConfigValue(String group, String... keys) {
-        if (configManager == null) {
-            return null;
-        }
-        for (String key : keys) {
-            String val = configManager.getRSProfileConfiguration(group, key);
-            if (val == null || val.isEmpty()) {
-                val = configManager.getConfiguration(group, key);
-            }
-            if (val != null && !val.isEmpty()) {
-                return val;
-            }
-        }
-        return null;
-    }
 
     private boolean isQueryRelatedToSlayerTask(String query, String activeTask) {
         if (query == null || activeTask == null || query.isEmpty() || activeTask.isEmpty()) {
@@ -778,23 +766,4 @@ public class AiService {
         }
     }
 
-    @SuppressWarnings("unused")
-    private String executeWikiSearch(String query) {
-        return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
-    }
-
-    @SuppressWarnings("unused")
-    private String describeAccountType(Integer accountTypeVarbit) {
-        return Utilities.describeAccountTypeFromVarbit(accountTypeVarbit);
-    }
-
-    @SuppressWarnings("unused")
-    private String describeSpellbook(int val) {
-        return Utilities.describeSpellbook(val);
-    }
-
-    @SuppressWarnings("unused")
-    private JsonObject aggregateItemsWithPrices(ItemContainer container, String filter, int minValue) {
-        return ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, container, filter, minValue);
-    }
 }

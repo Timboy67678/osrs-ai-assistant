@@ -55,6 +55,15 @@ public interface ProviderHandler {
                         List<AiService.ToolResult> results);
 
         /**
+         * Disables further tool/function calling on the request body (used when the
+         * maximum search depth is reached), while retaining tool definitions to keep
+         * multi-turn conversation schemas valid across providers.
+         *
+         * @param requestBody the ongoing API request body
+         */
+        void disableToolCalling(JsonObject requestBody);
+
+        /**
          * Extracts final human-readable text response content from the API response
          * object.
          *

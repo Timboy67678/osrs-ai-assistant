@@ -3,6 +3,7 @@ package com.osrsai.tools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Quest;
@@ -17,7 +18,6 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
  * Tool implementations for time tracking, birdhouse traps, Hespori growth,
@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 public class FarmingAndTimerTools {
-    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]*>");
 
     private static final int VARBIT_BIRDHOUSE_MEADOW_NORTH = 6521;
     private static final int VARBIT_BIRDHOUSE_MEADOW_SOUTH = 6522;
@@ -58,22 +57,6 @@ public class FarmingAndTimerTools {
         this.gson = gson;
     }
 
-    private String getConfigValue(String group, String... keys) {
-        if (configManager == null) {
-            return null;
-        }
-        for (String key : keys) {
-            String val = configManager.getRSProfileConfiguration(group, key);
-            if (val == null || val.isEmpty()) {
-                val = configManager.getConfiguration(group, key);
-            }
-            if (val != null && !val.isEmpty()) {
-                return val;
-            }
-        }
-        return null;
-    }
-
     private QuestState getQuestStateSafe(Quest quest) {
         if (quest == null || client == null)
             return QuestState.NOT_STARTED;
@@ -98,10 +81,10 @@ public class FarmingAndTimerTools {
         int bh3 = client != null ? client.getVarbitValue(VARBIT_BIRDHOUSE_VALLEY_NORTH) : 0;
         int bh4 = client != null ? client.getVarbitValue(VARBIT_BIRDHOUSE_VALLEY_SOUTH) : 0;
 
-        String bhVal1 = getConfigValue("timetracking", "birdhouse.1626");
-        String bhVal2 = getConfigValue("timetracking", "birdhouse.1627");
-        String bhVal3 = getConfigValue("timetracking", "birdhouse.1628");
-        String bhVal4 = getConfigValue("timetracking", "birdhouse.1629");
+        String bhVal1 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1626");
+        String bhVal2 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1627");
+        String bhVal3 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1628");
+        String bhVal4 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1629");
 
         long bhTime1 = parseTimestampOrDuration(bhVal1);
         long bhTime2 = parseTimestampOrDuration(bhVal2);
@@ -186,7 +169,8 @@ public class FarmingAndTimerTools {
                     "dailytaskindicators", "dailytasks" };
             for (String group : kingdomGroups) {
                 if (cachedFavour == null) {
-                    String val = getConfigValue(group, "approval", "lastApproval", "favor", "favour", "lastFavor",
+                    String val = Utilities.getConfigValue(configManager, group, "approval", "lastApproval", "favor",
+                            "favour", "lastFavor",
                             "lastFavour", "approvalPercent");
                     if (val != null) {
                         try {
@@ -196,7 +180,8 @@ public class FarmingAndTimerTools {
                     }
                 }
                 if (cachedCoffer == null) {
-                    String val = getConfigValue(group, "coffer", "lastCoffer", "coffers", "lastCoffers",
+                    String val = Utilities.getConfigValue(configManager, group, "coffer", "lastCoffer", "coffers",
+                            "lastCoffers",
                             "cofferAmount");
                     if (val != null) {
                         try {
@@ -206,7 +191,8 @@ public class FarmingAndTimerTools {
                     }
                 }
                 if (lastChangedInstant == null) {
-                    String lastChangedStr = getConfigValue(group, "lastChanged", "lastCheck", "lastVisit",
+                    String lastChangedStr = Utilities.getConfigValue(configManager, group, "lastChanged", "lastCheck",
+                            "lastVisit",
                             "lastTimestamp");
                     if (lastChangedStr != null && !lastChangedStr.isEmpty()) {
                         try {
@@ -372,7 +358,7 @@ public class FarmingAndTimerTools {
                 }
                 ibObj.addProperty("text", text.trim());
                 if (tooltip != null && !tooltip.trim().isEmpty()) {
-                    String cleanTooltip = PATTERN_HTML_TAGS.matcher(tooltip).replaceAll("").trim();
+                    String cleanTooltip = Utilities.PATTERN_HTML_TAGS.matcher(tooltip).replaceAll("").trim();
                     if (!cleanTooltip.isEmpty()) {
                         ibObj.addProperty("tooltip", cleanTooltip);
                     }
@@ -399,9 +385,9 @@ public class FarmingAndTimerTools {
 
         if (configManager != null) {
             for (FarmingPatchDef patchDef : getKnownFarmingPatches()) {
-                String val = getConfigValue("timetracking", patchDef.configKey);
+                String val = Utilities.getConfigValue(configManager, "timetracking", patchDef.configKey);
                 if (val == null || val.isEmpty()) {
-                    val = getConfigValue("farmingtracker", patchDef.configKey);
+                    val = Utilities.getConfigValue(configManager, "farmingtracker", patchDef.configKey);
                 }
                 if (val == null || val.trim().isEmpty() || "0".equals(val.trim())) {
                     continue;
