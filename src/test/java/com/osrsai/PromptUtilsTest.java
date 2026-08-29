@@ -27,6 +27,7 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("MANDATORY WIKI VERIFICATION"));
         Assert.assertTrue(prompt.contains("USER COUNTER-CLAIMS & OVERRIDING MISTAKES"));
         Assert.assertTrue(prompt.contains("DRAGON COMBAT & DRAGONFIRE PROTECTION"));
+        Assert.assertTrue(prompt.contains("SLAYER TASKS, SLAYER XP & SLAYER HELMET MECHANICS"));
     }
 
     @Test
