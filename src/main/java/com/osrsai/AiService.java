@@ -378,7 +378,8 @@ public class AiService {
                     }
                     String responseBody = resp.body().string();
                     JsonObject root = gson.fromJson(responseBody, JsonObject.class);
-                    log.info("Received response from AI provider {}: {}", provider, root != null ? root.toString() : responseBody.replaceAll("\\s+", " ").trim());
+                    log.info("Received response from AI provider {}: {}", provider,
+                            root != null ? root.toString() : responseBody.replaceAll("\\s+", " ").trim());
 
                     boolean hasToolCalls = false;
                     List<ToolCall> toolCalls = new ArrayList<>();
@@ -715,7 +716,6 @@ public class AiService {
 
         return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
     }
-
 
     private boolean isQueryRelatedToSlayerTask(String query, String activeTask) {
         if (query == null || activeTask == null || query.isEmpty() || activeTask.isEmpty()) {

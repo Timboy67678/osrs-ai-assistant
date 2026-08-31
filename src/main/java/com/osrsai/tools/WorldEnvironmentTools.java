@@ -41,6 +41,61 @@ public class WorldEnvironmentTools {
     private static final int POH_LEVEL_ORNATE_JEWELLERY_BOX = 91;
     private static final int POH_LEVEL_SPIRIT_TREE = 95;
 
+    private static class SpellTeleport {
+        final String name;
+        final int requiredLevel;
+
+        SpellTeleport(String name, int requiredLevel) {
+            this.name = name;
+            this.requiredLevel = requiredLevel;
+        }
+    }
+
+    private static final Map<String, List<SpellTeleport>> SPELLBOOK_TELEPORTS = Map.of(
+            "Standard", List.of(
+                    new SpellTeleport("Home Teleport (Lumbridge)", 0),
+                    new SpellTeleport("Varrock Teleport (25)", 25),
+                    new SpellTeleport("Lumbridge Teleport (31)", 31),
+                    new SpellTeleport("Falador Teleport (37)", 37),
+                    new SpellTeleport("Teleport to House (40)", 40),
+                    new SpellTeleport("Camelot Teleport (45)", 45),
+                    new SpellTeleport("Ardougne Teleport (51)", 51),
+                    new SpellTeleport("Watchtower Teleport (58)", 58),
+                    new SpellTeleport("Trollheim Teleport (61)", 61),
+                    new SpellTeleport("Ape Atoll Teleport (64)", 64),
+                    new SpellTeleport("Kourend Castle Teleport (69)", 69)),
+            "Ancient Magicks", List.of(
+                    new SpellTeleport("Edgeville Home Teleport", 0),
+                    new SpellTeleport("Paddewwa Teleport (54)", 54),
+                    new SpellTeleport("Senntisten Teleport (60)", 60),
+                    new SpellTeleport("Kharyrll Teleport (66)", 66),
+                    new SpellTeleport("Lassar Teleport (72)", 72),
+                    new SpellTeleport("Dareeyak Teleport (78)", 78),
+                    new SpellTeleport("Carrallangar Teleport (84)", 84),
+                    new SpellTeleport("Annakarl Teleport (90)", 90),
+                    new SpellTeleport("Ghorrock Teleport (96)", 96)),
+            "Lunar", List.of(
+                    new SpellTeleport("Lunar Home Teleport", 0),
+                    new SpellTeleport("Moonclan Teleport (69)", 69),
+                    new SpellTeleport("Ourania Teleport (71)", 71),
+                    new SpellTeleport("Waterbirth Teleport (72)", 72),
+                    new SpellTeleport("Barbarian Teleport (75)", 75),
+                    new SpellTeleport("Khazard Teleport (78)", 78),
+                    new SpellTeleport("Fishing Guild Teleport (85)", 85),
+                    new SpellTeleport("Catherby Teleport (87)", 87),
+                    new SpellTeleport("Ice Plateau Teleport (89)", 89)),
+            "Arceuus", List.of(
+                    new SpellTeleport("Arceuus Home Teleport", 0),
+                    new SpellTeleport("Arceuus Library Teleport (38)", 38),
+                    new SpellTeleport("Draynor Manor Teleport (40)", 40),
+                    new SpellTeleport("Salve Graveyard Teleport (40)", 40),
+                    new SpellTeleport("Fenkenstrain's Castle Teleport (48)", 48),
+                    new SpellTeleport("West Ardougne Teleport (61)", 61),
+                    new SpellTeleport("Harmony Island Teleport (65)", 65),
+                    new SpellTeleport("Cemetery Teleport (71)", 71),
+                    new SpellTeleport("Barrows Teleport (83)", 83),
+                    new SpellTeleport("Ape Atoll Teleport (90)", 90)));
+
     private final Client client;
     private final ItemManager itemManager;
     private final LocationResolver locationResolver;
@@ -462,84 +517,13 @@ public class WorldEnvironmentTools {
 
         JsonArray unlockedTeleports = new JsonArray();
         int effectiveMagic = Math.max(magicLevel, magicBoosted);
-        if ("Standard".equals(spellbookName)) {
-            unlockedTeleports.add("Home Teleport (Lumbridge)");
-            if (effectiveMagic >= 25)
-                unlockedTeleports.add("Varrock Teleport (25)");
-            if (effectiveMagic >= 31)
-                unlockedTeleports.add("Lumbridge Teleport (31)");
-            if (effectiveMagic >= 37)
-                unlockedTeleports.add("Falador Teleport (37)");
-            if (effectiveMagic >= 40)
-                unlockedTeleports.add("Teleport to House (40)");
-            if (effectiveMagic >= 45)
-                unlockedTeleports.add("Camelot Teleport (45)");
-            if (effectiveMagic >= 51)
-                unlockedTeleports.add("Ardougne Teleport (51)");
-            if (effectiveMagic >= 58)
-                unlockedTeleports.add("Watchtower Teleport (58)");
-            if (effectiveMagic >= 61)
-                unlockedTeleports.add("Trollheim Teleport (61)");
-            if (effectiveMagic >= 64)
-                unlockedTeleports.add("Ape Atoll Teleport (64)");
-            if (effectiveMagic >= 69)
-                unlockedTeleports.add("Kourend Castle Teleport (69)");
-        } else if ("Ancient Magicks".equals(spellbookName)) {
-            unlockedTeleports.add("Edgeville Home Teleport");
-            if (effectiveMagic >= 54)
-                unlockedTeleports.add("Paddewwa Teleport (54)");
-            if (effectiveMagic >= 60)
-                unlockedTeleports.add("Senntisten Teleport (60)");
-            if (effectiveMagic >= 66)
-                unlockedTeleports.add("Kharyrll Teleport (66)");
-            if (effectiveMagic >= 72)
-                unlockedTeleports.add("Lassar Teleport (72)");
-            if (effectiveMagic >= 78)
-                unlockedTeleports.add("Dareeyak Teleport (78)");
-            if (effectiveMagic >= 84)
-                unlockedTeleports.add("Carrallangar Teleport (84)");
-            if (effectiveMagic >= 90)
-                unlockedTeleports.add("Annakarl Teleport (90)");
-            if (effectiveMagic >= 96)
-                unlockedTeleports.add("Ghorrock Teleport (96)");
-        } else if ("Lunar".equals(spellbookName)) {
-            unlockedTeleports.add("Lunar Home Teleport");
-            if (effectiveMagic >= 69)
-                unlockedTeleports.add("Moonclan Teleport (69)");
-            if (effectiveMagic >= 71)
-                unlockedTeleports.add("Ourania Teleport (71)");
-            if (effectiveMagic >= 72)
-                unlockedTeleports.add("Waterbirth Teleport (72)");
-            if (effectiveMagic >= 75)
-                unlockedTeleports.add("Barbarian Teleport (75)");
-            if (effectiveMagic >= 78)
-                unlockedTeleports.add("Khazard Teleport (78)");
-            if (effectiveMagic >= 85)
-                unlockedTeleports.add("Fishing Guild Teleport (85)");
-            if (effectiveMagic >= 87)
-                unlockedTeleports.add("Catherby Teleport (87)");
-            if (effectiveMagic >= 89)
-                unlockedTeleports.add("Ice Plateau Teleport (89)");
-        } else if ("Arceuus".equals(spellbookName)) {
-            unlockedTeleports.add("Arceuus Home Teleport");
-            if (effectiveMagic >= 38)
-                unlockedTeleports.add("Arceuus Library Teleport (38)");
-            if (effectiveMagic >= 40)
-                unlockedTeleports.add("Draynor Manor Teleport (40)");
-            if (effectiveMagic >= 40)
-                unlockedTeleports.add("Salve Graveyard Teleport (40)");
-            if (effectiveMagic >= 48)
-                unlockedTeleports.add("Fenkenstrain's Castle Teleport (48)");
-            if (effectiveMagic >= 61)
-                unlockedTeleports.add("West Ardougne Teleport (61)");
-            if (effectiveMagic >= 65)
-                unlockedTeleports.add("Harmony Island Teleport (65)");
-            if (effectiveMagic >= 71)
-                unlockedTeleports.add("Cemetery Teleport (71)");
-            if (effectiveMagic >= 83)
-                unlockedTeleports.add("Barrows Teleport (83)");
-            if (effectiveMagic >= 90)
-                unlockedTeleports.add("Ape Atoll Teleport (90)");
+        List<SpellTeleport> availableSpells = SPELLBOOK_TELEPORTS.get(spellbookName);
+        if (availableSpells != null) {
+            for (SpellTeleport tp : availableSpells) {
+                if (effectiveMagic >= tp.requiredLevel) {
+                    unlockedTeleports.add(tp.name);
+                }
+            }
         }
         magicObj.add("unlockedSpellTeleports", unlockedTeleports);
         result.add("magicAndSpellbook", magicObj);
