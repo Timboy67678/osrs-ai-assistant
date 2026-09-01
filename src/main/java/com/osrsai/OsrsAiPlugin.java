@@ -152,6 +152,13 @@ public class OsrsAiPlugin extends Plugin {
     }
 
     /**
+     * Listens for in-game chat commands (e.g. ::commandName).
+     */
+    @Subscribe
+    public void onCommandExecuted(net.runelite.api.events.CommandExecuted commandExecuted) {
+    }
+
+    /**
      * Provides the configuration instance bound to the RuneLite Dependency
      * Injection system.
      *

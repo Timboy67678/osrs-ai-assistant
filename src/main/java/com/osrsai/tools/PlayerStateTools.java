@@ -32,7 +32,197 @@ public class PlayerStateTools {
     private static final int VARP_SPECIAL_ATTACK_PERCENT = 300;
     private static final int VARP_NMZ_REWARD_POINTS = 1056;
     private static final int VARP_PEST_CONTROL_POINTS = 261;
-    private static final int POISON_VENOM_THRESHOLD = 1000000;
+    private static final int POISON_VENOM_THRESHOLD = 1_000_000; // start of venom
+
+    // ==========================================
+    // Slayer Varbits: Unlocks, Extensions, and Per-Master Block Lists
+    // ==========================================
+    private static final int VARBIT_SLAYER_POINTS = 4068;
+    private static final int VARBIT_SLAYER_TASK_STREAK = 4069;
+
+    /**
+     * Exact Varbit IDs for permanent and toggleable Slayer Unlocks.
+     */
+    private static final Map<Integer, String> SLAYER_UNLOCK_VARBITS = new LinkedHashMap<>();
+    static {
+        SLAYER_UNLOCK_VARBITS.put(4027, "Gargoyle Smasher");
+        SLAYER_UNLOCK_VARBITS.put(4028, "Slug Salter");
+        SLAYER_UNLOCK_VARBITS.put(4029, "Reptile Freezer");
+        SLAYER_UNLOCK_VARBITS.put(4030, "'Shroom Sprayer");
+        SLAYER_UNLOCK_VARBITS.put(3202, "Malevolent Masquerade (Slayer Helmet Crafting)");
+        SLAYER_UNLOCK_VARBITS.put(3207, "Ring Bling (Slayer Ring Crafting)");
+        SLAYER_UNLOCK_VARBITS.put(3208, "Broader Fletching");
+        SLAYER_UNLOCK_VARBITS.put(2462, "Seeing Red (Red Dragons)");
+        SLAYER_UNLOCK_VARBITS.put(4095, "Watch the Birdie (Aviansies)");
+        SLAYER_UNLOCK_VARBITS.put(4691, "Hot Stuff (TzHaar / TzTok-Jad)");
+        SLAYER_UNLOCK_VARBITS.put(4724, "Like a Boss");
+        SLAYER_UNLOCK_VARBITS.put(4996, "Reptile Got Ripped (Lizardmen)");
+        SLAYER_UNLOCK_VARBITS.put(5358, "Bigger and Badder (Superior Slayer Monsters)");
+        SLAYER_UNLOCK_VARBITS.put(4589, "Duly Noted (Mithril Dragons)");
+        SLAYER_UNLOCK_VARBITS.put(240, "Stop the Wyvern (Fossil Island Wyverns)");
+        SLAYER_UNLOCK_VARBITS.put(6485, "Double Trouble (Grotesque Guardians)");
+        SLAYER_UNLOCK_VARBITS.put(9456, "Basilocked (Basilisks)");
+        SLAYER_UNLOCK_VARBITS.put(10388, "Actual Vampyre Slayer (Vampyres)");
+        SLAYER_UNLOCK_VARBITS.put(13636, "I Wildy More Slayer (Krystilia Wilderness Tasks)");
+        SLAYER_UNLOCK_VARBITS.put(15286, "Warped Reality (Warped Creatures)");
+        SLAYER_UNLOCK_VARBITS.put(19604, "Wings Spread (Gryphons)");
+        SLAYER_UNLOCK_VARBITS.put(19605, "Lured In (Aquanites)");
+        SLAYER_UNLOCK_VARBITS.put(15399, "Chance of Heavy Frost (Frost Dragons)");
+        SLAYER_UNLOCK_VARBITS.put(15398, "Longer Gryphons");
+        SLAYER_UNLOCK_VARBITS.put(17219, "Longer Custodians");
+        SLAYER_UNLOCK_VARBITS.put(19602, "Longer Wyrms");
+        SLAYER_UNLOCK_VARBITS.put(19603, "Longer Aquanites");
+        SLAYER_UNLOCK_VARBITS.put(14822, "Longer Revenants");
+    }
+
+    /**
+     * Exact Varbit IDs for Slayer Task Extensions.
+     */
+    private static final Map<Integer, String> SLAYER_EXTENSION_VARBITS = new LinkedHashMap<>();
+    static {
+        SLAYER_EXTENSION_VARBITS.put(4747, "Aberrant Spectres (Smell ya later)");
+        SLAYER_EXTENSION_VARBITS.put(4090, "Abyssal Demons (Augment my abbies)");
+        SLAYER_EXTENSION_VARBITS.put(4085, "Ankou (Ankou very much)");
+        SLAYER_EXTENSION_VARBITS.put(4086, "Suqahs (Suq-a-nother one)");
+        SLAYER_EXTENSION_VARBITS.put(4087, "Fire Giants (Fire & Darkness)");
+        SLAYER_EXTENSION_VARBITS.put(4088, "Metal Dragons (Pedal to the metals)");
+        SLAYER_EXTENSION_VARBITS.put(4091, "Dark Beasts (It's dark in here)");
+        SLAYER_EXTENSION_VARBITS.put(4092, "Greater Demons (Greater challenge)");
+        SLAYER_EXTENSION_VARBITS.put(4094, "Mithril Dragons (I hope you mith me)");
+        SLAYER_EXTENSION_VARBITS.put(4746, "Bloodvelds (Bleed me dry)");
+        SLAYER_EXTENSION_VARBITS.put(4748, "Aviansies (Birds of a feather)");
+        SLAYER_EXTENSION_VARBITS.put(4750, "Cave Horrors (Horrorific)");
+        SLAYER_EXTENSION_VARBITS.put(4751, "Dust Devils (To dust you shall return)");
+        SLAYER_EXTENSION_VARBITS.put(4752, "Skeletal Wyverns (Wyver-nother one)");
+        SLAYER_EXTENSION_VARBITS.put(4753, "Gargoyles (Get smashed)");
+        SLAYER_EXTENSION_VARBITS.put(4754, "Nechryael (Nechs please)");
+        SLAYER_EXTENSION_VARBITS.put(4755, "Cave Kraken (Krack on)");
+        SLAYER_EXTENSION_VARBITS.put(4757, "Spiritual Creatures (Spiritual fervour)");
+        SLAYER_EXTENSION_VARBITS.put(5359, "Scabarites (Get scabaright on it)");
+        SLAYER_EXTENSION_VARBITS.put(5733, "Fossil Island Wyverns (Wyver-nother two)");
+        SLAYER_EXTENSION_VARBITS.put(6094, "Adamant Dragons (Ada'mind some more)");
+        SLAYER_EXTENSION_VARBITS.put(6095, "Rune Dragons (RUUUUUNE)");
+        SLAYER_EXTENSION_VARBITS.put(9455, "Basilisks (Basilonger)");
+        SLAYER_EXTENSION_VARBITS.put(10389, "Vampyres (More at stake)");
+    }
+
+    /**
+     * Slayer Master block slot varbits mapping: Master Name -> array of slot Varbit
+     * IDs.
+     */
+    private static final Map<String, int[]> SLAYER_MASTER_BLOCK_VARBITS = new LinkedHashMap<>();
+    static {
+        SLAYER_MASTER_BLOCK_VARBITS.put("Duradel", new int[] { 17848, 17849, 17850, 17851, 17852, 17853, 17866 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Nieve", new int[] { 17842, 17843, 17844, 17845, 17846, 17847, 17865 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Konar", new int[] { 17836, 17837, 17838, 17839, 17840, 17841, 17864 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Chaeldar", new int[] { 17830, 17831, 17832, 17833, 17834, 17835, 17863 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Vannaka", new int[] { 17824, 17825, 17826, 17827, 17828, 17829, 17862 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Mazchna", new int[] { 17818, 17819, 17820, 17821, 17822, 17823, 17861 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Turael", new int[] { 17812, 17813, 17814, 17815, 17816, 17817, 17860 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Krystilia", new int[] { 17854, 17855, 17856, 17857, 17858, 17859, 17867 });
+        SLAYER_MASTER_BLOCK_VARBITS.put("Mortimer", new int[] { 15783, 15784 });
+    }
+
+    /**
+     * Known Slayer task ID to name mapping for blocked slots and active tasks.
+     */
+    private static final Map<Integer, String> SLAYER_TASK_ID_NAMES = new HashMap<>();
+    static {
+        SLAYER_TASK_ID_NAMES.put(1, "Abyssal Sire");
+        SLAYER_TASK_ID_NAMES.put(2, "Alchemical Hydra");
+        SLAYER_TASK_ID_NAMES.put(3, "Amoxliatl");
+        SLAYER_TASK_ID_NAMES.put(4, "Araxxor");
+        SLAYER_TASK_ID_NAMES.put(6, "Brutus");
+        SLAYER_TASK_ID_NAMES.put(7, "Bryophyta");
+        SLAYER_TASK_ID_NAMES.put(8, "Callisto");
+        SLAYER_TASK_ID_NAMES.put(9, "Cerberus");
+        SLAYER_TASK_ID_NAMES.put(10, "Chaos Elemental");
+        SLAYER_TASK_ID_NAMES.put(11, "Chaos Fanatic");
+        SLAYER_TASK_ID_NAMES.put(12, "Crazy Archaeologist");
+        SLAYER_TASK_ID_NAMES.put(15, "Corporeal Beast");
+        SLAYER_TASK_ID_NAMES.put(16, "Commander Zilyana");
+        SLAYER_TASK_ID_NAMES.put(17, "Crystalline Hunllef");
+        SLAYER_TASK_ID_NAMES.put(18, "Corrupted Hunllef");
+        SLAYER_TASK_ID_NAMES.put(19, "Dagannoth Prime");
+        SLAYER_TASK_ID_NAMES.put(20, "Dagannoth Rex");
+        SLAYER_TASK_ID_NAMES.put(21, "Dagannoth Supreme");
+        SLAYER_TASK_ID_NAMES.put(22, "Deranged Archaeologist");
+        SLAYER_TASK_ID_NAMES.put(23, "Doom of Mokhaiotl");
+        SLAYER_TASK_ID_NAMES.put(24, "Duke Sucellus");
+        SLAYER_TASK_ID_NAMES.put(25, "Fortis Colosseum");
+        SLAYER_TASK_ID_NAMES.put(26, "General Graardor");
+        SLAYER_TASK_ID_NAMES.put(27, "Giant Mole");
+        SLAYER_TASK_ID_NAMES.put(28, "Grotesque Guardians");
+        SLAYER_TASK_ID_NAMES.put(29, "Hespori");
+        SLAYER_TASK_ID_NAMES.put(30, "Black Demons");
+        SLAYER_TASK_ID_NAMES.put(31, "Kalphite Queen");
+        SLAYER_TASK_ID_NAMES.put(32, "King Black Dragon");
+        SLAYER_TASK_ID_NAMES.put(33, "Kraken");
+        SLAYER_TASK_ID_NAMES.put(34, "Kree'arra");
+        SLAYER_TASK_ID_NAMES.put(35, "K'ril Tsutsaroth");
+        SLAYER_TASK_ID_NAMES.put(36, "The Leviathan");
+        SLAYER_TASK_ID_NAMES.put(37, "The Mad Angel");
+        SLAYER_TASK_ID_NAMES.put(38, "Banshees");
+        SLAYER_TASK_ID_NAMES.put(39, "The Mimic");
+        SLAYER_TASK_ID_NAMES.put(40, "Moons of Peril");
+        SLAYER_TASK_ID_NAMES.put(41, "Nex");
+        SLAYER_TASK_ID_NAMES.put(42, "The Nightmare");
+        SLAYER_TASK_ID_NAMES.put(43, "Phosani's Nightmare");
+        SLAYER_TASK_ID_NAMES.put(44, "Obor");
+        SLAYER_TASK_ID_NAMES.put(45, "Phantom Muspah");
+        SLAYER_TASK_ID_NAMES.put(46, "Royal Titans");
+        SLAYER_TASK_ID_NAMES.put(47, "Scurrius");
+        SLAYER_TASK_ID_NAMES.put(48, "Sarachnis");
+        SLAYER_TASK_ID_NAMES.put(49, "Scorpia");
+        SLAYER_TASK_ID_NAMES.put(50, "Shellbane Gryphon");
+        SLAYER_TASK_ID_NAMES.put(51, "Skotizo");
+        SLAYER_TASK_ID_NAMES.put(52, "Tempoross");
+        SLAYER_TASK_ID_NAMES.put(53, "Kalphite");
+        SLAYER_TASK_ID_NAMES.put(56, "Thermonuclear Smoke Devil");
+        SLAYER_TASK_ID_NAMES.put(57, "Tombs of Amascut: Entry Mode");
+        SLAYER_TASK_ID_NAMES.put(58, "Tombs of Amascut");
+        SLAYER_TASK_ID_NAMES.put(59, "Tombs of Amascut: Expert Mode");
+        SLAYER_TASK_ID_NAMES.put(60, "TzHaar-Ket-Rak's Challenges");
+        SLAYER_TASK_ID_NAMES.put(61, "TzKal-Zuk");
+        SLAYER_TASK_ID_NAMES.put(62, "TzTok-Jad");
+        SLAYER_TASK_ID_NAMES.put(63, "Vardorvis");
+        SLAYER_TASK_ID_NAMES.put(64, "Venenatis");
+        SLAYER_TASK_ID_NAMES.put(65, "Vet'ion");
+        SLAYER_TASK_ID_NAMES.put(66, "Vorkath");
+        SLAYER_TASK_ID_NAMES.put(67, "The Whisperer");
+        SLAYER_TASK_ID_NAMES.put(68, "Wintertodt");
+        SLAYER_TASK_ID_NAMES.put(69, "Yama");
+        SLAYER_TASK_ID_NAMES.put(70, "Zalcano");
+        SLAYER_TASK_ID_NAMES.put(71, "Zulrah");
+        SLAYER_TASK_ID_NAMES.put(72, "Fragment of Seren");
+        SLAYER_TASK_ID_NAMES.put(73, "Glough");
+        SLAYER_TASK_ID_NAMES.put(74, "Galvek");
+        SLAYER_TASK_ID_NAMES.put(75, "Other");
+        SLAYER_TASK_ID_NAMES.put(76, "Greater Demons");
+        SLAYER_TASK_ID_NAMES.put(77, "Lizardman Shamans");
+        SLAYER_TASK_ID_NAMES.put(78, "Wyrms");
+        SLAYER_TASK_ID_NAMES.put(79, "Black Dragons");
+        SLAYER_TASK_ID_NAMES.put(80, "Cave Horrors");
+        SLAYER_TASK_ID_NAMES.put(81, "Hellhounds");
+        SLAYER_TASK_ID_NAMES.put(82, "Bloodvelds");
+        SLAYER_TASK_ID_NAMES.put(83, "Suqahs");
+        SLAYER_TASK_ID_NAMES.put(84, "Demonic Gorillas");
+        SLAYER_TASK_ID_NAMES.put(85, "Basilisk Knights");
+        SLAYER_TASK_ID_NAMES.put(86, "Gargoyles");
+        SLAYER_TASK_ID_NAMES.put(87, "Skeletal Wyverns");
+        SLAYER_TASK_ID_NAMES.put(88, "Kurasks");
+        SLAYER_TASK_ID_NAMES.put(89, "Brutal Black Dragons");
+        SLAYER_TASK_ID_NAMES.put(90, "Giants");
+        SLAYER_TASK_ID_NAMES.put(91, "Tormented Demons");
+    }
+
+    /**
+     * Helper to resolve a Slayer task ID to its human-readable monster name.
+     */
+    private String resolveSlayerTaskName(int taskId) {
+        String name = SLAYER_TASK_ID_NAMES.get(taskId);
+        return name != null ? name : "Task ID " + taskId;
+    }
 
     private static final int VARBIT_TITHE_FARM_POINTS = 4893;
     private static final int VARBIT_VALE_RESEARCH_POINTS = 16301;
@@ -44,7 +234,6 @@ public class PlayerStateTools {
     private static final int VARBIT_BA_DEFENDER_POINTS = 4762;
     private static final int VARBIT_BA_COLLECTOR_POINTS = 4763;
     private static final int VARBIT_BA_HEALER_POINTS = 4764;
-    private static final int VARBIT_CARPENTERS_POINTS = 10671;
     private static final int VARBIT_GIANTS_FOUNDRY_REPUTATION = 13919;
     private static final int VARBIT_VOLCANIC_MINE_POINTS = 5934;
     private static final int VARBIT_LMS_POINTS = 9304;
@@ -84,8 +273,6 @@ public class PlayerStateTools {
         this.infoBoxManager = infoBoxManager;
         this.gson = gson;
     }
-
-
 
     public String normalizeSkillName(String input) {
         if (input == null) {
@@ -328,14 +515,34 @@ public class PlayerStateTools {
         result.add("activePrayers", activePrayers);
 
         int poisonVarp = client.getVarpValue(VarPlayerID.POISON);
+
         String status = "Healthy";
-        if (poisonVarp > 0 && poisonVarp < POISON_VENOM_THRESHOLD) {
-            status = "Poisoned (" + poisonVarp + " dmg)";
-        } else if (poisonVarp >= POISON_VENOM_THRESHOLD) {
-            int venomDmg = (poisonVarp - POISON_VENOM_THRESHOLD) / 5 + 6;
-            status = "Venomed (" + venomDmg + " dmg)";
+        boolean isPoisoned = false;
+        boolean isVenomed = false;
+        boolean isImmune = false;
+        int nextDamage = 0;
+
+        if (poisonVarp >= POISON_VENOM_THRESHOLD) {
+            status = "Venomed";
+            isVenomed = true;
+            nextDamage = Math.min(20, 6 + ((poisonVarp - POISON_VENOM_THRESHOLD) * 2));
+        } else if (poisonVarp > 0) {
+            status = "Poisoned";
+            isPoisoned = true;
+            nextDamage = (int) Math.ceil(poisonVarp / 5.0f);
+        } else if (poisonVarp < -38) {
+            status = "Venom Immune";
+            isImmune = true;
+        } else if (poisonVarp < 0) {
+            status = "Poison Immune";
+            isImmune = true;
         }
-        result.addProperty("poisonState", status);
+
+        result.addProperty("statusString", status);
+        result.addProperty("isPoisoned", isPoisoned);
+        result.addProperty("isVenomed", isVenomed);
+        result.addProperty("isImmune", isImmune);
+        result.addProperty("nextDamageAmount", nextDamage);
 
         JsonObject boostedSkills = new JsonObject();
         for (Skill s : Skill.values()) {
@@ -449,12 +656,6 @@ public class PlayerStateTools {
         }
 
         try {
-            int carp = client.getVarbitValue(VARBIT_CARPENTERS_POINTS);
-            points.addProperty("carpentersPoints", carp);
-        } catch (Exception ignored) {
-        }
-
-        try {
             int gf = client.getVarbitValue(VARBIT_GIANTS_FOUNDRY_REPUTATION);
             points.addProperty("giantsFoundryReputation", gf);
         } catch (Exception ignored) {
@@ -545,29 +746,47 @@ public class PlayerStateTools {
         String taskName = Utilities.getConfigValue(configManager, "slayer", "taskName");
         String amount = Utilities.getConfigValue(configManager, "slayer", "amount");
         String taskLocation = Utilities.getConfigValue(configManager, "slayer", "taskLocation", "location");
-        String slayerMaster = Utilities.getConfigValue(configManager, "slayer", "slayerMaster", "masterName", "master", "taskMaster");
+        String slayerMaster = Utilities.getConfigValue(configManager, "slayer", "slayerMaster", "masterName", "master",
+                "taskMaster");
         String pointsStr = Utilities.getConfigValue(configManager, "slayer", "points");
         String streakStr = Utilities.getConfigValue(configManager, "slayer", "streak");
 
+        boolean includeUnlocks = (args != null && args.has("includeUnlocks")
+                && !args.get("includeUnlocks").isJsonNull())
+                && args.get("includeUnlocks").getAsBoolean();
+
+        // 1. Live Points & Streak (prefer live game varbits, fallback to config)
         int pointsVal = 0;
-        if (pointsStr != null && !pointsStr.isEmpty()) {
+        int streakVal = 0;
+        try {
+            pointsVal = client.getVarbitValue(VARBIT_SLAYER_POINTS);
+            streakVal = client.getVarbitValue(VARBIT_SLAYER_TASK_STREAK);
+        } catch (Exception ignored) {
+        }
+        if (pointsVal <= 0 && pointsStr != null && !pointsStr.isEmpty()) {
             try {
                 pointsVal = Integer.parseInt(pointsStr);
             } catch (NumberFormatException ignored) {
             }
         }
-        if (pointsVal != 0) {
-            result.addProperty("points", pointsVal);
-        }
-        if (streakStr != null && !streakStr.isEmpty()) {
+        if (streakVal <= 0 && streakStr != null && !streakStr.isEmpty()) {
             try {
-                result.addProperty("streak", Integer.parseInt(streakStr));
+                streakVal = Integer.parseInt(streakStr);
             } catch (NumberFormatException ignored) {
             }
         }
+
+        result.addProperty("points", pointsVal);
+        result.addProperty("streak", streakVal);
+
+        // 2. Active Task Info
         if (taskName != null && !taskName.isEmpty() && amount != null) {
             result.addProperty("task", taskName);
-            result.addProperty("quantity", Integer.parseInt(amount));
+            try {
+                result.addProperty("quantity", Integer.parseInt(amount));
+            } catch (NumberFormatException e) {
+                result.addProperty("quantity", 0);
+            }
             if (taskLocation != null && !taskLocation.isEmpty() && !"None".equalsIgnoreCase(taskLocation.trim())) {
                 result.addProperty("location", taskLocation.trim());
             }
@@ -578,6 +797,58 @@ public class PlayerStateTools {
             result.addProperty("task", "None");
             result.addProperty("quantity", 0);
         }
+
+        // 3. Optional: Slayer Unlocks, Extensions, and Per-Master Block Lists
+        if (includeUnlocks) {
+            // Unlocks
+            JsonArray unlockedArray = new JsonArray();
+            for (Map.Entry<Integer, String> entry : SLAYER_UNLOCK_VARBITS.entrySet()) {
+                try {
+                    if (client.getVarbitValue(entry.getKey()) == 1) {
+                        unlockedArray.add(entry.getValue());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            result.add("purchasedUnlocks", unlockedArray);
+
+            // Extensions
+            JsonArray extensionsArray = new JsonArray();
+            for (Map.Entry<Integer, String> entry : SLAYER_EXTENSION_VARBITS.entrySet()) {
+                try {
+                    if (client.getVarbitValue(entry.getKey()) == 1) {
+                        extensionsArray.add(entry.getValue());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            result.add("activeExtensions", extensionsArray);
+
+            // Block Lists grouped by Slayer Master
+            JsonObject blockListsByMaster = new JsonObject();
+            for (Map.Entry<String, int[]> entry : SLAYER_MASTER_BLOCK_VARBITS.entrySet()) {
+                String master = entry.getKey();
+                int[] slotVarbits = entry.getValue();
+                JsonArray blockedTasks = new JsonArray();
+
+                for (int slotVarbit : slotVarbits) {
+                    try {
+                        int taskId = client.getVarbitValue(slotVarbit);
+                        if (taskId > 0) {
+                            String taskLabel = resolveSlayerTaskName(taskId);
+                            blockedTasks.add(taskLabel);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                if (blockedTasks.size() > 0) {
+                    blockListsByMaster.add(master, blockedTasks);
+                }
+            }
+            result.add("blockedTasksByMaster", blockListsByMaster);
+        }
+
         return gson.toJson(result);
     }
 }
