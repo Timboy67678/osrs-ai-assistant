@@ -9,19 +9,13 @@ import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.nodes.Node;
-import org.jsoup.nodes.TextNode;
-import org.jsoup.select.Elements;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -586,6 +580,28 @@ public class WikiSearchUtil {
         return null;
     }
 
+    private static final Pattern PATTERN_HTML_NOISE = Pattern.compile(
+            "(?is)<(script|style|svg|img|video|audio|figure|iframe|noscript)[^>]*>.*?</\\1>|<img[^>]*>|<br\\s*/?>");
+    private static final Pattern PATTERN_HTML_CLASS_NOISE = Pattern.compile(
+            "(?is)<(div|span|sup|table|ul|ol|p)[^>]*class=[\"'][^\"']*?\\b(mw-editsection|mw-editsection-visualeditor|toc|noexcerpt|navbox|vertical-navbox|catlinks|printfooter|hatnote|dablink|ambox|cmbox|notice|reflist|references|reference|mw-empty-elt|mw-collapsible|mw-collapsed|collapsed|collapsible|infobox-cell-hidden|hidden-cell)\\b[^\"']*?[\"'][^>]*>.*?</\\1>");
+    private static final Pattern PATTERN_HTML_DISPLAY_NONE = Pattern.compile(
+            "(?is)<[a-zA-Z0-9]+[^>]*style=[\"'][^\"']*?display:\\s*none[^\"']*?[\"'][^>]*>.*?</[a-zA-Z0-9]+>");
+    private static final Pattern PATTERN_HTML_USELESS_SECTION = Pattern.compile(
+            "(?is)<h[23][^>]*>(?:<[^>]+>)*\\s*(?:changes|update history|history|gallery|references|external links|navigation)\\s*(?:</[^>]+>)*</h[23]>.*?(?=<h2|$)");
+    private static final Pattern PATTERN_HTML_INFOBOX = Pattern.compile(
+            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(infobox|questdetails|questreq|equipment-stats|quest)[^\"']*?[\"'][^>]*>(.*?)</table>");
+    private static final Pattern PATTERN_HTML_WIKITABLE = Pattern.compile(
+            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(wikitable|item-drops|drop-table)[^\"']*?[\"'][^>]*>(.*?)</table>");
+    private static final Pattern PATTERN_HTML_TR = Pattern.compile("(?is)<tr[^>]*>(.*?)</tr>");
+    private static final Pattern PATTERN_HTML_TH = Pattern.compile("(?is)<th[^>]*>(.*?)</th>");
+    private static final Pattern PATTERN_HTML_TD = Pattern.compile("(?is)<td[^>]*>(.*?)</td>");
+    private static final Pattern PATTERN_HTML_H2 = Pattern.compile("(?is)<h2[^>]*>(.*?)</h2>");
+    private static final Pattern PATTERN_HTML_H3 = Pattern.compile("(?is)<h3[^>]*>(.*?)</h3>");
+    private static final Pattern PATTERN_HTML_H4 = Pattern.compile("(?is)<h4[^>]*>(.*?)</h4>");
+    private static final Pattern PATTERN_HTML_P = Pattern.compile("(?is)<p[^>]*>(.*?)</p>");
+    private static final Pattern PATTERN_HTML_LI = Pattern.compile("(?is)<li[^>]*>(.*?)</li>");
+    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]+>");
+
     /**
      * Converts server-rendered MediaWiki HTML into concise, structured Markdown.
      *
@@ -598,53 +614,93 @@ public class WikiSearchUtil {
             return "";
         }
 
-        Document doc = Jsoup.parse(html);
-        Element root = doc.selectFirst(".mw-parser-output");
-        if (root == null) {
-            root = doc.body();
+        String cleaned = html;
+        for (int i = 0; i < 3; i++) {
+            cleaned = PATTERN_HTML_NOISE.matcher(cleaned).replaceAll(" ");
+            cleaned = PATTERN_HTML_CLASS_NOISE.matcher(cleaned).replaceAll(" ");
+            cleaned = PATTERN_HTML_DISPLAY_NONE.matcher(cleaned).replaceAll(" ");
         }
-
-        // 1. Remove noise DOM elements (edit sections, toc, navboxes, hatnotes,
-        // disambiguations, references, collapsible popups, hidden cells)
-        root.select(
-                "script, style, .mw-editsection, .mw-editsection-visualeditor, #toc, .toc, .mw-empty-elt, " +
-                        ".noexcerpt, .navbox, .vertical-navbox, .catlinks, .printfooter, img, svg, audio, video, figure, iframe, "
-                        +
-                        ".hatnote, .dablink, .ambox, .cmbox, .notice, .reflist, .references, sup.reference, " +
-                        ".mw-collapsible, .mw-collapsed, .collapsed, .collapsible, .infobox-cell-hidden, .hidden-cell, "
-                        +
-                        "[style*='display:none'], [style*='display: none']")
-                .remove();
-
-        // 2. Remove useless trailing/side sections
-        removeUselessSectionsFromDom(root);
+        cleaned = PATTERN_HTML_USELESS_SECTION.matcher(cleaned).replaceAll(" ");
 
         StringBuilder sb = new StringBuilder();
         sb.append("# ").append(title).append("\n\n");
 
-        // 3. Extract Infobox & Quest Details/Stats
-        String infoboxMarkdown = extractInfoboxData(root);
+        // 1. Extract Infobox & Quest Details/Stats
+        StringBuilder infoboxSb = new StringBuilder();
+        Matcher infoboxMatcher = PATTERN_HTML_INFOBOX.matcher(cleaned);
+        while (infoboxMatcher.find()) {
+            String tableHtml = infoboxMatcher.group(2);
+            Matcher trMatcher = PATTERN_HTML_TR.matcher(tableHtml);
+            while (trMatcher.find()) {
+                String rowHtml = trMatcher.group(1);
+                List<String> ths = extractCellTexts(rowHtml, PATTERN_HTML_TH);
+                List<String> tds = extractCellTexts(rowHtml, PATTERN_HTML_TD);
 
-        // 4. Extract Lead Paragraphs (summary before first major heading)
-        String leadSummary = extractLeadSummary(root);
-        if (!leadSummary.isEmpty()) {
-            sb.append(leadSummary).append("\n\n");
+                if (!ths.isEmpty() && !tds.isEmpty()) {
+                    String key = cleanCellText(ths.get(0));
+                    String val = cleanCellText(tds.get(0));
+                    if (isValidInfoboxPair(key, val)) {
+                        infoboxSb.append("- **").append(key).append("**: ").append(val).append("\n");
+                    }
+                } else if (tds.size() >= 2) {
+                    String key = cleanCellText(tds.get(0));
+                    String val = cleanCellText(tds.get(1));
+                    if (isValidInfoboxPair(key, val)) {
+                        infoboxSb.append("- **").append(key).append("**: ").append(val).append("\n");
+                    }
+                } else if (tds.size() == 1) {
+                    String val = cleanCellText(tds.get(0));
+                    if (!val.isEmpty() && !val.equalsIgnoreCase("Details")
+                            && !val.contains("You will have to buy another")) {
+                        infoboxSb.append("- ").append(val).append("\n");
+                    }
+                }
+            }
         }
+        cleaned = PATTERN_HTML_INFOBOX.matcher(cleaned).replaceAll(" ");
 
+        String infoboxMarkdown = infoboxSb.toString().trim();
         if (!infoboxMarkdown.isEmpty()) {
             sb.append("## Overview & Stats\n").append(infoboxMarkdown).append("\n\n");
         }
 
-        // 5. Format Wikitables & Drop Tables into Markdown Tables
-        convertWikitablesToMarkdown(root);
+        // 2. Format Wikitables & Drop Tables into Markdown Tables
+        StringBuffer tableReplaced = new StringBuffer();
+        Matcher tableMatcher = PATTERN_HTML_WIKITABLE.matcher(cleaned);
+        while (tableMatcher.find()) {
+            String tableHtml = tableMatcher.group(2);
+            String mdTable = formatHtmlTableToMarkdown(tableHtml);
+            tableMatcher.appendReplacement(tableReplaced, Matcher.quoteReplacement("\n\n" + mdTable + "\n\n"));
+        }
+        tableMatcher.appendTail(tableReplaced);
+        cleaned = tableReplaced.toString();
 
-        // 6. Convert remaining body structure
-        String bodyMarkdown = convertBodyToMarkdown(root);
-        sb.append(bodyMarkdown);
+        // 3. Convert Headings, Paragraphs, Lists
+        cleaned = PATTERN_HTML_H2.matcher(cleaned).replaceAll("\n\n## $1\n\n");
+        cleaned = PATTERN_HTML_H3.matcher(cleaned).replaceAll("\n\n### $1\n\n");
+        cleaned = PATTERN_HTML_H4.matcher(cleaned).replaceAll("\n\n#### $1\n\n");
+        cleaned = PATTERN_HTML_P.matcher(cleaned).replaceAll("\n\n$1\n\n");
+        cleaned = PATTERN_HTML_LI.matcher(cleaned).replaceAll("\n- $1");
+
+        // 4. Clean bold, italic, tags, and entities
+        cleaned = cleaned.replaceAll("(?i)<(b|strong)>([\\s\\S]*?)</\\1>", "**$2**");
+        cleaned = cleaned.replaceAll("(?i)<(i|em)>([\\s\\S]*?)</\\1>", "*$2*");
+        cleaned = PATTERN_HTML_TAGS.matcher(cleaned).replaceAll(" ");
+        cleaned = decodeHtmlEntities(cleaned);
+        cleaned = PATTERN_EDIT_BUTTONS.matcher(cleaned).replaceAll("");
+        cleaned = PATTERN_MOID_NOISE.matcher(cleaned).replaceAll("");
+
+        String[] lines = cleaned.split("\r?\n");
+        StringBuilder bodySb = new StringBuilder();
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) {
+                bodySb.append(trimmed).append("\n\n");
+            }
+        }
+        sb.append(bodySb.toString().trim());
 
         String result = sb.toString().trim();
-        result = PATTERN_EDIT_BUTTONS.matcher(result).replaceAll("");
-        result = PATTERN_MOID_NOISE.matcher(result).replaceAll("");
         result = PATTERN_MULTIPLE_NEWLINES.matcher(result).replaceAll("\n\n");
 
         if (result.length() > WIKI_EXTRACT_CHARS) {
@@ -653,258 +709,128 @@ public class WikiSearchUtil {
         return result;
     }
 
-    private static void removeUselessSectionsFromDom(Element root) {
-        Elements headings = root.select("h2, h3");
-        List<Element> toRemove = new ArrayList<>();
-        for (Element heading : headings) {
-            String headingText = heading.text().trim();
-            if (PATTERN_USELESS_HEADINGS.matcher(headingText).matches()) {
-                toRemove.add(heading);
-                Element next = heading.nextElementSibling();
-                while (next != null && !next.tagName().equalsIgnoreCase("h2")) {
-                    toRemove.add(next);
-                    next = next.nextElementSibling();
+    private static String formatHtmlTableToMarkdown(String tableHtml) {
+        Matcher trMatcher = PATTERN_HTML_TR.matcher(tableHtml);
+        List<List<String>> allRows = new ArrayList<>();
+        List<String> headers = new ArrayList<>();
+
+        while (trMatcher.find()) {
+            String rowHtml = trMatcher.group(1);
+            List<String> ths = extractCellTexts(rowHtml, PATTERN_HTML_TH);
+            List<String> tds = extractCellTexts(rowHtml, PATTERN_HTML_TD);
+
+            if (headers.isEmpty() && !ths.isEmpty()) {
+                for (String th : ths) {
+                    String hText = cleanCellText(th).replace("|", "\\|");
+                    headers.add(hText.isEmpty() ? "-" : hText);
+                }
+            } else {
+                List<String> rowCells = new ArrayList<>();
+                for (String th : ths) {
+                    rowCells.add(cleanCellText(th).replace("|", "\\|"));
+                }
+                for (String td : tds) {
+                    rowCells.add(cleanCellText(td).replace("|", "\\|"));
+                }
+                if (!rowCells.isEmpty()) {
+                    allRows.add(rowCells);
                 }
             }
         }
-        for (Element el : toRemove) {
-            el.remove();
-        }
-    }
 
-    private static String extractInfoboxData(Element root) {
-        Elements infoboxes = root.select(
-                "table[class*='infobox'], table.questdetails, table.questreq, div.questreq, table.equipment-stats, table[class*='quest']");
-        if (infoboxes.isEmpty()) {
+        if (headers.isEmpty() && !allRows.isEmpty()) {
+            int maxCols = 0;
+            for (List<String> dr : allRows) {
+                maxCols = Math.max(maxCols, dr.size());
+            }
+            for (int col = 1; col <= maxCols; col++) {
+                headers.add("Col " + col);
+            }
+        }
+
+        if (headers.isEmpty()) {
             return "";
         }
 
-        StringBuilder sb = new StringBuilder();
-        for (Element infobox : infoboxes) {
-            Elements rows = infobox.select("tr");
-            for (Element row : rows) {
-                Elements headers = row.select("th");
-                Elements cells = row.select("td");
-                if (!headers.isEmpty() && !cells.isEmpty()) {
-                    String key = PATTERN_EDIT_BUTTONS.matcher(headers.text().trim()).replaceAll("").trim();
-                    String val = PATTERN_EDIT_BUTTONS.matcher(cells.text().trim()).replaceAll("").trim();
-                    key = PATTERN_MOID_NOISE.matcher(key).replaceAll("").trim();
-                    val = PATTERN_MOID_NOISE.matcher(val).replaceAll("").trim();
-                    // Skip rows where the key is a raw numeric stat token (e.g. "+60", "+0")
-                    // rather than a human-readable label — these are rendering artefacts
-                    // from the OSRS wiki NPC combat-stats infobox and produce garbled
-                    // output like "- **+60**: 50% weakness" that can mislead the AI.
-                    if (!key.isEmpty() && !val.isEmpty() && !key.equalsIgnoreCase("Image")
-                            && !key.equalsIgnoreCase("Caption")
-                            && !isRawStatKey(key)
-                            && !val.equalsIgnoreCase("Not alchemisable") && !val.equalsIgnoreCase("Not sold")
-                            && !val.equalsIgnoreCase("No data to display")) {
-                        sb.append("- **").append(key).append("**: ").append(val).append("\n");
-                    }
-                } else if (cells.size() >= 2) {
-                    String key = PATTERN_EDIT_BUTTONS.matcher(cells.get(0).text().trim()).replaceAll("").trim();
-                    String val = PATTERN_EDIT_BUTTONS.matcher(cells.get(1).text().trim()).replaceAll("").trim();
-                    key = PATTERN_MOID_NOISE.matcher(key).replaceAll("").trim();
-                    val = PATTERN_MOID_NOISE.matcher(val).replaceAll("").trim();
-                    if (!key.isEmpty() && !val.isEmpty() && !key.equalsIgnoreCase("Image")
-                            && !isRawStatKey(key)
-                            && !val.equalsIgnoreCase("Not alchemisable") && !val.equalsIgnoreCase("Not sold")
-                            && !val.equalsIgnoreCase("No data to display")) {
-                        sb.append("- **").append(key).append("**: ").append(val).append("\n");
-                    }
-                } else if (cells.size() == 1) {
-                    String val = PATTERN_EDIT_BUTTONS.matcher(cells.get(0).text().trim()).replaceAll("").trim();
-                    val = PATTERN_MOID_NOISE.matcher(val).replaceAll("").trim();
-                    if (!val.isEmpty() && !val.equalsIgnoreCase("Details")
-                            && !val.contains("You will have to buy another")) {
-                        sb.append("- ").append(val).append("\n");
-                    }
-                }
-            }
-            infobox.remove();
+        StringBuilder tableSb = new StringBuilder();
+        tableSb.append("| ").append(String.join(" | ", headers)).append(" |\n");
+        tableSb.append("| ");
+        for (int i = 0; i < headers.size(); i++) {
+            tableSb.append("---").append(i < headers.size() - 1 ? " | " : "");
         }
-        return sb.toString().trim();
+        tableSb.append(" |\n");
+
+        int rowCount = 0;
+        for (List<String> rowData : allRows) {
+            while (rowData.size() < headers.size()) {
+                rowData.add("");
+            }
+            tableSb.append("| ").append(String.join(" | ", rowData.subList(0, headers.size()))).append(" |\n");
+            rowCount++;
+            if (rowCount >= MAX_WIKITABLE_DATA_ROWS) {
+                break;
+            }
+        }
+
+        if (allRows.size() > MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD) {
+            tableSb.append("*...[").append(allRows.size() - MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD)
+                    .append(" additional rows truncated]*\n");
+        }
+        return tableSb.toString().trim();
     }
 
-    /**
-     * Returns {@code true} if the given infobox key looks like a raw numeric stat
-     * token rather than a human-readable label.
-     * <p>
-     * The OSRS wiki NPC infobox renders combat bonuses (e.g. attack/defence/ranged
-     * bonuses) as bare cells like "+60" or "+0" without semantic column headers,
-     * which our parser naively promotes to key/value pairs such as
-     * {@code "- **+60**: 50% weakness"}. These entries are meaningless out of
-     * context and can mislead the AI into inventing incorrect monster weaknesses.
-     *
-     * @param key infobox key string to test
-     * @return {@code true} if the key should be suppressed
-     */
+    private static List<String> extractCellTexts(String html, Pattern cellPattern) {
+        List<String> list = new ArrayList<>();
+        Matcher m = cellPattern.matcher(html);
+        while (m.find()) {
+            list.add(m.group(1));
+        }
+        return list;
+    }
+
+    private static String cleanCellText(String cellHtml) {
+        if (cellHtml == null) {
+            return "";
+        }
+        String text = PATTERN_HTML_TAGS.matcher(cellHtml).replaceAll(" ").trim();
+        text = decodeHtmlEntities(text);
+        text = PATTERN_EDIT_BUTTONS.matcher(text).replaceAll("").trim();
+        text = PATTERN_MOID_NOISE.matcher(text).replaceAll("").trim();
+        return text.replaceAll("\\s+", " ").trim();
+    }
+
+    private static boolean isValidInfoboxPair(String key, String val) {
+        return !key.isEmpty() && !val.isEmpty()
+                && !key.equalsIgnoreCase("Image")
+                && !key.equalsIgnoreCase("Caption")
+                && !isRawStatKey(key)
+                && !val.equalsIgnoreCase("Not alchemisable")
+                && !val.equalsIgnoreCase("Not sold")
+                && !val.equalsIgnoreCase("No data to display");
+    }
+
     static boolean isRawStatKey(String key) {
         if (key == null || key.isEmpty()) {
             return false;
         }
-        // Matches tokens like "+0", "+60", "-10", "0", "100", "100%", "+100%"
         return key.matches("[+\\-]?\\d+%?");
     }
 
-    private static String extractLeadSummary(Element root) {
-        StringBuilder sb = new StringBuilder();
-        List<Element> leadParagraphs = new ArrayList<>();
-        for (Element child : root.children()) {
-            if (child.tagName().equalsIgnoreCase("h2")) {
-                break;
-            }
-            if (child.tagName().equalsIgnoreCase("p")) {
-                String text = child.text().trim();
-                if (!text.isEmpty()) {
-                    sb.append(text).append("\n\n");
-                }
-                leadParagraphs.add(child);
-            }
+    public static String decodeHtmlEntities(String text) {
+        if (text == null || text.isEmpty()) {
+            return "";
         }
-        for (Element p : leadParagraphs) {
-            p.remove();
-        }
-        return sb.toString().trim();
-    }
-
-    private static void convertWikitablesToMarkdown(Element root) {
-        Elements tables = root.select("table.wikitable, table.item-drops, table.drop-table");
-        for (Element table : tables) {
-            Elements rows = table.select("tr");
-            if (rows.isEmpty()) {
-                table.remove();
-                continue;
-            }
-
-            StringBuilder tableSb = new StringBuilder("\n\n");
-            List<String> headers = new ArrayList<>();
-
-            Element firstRow = rows.get(0);
-            Elements ths = firstRow.select("th");
-            if (!ths.isEmpty()) {
-                for (Element th : ths) {
-                    String hText = th.text().trim().replace("|", "\\|");
-                    headers.add(hText.isEmpty() ? "-" : hText);
-                }
-            }
-
-            int startRowIdx = headers.isEmpty() ? 0 : 1;
-            List<List<String>> dataRows = new ArrayList<>();
-
-            for (int i = startRowIdx; i < rows.size(); i++) {
-                Element r = rows.get(i);
-                Elements tds = r.select("td, th");
-                if (tds.isEmpty())
-                    continue;
-                List<String> cellValues = new ArrayList<>();
-                for (Element td : tds) {
-                    String val = td.text().trim().replace("|", "\\|");
-                    cellValues.add(val);
-                }
-                dataRows.add(cellValues);
-
-                if (dataRows.size() >= MAX_WIKITABLE_DATA_ROWS) {
-                    break;
-                }
-            }
-
-            if (headers.isEmpty() && !dataRows.isEmpty()) {
-                int maxCols = 0;
-                for (List<String> dr : dataRows) {
-                    maxCols = Math.max(maxCols, dr.size());
-                }
-                for (int col = 1; col <= maxCols; col++) {
-                    headers.add("Col " + col);
-                }
-            }
-
-            if (!headers.isEmpty()) {
-                tableSb.append("| ").append(String.join(" | ", headers)).append(" |\n");
-                tableSb.append("| ")
-                        .append(headers.stream().map(h -> "---").reduce((a, b) -> a + " | " + b).orElse("---"))
-                        .append(" |\n");
-
-                for (List<String> rowData : dataRows) {
-                    while (rowData.size() < headers.size()) {
-                        rowData.add("");
-                    }
-                    tableSb.append("| ").append(String.join(" | ", rowData.subList(0, headers.size()))).append(" |\n");
-                }
-
-                if (rows.size() > MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD) {
-                    tableSb.append("*...[").append(rows.size() - MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD)
-                            .append(" additional rows truncated]*\n");
-                }
-                tableSb.append("\n");
-
-                table.replaceWith(new TextNode(tableSb.toString()));
-            } else {
-                table.remove();
-            }
-        }
-    }
-
-    private static String convertBodyToMarkdown(Element root) {
-        StringBuilder sb = new StringBuilder();
-        for (Node childNode : root.childNodes()) {
-            if (childNode instanceof TextNode) {
-                String text = ((TextNode) childNode).text().trim();
-                if (!text.isEmpty()) {
-                    sb.append(text).append("\n\n");
-                }
-            } else if (childNode instanceof Element) {
-                Element child = (Element) childNode;
-                String tag = child.tagName().toLowerCase();
-                switch (tag) {
-                    case "h2":
-                        String h2Text = child.text().trim();
-                        if (!h2Text.isEmpty()) {
-                            sb.append("\n## ").append(h2Text).append("\n\n");
-                        }
-                        break;
-                    case "h3":
-                        String h3Text = child.text().trim();
-                        if (!h3Text.isEmpty()) {
-                            sb.append("\n### ").append(h3Text).append("\n\n");
-                        }
-                        break;
-                    case "h4":
-                        String h4Text = child.text().trim();
-                        if (!h4Text.isEmpty()) {
-                            sb.append("\n#### ").append(h4Text).append("\n\n");
-                        }
-                        break;
-                    case "p":
-                        String pText = child.text().trim();
-                        if (!pText.isEmpty()) {
-                            sb.append(pText).append("\n\n");
-                        }
-                        break;
-                    case "ul":
-                    case "ol":
-                        for (Element li : child.select("> li")) {
-                            String liText = li.text().trim();
-                            if (!liText.isEmpty()) {
-                                sb.append("- ").append(liText).append("\n");
-                            }
-                        }
-                        sb.append("\n");
-                        break;
-                    case "div":
-                    case "span":
-                    case "blockquote":
-                        String divText = child.text().trim();
-                        if (!divText.isEmpty()) {
-                            sb.append(divText).append("\n\n");
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-        return sb.toString();
+        return text.replace("&nbsp;", " ")
+                .replace("&#160;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#039;", "'")
+                .replace("&apos;", "'")
+                .replace("&#8203;", "")
+                .replace("&ndash;", "–")
+                .replace("&mdash;", "—");
     }
 
     /**
