@@ -43,7 +43,7 @@ public class OsrsToolRegistry {
                                 true, true, AiService::executeGetPlayerEquipment));
 
                 registry.add(new AiService.ToolDefinition("get_player_slayer_task",
-                                "Retrieve the player's current Slayer task, remaining quantity, assigned location (if location-specific, e.g. Konar), assigned Slayer master (e.g. Duradel, Nieve, Konar), current Slayer points, and current streak. Optionally include purchased slayer unlocks (e.g. 'Broader Fletching', 'Like a Boss', 'Bigger and Badder') and the current block list. Pass includeUnlocks=true when the user asks about their slayer setup, what they have unlocked, what is blocked, or when recommending tasks to block/unlock.",
+                                "Retrieve the player's current standard Slayer task AND separate Mortimer Slayer task, remaining quantities, assigned locations, assigned Slayer masters (e.g. Duradel, Nieve, Konar, Mortimer), current Slayer points, and current streaks (standard streak & Mortimer streak). Optionally include purchased slayer unlocks (e.g. 'Broader Fletching', 'Like a Boss', 'Bigger and Badder') and the current block list. Pass includeUnlocks=true when the user asks about their slayer setup, what they have unlocked, what is blocked, or when recommending tasks to block/unlock.",
                                 true, true, AiService::executeGetPlayerSlayerTask)
                                 .addParam("includeUnlocks", "boolean",
                                                 "If true, also returns the list of purchased slayer unlocks and the current task block list. Omit or set false to save context tokens when only the active task is needed.",

@@ -33,7 +33,6 @@ public class FarmingAndTimerTools {
     private static final int VARBIT_BIRDHOUSE_VALLEY_NORTH = 6523;
     private static final int VARBIT_BIRDHOUSE_VALLEY_SOUTH = 6524;
 
-    private static final int VARBIT_HESPORI_GROWTH = 7908;
     private static final int HESPORI_STAGE_READY = 7;
 
     private static final int VARP_TEARS_OF_GUTHIX_COOLDOWN = 452;
@@ -132,7 +131,7 @@ public class FarmingAndTimerTools {
 
         // 2. Hespori Boss Growth
         JsonObject hespori = new JsonObject();
-        int hesporiVar = client != null ? client.getVarbitValue(VARBIT_HESPORI_GROWTH) : 0;
+        int hesporiVar = client != null ? client.getVarbitValue(Varbits.FARMING_7908) : 0;
         hespori.addProperty("stateVarbit", hesporiVar);
         hespori.addProperty("status", hesporiVar >= HESPORI_STAGE_READY ? "Fully Grown / Ready to fight"
                 : (hesporiVar > 0 ? "Growing" : "Empty / Cleared"));

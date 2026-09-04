@@ -11,7 +11,6 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,7 +32,8 @@ import java.util.regex.Pattern;
  * Markdown extracts without external dependencies.
  */
 @Slf4j
-public class WikiSearchUtil {
+public final class WikiSearchUtil {
+
     /**
      * Custom User-Agent header string required by Old School RuneScape Wiki API
      * guidelines.
@@ -42,9 +42,6 @@ public class WikiSearchUtil {
 
     /** Endpoint URL for the Old School RuneScape Wiki MediaWiki API. */
     public static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
-
-    /** Maximum nested template cleaning iterations. */
-    public static final int MAX_TEMPLATE_REMOVALS = 5;
 
     /**
      * Maximum character limit for wiki article extracts passed to the AI prompt
@@ -73,9 +70,181 @@ public class WikiSearchUtil {
     /** Maximum number of entries retained in the synchronized search cache. */
     private static final int CACHE_MAX_ENTRIES = 500;
 
+    // =========================================================================
+    // HTML Parsing & Tokenizing Patterns
+    // =========================================================================
+
+    private static final Pattern PATTERN_HTML_NOISE = Pattern.compile(
+            "(?is)<(script|style|svg|img|video|audio|figure|iframe|noscript)[^>]*>.*?</\\1>|<br\\s*/?>");
+    private static final Pattern PATTERN_HTML_CLASS_NOISE = Pattern.compile(
+            "(?is)<(div|span|sup|table|ul|ol|p)[^>]*class=[\"'][^\"']*?\\b(mw-editsection|mw-editsection-visualeditor|toc|noexcerpt|navbox|vertical-navbox|catlinks|printfooter|hatnote|dablink|ambox|cmbox|notice|reflist|references|reference|mw-empty-elt|mw-collapsible|mw-collapsed|collapsed|collapsible|infobox-cell-hidden|hidden-cell)\\b[^\"']*?[\"'][^>]*>.*?</\\1>");
+    private static final Pattern PATTERN_HTML_DISPLAY_NONE = Pattern.compile(
+            "(?is)<[a-zA-Z0-9]+[^>]*style=[\"'][^\"']*?display:\\s*none[^\"']*?[\"'][^>]*>.*?</[a-zA-Z0-9]+>");
+    private static final Pattern PATTERN_HTML_USELESS_SECTION = Pattern.compile(
+            "(?is)<h[23][^>]*>(?:<[^>]+>)*\\s*(?:changes|update history|history|gallery|references|external links|navigation)\\s*(?:</[^>]+>)*</h[23]>.*?(?=<h2|$)");
+    private static final Pattern PATTERN_HTML_INFOBOX = Pattern.compile(
+            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(infobox|questdetails|questreq|equipment-stats|quest)[^\"']*?[\"'][^>]*>(.*?)</table>");
+    private static final Pattern PATTERN_HTML_WIKITABLE = Pattern.compile(
+            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(wikitable|item-drops|drop-table)[^\"']*?[\"'][^>]*>(.*?)</table>");
+    private static final Pattern PATTERN_HTML_TR = Pattern.compile("(?is)<tr[^>]*>(.*?)</tr>");
+    private static final Pattern PATTERN_HTML_TH = Pattern.compile("(?is)<th[^>]*>(.*?)</th>");
+    private static final Pattern PATTERN_HTML_TD = Pattern.compile("(?is)<td[^>]*>(.*?)</td>");
+    private static final Pattern PATTERN_HTML_H2 = Pattern.compile("(?is)<h2[^>]*>(.*?)</h2>");
+    private static final Pattern PATTERN_HTML_H3 = Pattern.compile("(?is)<h3[^>]*>(.*?)</h3>");
+    private static final Pattern PATTERN_HTML_H4 = Pattern.compile("(?is)<h4[^>]*>(.*?)</h4>");
+    private static final Pattern PATTERN_HTML_P = Pattern.compile("(?is)<p[^>]*>(.*?)</p>");
+    private static final Pattern PATTERN_HTML_LI = Pattern.compile("(?is)<li[^>]*>(.*?)</li>");
+    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]+>");
+
+    // =========================================================================
+    // General Formatting & Cleaning Patterns
+    // =========================================================================
+
+    private static final Pattern PATTERN_BOLD_TAGS = Pattern.compile("(?i)<(b|strong)>([\\s\\S]*?)</\\1>");
+    private static final Pattern PATTERN_ITALIC_TAGS = Pattern.compile("(?i)<(i|em)>([\\s\\S]*?)</\\1>");
+    private static final Pattern PATTERN_EDIT_BUTTONS = Pattern
+            .compile("(?i)\\[edit\\s*\\|\\s*edit source\\]|\\[edit\\]|\\b(\\?\\s*)?\\(edit\\)");
+    private static final Pattern PATTERN_MOID_NOISE = Pattern.compile("(?i)\\b(view|edit|MOID+)\\b");
+    private static final Pattern PATTERN_MULTIPLE_NEWLINES = Pattern.compile("\n{3,}");
+    private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern PATTERN_NON_ALPHA = Pattern.compile("[^a-z]+");
+    private static final Pattern PATTERN_RAW_STAT = Pattern.compile("[+\\-]?\\d+%?");
+    private static final Pattern PATTERN_LINES = Pattern.compile("\r?\n");
+
+    // =========================================================================
+    // Legacy Wikitext Cleaning Patterns
+    // =========================================================================
+
+    private static final Pattern PATTERN_COMMENTS = Pattern.compile("(?s)<!--.*?-->");
+    private static final Pattern PATTERN_MAGIC = Pattern.compile("(?i)__(TOC|NOTOC|NOEDITSECTION)__");
+    private static final Pattern PATTERN_FILES = Pattern.compile("(?i)\\[\\[(File|Image|Category):.*?\\]\\]");
+    private static final Pattern PATTERN_PIPE_LINKS = Pattern.compile("\\[\\[[^]]*?\\|([^]]+?)\\]\\]");
+    private static final Pattern PATTERN_SIMPLE_LINKS = Pattern.compile("\\[\\[([^]]+?)\\]\\]");
+    private static final Pattern PATTERN_BOLD = Pattern.compile("'''(.*?)'''");
+    private static final Pattern PATTERN_ITALIC = Pattern.compile("''(.*?)''");
+    private static final Pattern PATTERN_EMPTY_LINES = Pattern.compile("(?m)^[ \t]*\r?\n");
+    private static final Pattern PATTERN_TABLE_START = Pattern.compile("(?s)\\{\\|[^\n]*\n");
+    private static final Pattern PATTERN_TABLE_END = Pattern.compile("\\|\\}");
+    private static final Pattern PATTERN_TABLE_CLASS = Pattern.compile("(?m)^\\|+[^\n]*class=[^\n]*\n?");
+    private static final Pattern PATTERN_TABLE_STYLE = Pattern.compile("(?m)^\\|+[^\n]*style=[^\n]*\n?");
+    private static final Pattern PATTERN_TABLE_ROW = Pattern.compile("\\|\\-");
+    private static final Pattern PATTERN_TABLE_DELIM = Pattern.compile("!|\\|\\|");
+    private static final Pattern PATTERN_TABLE_CELL = Pattern.compile("(?m)^\\|");
+    private static final Pattern PATTERN_TABLE_HEADER = Pattern.compile("(?m)^!");
+    private static final Pattern PATTERN_USELESS_SECTIONS = Pattern.compile(
+            "(?ims)^==\\s*(Changes|Update history|History|Gallery|References|External links|Navigation)\\s*==.*?(?=(^==|\\z))");
+    private static final Pattern PATTERN_STUB_TAGS = Pattern.compile("(?i)\\{\\{(stub|clear|sic|!)\\}\\}");
+
+    // =========================================================================
+    // Search Query Cleaning Constants
+    // =========================================================================
+
+    private static final String[] SEARCH_PREFIXES = {
+            "what are the ingredients for",
+            "what is the drop rate of",
+            "what is the drop rate for",
+            "what is the recipe for",
+            "what are the stats for",
+            "what are the stats of",
+            "what is the stats for",
+            "what is the stats of",
+            "where can i find",
+            "where can i buy",
+            "where can i get",
+            "where do i find",
+            "where do i buy",
+            "where do i get",
+            "can you search for",
+            "can you look up",
+            "tell me about",
+            "information on",
+            "ingredients for",
+            "how do i craft",
+            "how do i make",
+            "how do i brew",
+            "how do i get",
+            "recipe for",
+            "search for",
+            "how to craft",
+            "how to make",
+            "how to brew",
+            "how to get",
+            "look up",
+            "where is",
+            "where are",
+            "what is",
+            "what are",
+            "info on",
+            "lookup",
+            "how to",
+            "how do"
+    };
+
+    private static final String[] SEARCH_SUFFIXES = {
+            " location coordinates",
+            " buy shops locations",
+            " shop locations osrs",
+            " slayer points cost",
+            " quest requirements",
+            " skill requirements",
+            " elemental weakness",
+            " quest requirement",
+            " skill requirement",
+            " map coordinates",
+            " shops locations",
+            " spawn locations",
+            " ingredients for",
+            " spawn location",
+            " shop locations",
+            " shop location",
+            " drop sources",
+            " drop source",
+            " map location",
+            " slayer points",
+            " requirements",
+            " requirement",
+            " coordinates",
+            " ingredients",
+            " points cost",
+            " slayer point",
+            " point cost",
+            " drop rates",
+            " drop table",
+            " drop rate",
+            " locations",
+            " location",
+            " weakness",
+            " sources",
+            " source",
+            " recipe",
+            " spawns",
+            " coords",
+            " shops",
+            " spawn",
+            " drops",
+            " stats",
+            " guide",
+            " points",
+            " costs",
+            " price",
+            " prices",
+            " cost",
+            " drop",
+            " shop",
+            " wiki",
+            " osrs",
+            " buy"
+    };
+
+    private static final Set<String> STOP_WORDS = Set.of(
+            "the", "and", "for", "from", "with", "that", "this", "how", "what",
+            "where", "when", "can", "you", "are", "not", "osrs", "wiki",
+            "get", "has", "its", "your", "their", "they", "have", "been");
+
     /**
      * Immutable wrapper pairing a wiki result JSON string with the epoch-second
-     * timestamp at which it was cached, used to enforce the {@link #CACHE_TTL_SECONDS}
+     * timestamp at which it was cached, used to enforce the
+     * {@link #CACHE_TTL_SECONDS}
      * expiry policy.
      */
     private static final class CacheEntry {
@@ -104,64 +273,6 @@ public class WikiSearchUtil {
                 }
             });
 
-    // =========================================================================
-    // HTML Parsing & Tokenizing Patterns
-    // =========================================================================
-
-    private static final Pattern PATTERN_HTML_NOISE = Pattern.compile(
-            "(?is)<(script|style|svg|img|video|audio|figure|iframe|noscript)[^>]*>.*?</\\1>|<img[^>]*>|<br\\s*/?>");
-    private static final Pattern PATTERN_HTML_CLASS_NOISE = Pattern.compile(
-            "(?is)<(div|span|sup|table|ul|ol|p)[^>]*class=[\"'][^\"']*?\\b(mw-editsection|mw-editsection-visualeditor|toc|noexcerpt|navbox|vertical-navbox|catlinks|printfooter|hatnote|dablink|ambox|cmbox|notice|reflist|references|reference|mw-empty-elt|mw-collapsible|mw-collapsed|collapsed|collapsible|infobox-cell-hidden|hidden-cell)\\b[^\"']*?[\"'][^>]*>.*?</\\1>");
-    private static final Pattern PATTERN_HTML_DISPLAY_NONE = Pattern.compile(
-            "(?is)<[a-zA-Z0-9]+[^>]*style=[\"'][^\"']*?display:\\s*none[^\"']*?[\"'][^>]*>.*?</[a-zA-Z0-9]+>");
-    private static final Pattern PATTERN_HTML_USELESS_SECTION = Pattern.compile(
-            "(?is)<h[23][^>]*>(?:<[^>]+>)*\\s*(?:changes|update history|history|gallery|references|external links|navigation)\\s*(?:</[^>]+>)*</h[23]>.*?(?=<h2|$)");
-    private static final Pattern PATTERN_HTML_INFOBOX = Pattern.compile(
-            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(infobox|questdetails|questreq|equipment-stats|quest)[^\"']*?[\"'][^>]*>(.*?)</table>");
-    private static final Pattern PATTERN_HTML_WIKITABLE = Pattern.compile(
-            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(wikitable|item-drops|drop-table)[^\"']*?[\"'][^>]*>(.*?)</table>");
-    private static final Pattern PATTERN_HTML_TR = Pattern.compile("(?is)<tr[^>]*>(.*?)</tr>");
-    private static final Pattern PATTERN_HTML_TH = Pattern.compile("(?is)<th[^>]*>(.*?)</th>");
-    private static final Pattern PATTERN_HTML_TD = Pattern.compile("(?is)<td[^>]*>(.*?)</td>");
-    private static final Pattern PATTERN_HTML_H2 = Pattern.compile("(?is)<h2[^>]*>(.*?)</h2>");
-    private static final Pattern PATTERN_HTML_H3 = Pattern.compile("(?is)<h3[^>]*>(.*?)</h3>");
-    private static final Pattern PATTERN_HTML_H4 = Pattern.compile("(?is)<h4[^>]*>(.*?)</h4>");
-    private static final Pattern PATTERN_HTML_P = Pattern.compile("(?is)<p[^>]*>(.*?)</p>");
-    private static final Pattern PATTERN_HTML_LI = Pattern.compile("(?is)<li[^>]*>(.*?)</li>");
-    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]+>");
-
-    // =========================================================================
-    // General Formatting & Cleaning Patterns
-    // =========================================================================
-
-    private static final Pattern PATTERN_EDIT_BUTTONS = Pattern.compile("(?i)\\[edit\\s*\\|\\s*edit source\\]|\\[edit\\]|\\b(\\?\\s*)?\\(edit\\)");
-    private static final Pattern PATTERN_MOID_NOISE = Pattern.compile("(?i)\\b(view|edit|MOID+)\\b");
-    private static final Pattern PATTERN_MULTIPLE_NEWLINES = Pattern.compile("\n{3,}");
-
-    // =========================================================================
-    // Legacy Wikitext Cleaning Patterns
-    // =========================================================================
-
-    private static final Pattern PATTERN_COMMENTS = Pattern.compile("(?s)<!--.*?-->");
-    private static final Pattern PATTERN_MAGIC = Pattern.compile("(?i)__(TOC|NOTOC|NOEDITSECTION)__");
-    private static final Pattern PATTERN_FILES = Pattern.compile("(?i)\\[\\[(File|Image|Category):.*?\\]\\]");
-    private static final Pattern PATTERN_PIPE_LINKS = Pattern.compile("\\[\\[[^]]*?\\|([^]]+?)\\]\\]");
-    private static final Pattern PATTERN_SIMPLE_LINKS = Pattern.compile("\\[\\[([^]]+?)\\]\\]");
-    private static final Pattern PATTERN_BOLD = Pattern.compile("'''(.*?)'''");
-    private static final Pattern PATTERN_ITALIC = Pattern.compile("''(.*?)''");
-    private static final Pattern PATTERN_EMPTY_LINES = Pattern.compile("(?m)^[ \t]*\r?\n");
-    private static final Pattern PATTERN_TABLE_START = Pattern.compile("(?s)\\{\\|[^\n]*\n");
-    private static final Pattern PATTERN_TABLE_END = Pattern.compile("\\|\\}");
-    private static final Pattern PATTERN_TABLE_CLASS = Pattern.compile("(?m)^\\|+[^\n]*class=[^\n]*\n?");
-    private static final Pattern PATTERN_TABLE_STYLE = Pattern.compile("(?m)^\\|+[^\n]*style=[^\n]*\n?");
-    private static final Pattern PATTERN_TABLE_ROW = Pattern.compile("\\|\\-");
-    private static final Pattern PATTERN_TABLE_DELIM = Pattern.compile("!|\\|\\|");
-    private static final Pattern PATTERN_TABLE_CELL = Pattern.compile("(?m)^\\|");
-    private static final Pattern PATTERN_TABLE_HEADER = Pattern.compile("(?m)^!");
-    private static final Pattern PATTERN_USELESS_SECTIONS = Pattern.compile(
-            "(?ims)^==\\s*(Changes|Update history|History|Gallery|References|External links|Navigation)\\s*==.*?(?=(^==|\\z))");
-    private static final Pattern PATTERN_STUB_TAGS = Pattern.compile("(?i)\\{\\{(stub|clear|sic|!)\\}\\}");
-
     private WikiSearchUtil() {
         // Utility class
     }
@@ -187,9 +298,9 @@ public class WikiSearchUtil {
         String cleanedQuery = extractSearchQuery(query);
         String cacheKey = cleanedQuery.trim().toLowerCase(Locale.ROOT);
 
-        if (SEARCH_CACHE.containsKey(cacheKey)) {
-            CacheEntry cached = SEARCH_CACHE.get(cacheKey);
-            if (cached != null && !cached.isExpired()) {
+        CacheEntry cached = SEARCH_CACHE.get(cacheKey);
+        if (cached != null) {
+            if (!cached.isExpired()) {
                 log.debug("Wiki search cache hit for: {}", cacheKey);
                 return cached.result;
             }
@@ -234,51 +345,10 @@ public class WikiSearchUtil {
             q = q.substring(0, q.length() - 1).trim();
         }
 
-        String[] prefixes = {
-                "what are the ingredients for",
-                "what is the drop rate of",
-                "what is the drop rate for",
-                "what is the recipe for",
-                "what are the stats for",
-                "what are the stats of",
-                "what is the stats for",
-                "what is the stats of",
-                "where can i find",
-                "where can i buy",
-                "where can i get",
-                "where do i find",
-                "where do i buy",
-                "where do i get",
-                "can you search for",
-                "can you look up",
-                "tell me about",
-                "information on",
-                "ingredients for",
-                "how do i craft",
-                "how do i make",
-                "how do i brew",
-                "how do i get",
-                "recipe for",
-                "search for",
-                "how to craft",
-                "how to make",
-                "how to brew",
-                "how to get",
-                "look up",
-                "where is",
-                "where are",
-                "what is",
-                "what are",
-                "info on",
-                "lookup",
-                "how to",
-                "how do"
-        };
-
         boolean prefixFound;
         do {
             prefixFound = false;
-            for (String prefix : prefixes) {
+            for (String prefix : SEARCH_PREFIXES) {
                 if (q.startsWith(prefix)) {
                     q = q.substring(prefix.length()).trim();
                     prefixFound = true;
@@ -295,66 +365,10 @@ public class WikiSearchUtil {
             q = q.substring(3).trim();
         }
 
-        String[] suffixes = {
-                " location coordinates",
-                " buy shops locations",
-                " shop locations osrs",
-                " slayer points cost",
-                " quest requirements",
-                " skill requirements",
-                " elemental weakness",
-                " quest requirement",
-                " skill requirement",
-                " map coordinates",
-                " shops locations",
-                " spawn locations",
-                " ingredients for",
-                " spawn location",
-                " shop locations",
-                " shop location",
-                " drop sources",
-                " drop source",
-                " map location",
-                " slayer points",
-                " requirements",
-                " requirement",
-                " coordinates",
-                " ingredients",
-                " points cost",
-                " slayer point",
-                " point cost",
-                " drop rates",
-                " drop table",
-                " drop rate",
-                " locations",
-                " location",
-                " weakness",
-                " sources",
-                " source",
-                " recipe",
-                " spawns",
-                " coords",
-                " shops",
-                " spawn",
-                " drops",
-                " stats",
-                " guide",
-                " points",
-                " costs",
-                " price",
-                " prices",
-                " cost",
-                " drop",
-                " shop",
-                " wiki",
-                " osrs",
-                " buy"
-        };
-
         boolean suffixFound;
         do {
             suffixFound = false;
-            for (String suffix : suffixes) {
+            for (String suffix : SEARCH_SUFFIXES) {
                 if (q.endsWith(suffix)) {
                     String trimmed = q.substring(0, q.length() - suffix.length()).trim();
                     if (!trimmed.isEmpty()) {
@@ -395,10 +409,11 @@ public class WikiSearchUtil {
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null)
+                if (!response.isSuccessful() || response.body() == null) {
                     return null;
+                }
                 JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                if (json.has("parse")) {
+                if (json != null && json.has("parse")) {
                     JsonObject parseObj = json.getAsJsonObject("parse");
                     String title = parseObj.has("title") ? parseObj.get("title").getAsString() : query;
                     if (parseObj.has("text")) {
@@ -463,18 +478,25 @@ public class WikiSearchUtil {
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null)
+                if (!response.isSuccessful() || response.body() == null) {
                     return null;
+                }
                 JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
+                if (json == null) {
+                    return null;
+                }
                 JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null)
+                if (queryObj == null) {
                     return null;
+                }
                 JsonObject pages = queryObj.getAsJsonObject("pages");
-                if (pages == null)
+                if (pages == null) {
                     return null;
+                }
                 for (Map.Entry<String, JsonElement> entry : pages.entrySet()) {
-                    if ("-1".equals(entry.getKey()))
+                    if ("-1".equals(entry.getKey())) {
                         continue;
+                    }
                     JsonObject page = entry.getValue().getAsJsonObject();
                     if (page.has("title")) {
                         return page.get("title").getAsString();
@@ -521,15 +543,21 @@ public class WikiSearchUtil {
                     .build();
 
             try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null)
+                if (!response.isSuccessful() || response.body() == null) {
                     return null;
+                }
                 JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
+                if (json == null) {
+                    return null;
+                }
                 JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null)
+                if (queryObj == null) {
                     return null;
+                }
                 JsonArray results = queryObj.getAsJsonArray("search");
-                if (results == null || results.size() == 0)
+                if (results == null || results.size() == 0) {
                     return null;
+                }
 
                 boolean wantsLeague = query != null && query.toLowerCase(Locale.ROOT).contains("league");
                 for (int i = 0; i < results.size(); i++) {
@@ -551,7 +579,8 @@ public class WikiSearchUtil {
     }
 
     /**
-     * Checks whether a resolved wiki article title is relevant to the original search
+     * Checks whether a resolved wiki article title is relevant to the original
+     * search
      * query by testing for at least one shared keyword of 3+ characters, ignoring
      * common English and OSRS stop words.
      *
@@ -563,26 +592,22 @@ public class WikiSearchUtil {
         if (title == null || query == null || title.isEmpty() || query.isEmpty()) {
             return false;
         }
-        Set<String> stopWords = new HashSet<>(Arrays.asList(
-                "the", "and", "for", "from", "with", "that", "this", "how", "what",
-                "where", "when", "can", "you", "are", "not", "osrs", "wiki",
-                "get", "has", "its", "your", "their", "they", "have", "been"));
 
         String titleLower = title.toLowerCase(Locale.ROOT);
         String queryLower = query.toLowerCase(Locale.ROOT);
 
-        String[] queryTokens = queryLower.split("[^a-z]+");
-        String[] titleTokens = titleLower.split("[^a-z]+");
+        String[] queryTokens = PATTERN_NON_ALPHA.split(queryLower);
+        String[] titleTokens = PATTERN_NON_ALPHA.split(titleLower);
 
         Set<String> titleWords = new HashSet<>();
         for (String t : titleTokens) {
-            if (t.length() >= 3 && !stopWords.contains(t)) {
+            if (t.length() >= 3 && !STOP_WORDS.contains(t)) {
                 titleWords.add(t);
             }
         }
 
         for (String q : queryTokens) {
-            if (q.length() >= 3 && !stopWords.contains(q) && titleWords.contains(q)) {
+            if (q.length() >= 3 && !STOP_WORDS.contains(q) && titleWords.contains(q)) {
                 return true;
             }
         }
@@ -602,7 +627,7 @@ public class WikiSearchUtil {
         if (jsonRes != null) {
             try {
                 JsonObject obj = gson.fromJson(jsonRes, JsonObject.class);
-                if (obj.has("extract")) {
+                if (obj != null && obj.has("extract")) {
                     return obj.get("extract").getAsString();
                 }
             } catch (Exception e) {
@@ -680,7 +705,7 @@ public class WikiSearchUtil {
         }
 
         // 2. Format Wikitables & Drop Tables into Markdown Tables
-        StringBuffer tableReplaced = new StringBuffer();
+        StringBuilder tableReplaced = new StringBuilder();
         Matcher tableMatcher = PATTERN_HTML_WIKITABLE.matcher(cleaned);
         while (tableMatcher.find()) {
             String tableHtml = tableMatcher.group(2);
@@ -698,14 +723,14 @@ public class WikiSearchUtil {
         cleaned = PATTERN_HTML_LI.matcher(cleaned).replaceAll("\n- $1");
 
         // 4. Clean bold, italic, tags, and entities
-        cleaned = cleaned.replaceAll("(?i)<(b|strong)>([\\s\\S]*?)</\\1>", "**$2**");
-        cleaned = cleaned.replaceAll("(?i)<(i|em)>([\\s\\S]*?)</\\1>", "*$2*");
+        cleaned = PATTERN_BOLD_TAGS.matcher(cleaned).replaceAll("**$2**");
+        cleaned = PATTERN_ITALIC_TAGS.matcher(cleaned).replaceAll("*$2*");
         cleaned = PATTERN_HTML_TAGS.matcher(cleaned).replaceAll(" ");
         cleaned = decodeHtmlEntities(cleaned);
         cleaned = PATTERN_EDIT_BUTTONS.matcher(cleaned).replaceAll("");
         cleaned = PATTERN_MOID_NOISE.matcher(cleaned).replaceAll("");
 
-        String[] lines = cleaned.split("\r?\n");
+        String[] lines = PATTERN_LINES.split(cleaned);
         StringBuilder bodySb = new StringBuilder();
         for (String line : lines) {
             String trimmed = line.trim();
@@ -811,7 +836,7 @@ public class WikiSearchUtil {
         text = decodeHtmlEntities(text);
         text = PATTERN_EDIT_BUTTONS.matcher(text).replaceAll("").trim();
         text = PATTERN_MOID_NOISE.matcher(text).replaceAll("").trim();
-        return text.replaceAll("\\s+", " ").trim();
+        return PATTERN_WHITESPACE.matcher(text).replaceAll(" ").trim();
     }
 
     private static boolean isValidInfoboxPair(String key, String val) {
@@ -828,7 +853,7 @@ public class WikiSearchUtil {
         if (key == null || key.isEmpty()) {
             return false;
         }
-        return key.matches("[+\\-]?\\d+%?");
+        return PATTERN_RAW_STAT.matcher(key).matches();
     }
 
     public static String decodeHtmlEntities(String text) {

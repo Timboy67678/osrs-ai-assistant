@@ -23,8 +23,6 @@ import java.util.regex.Pattern;
 @Slf4j
 public class GameContextBuilder {
 
-    private static final int VARBIT_SPELLBOOK = 4070;
-
     private final Client client;
     private final OsrsAiConfig config;
     private final LocationResolver locationResolver;
@@ -86,7 +84,7 @@ public class GameContextBuilder {
                 .append("Magic ").append(client.getRealSkillLevel(Skill.MAGIC)).append(", ")
                 .append("Hitpoints ").append(client.getRealSkillLevel(Skill.HITPOINTS)).append(", ")
                 .append("Slayer ").append(client.getRealSkillLevel(Skill.SLAYER)).append("\n");
-        int spellbookVar = client.getVarbitValue(VARBIT_SPELLBOOK);
+        int spellbookVar = client.getVarbitValue(Varbits.SPELLBOOK);
         sb.append("Active Spellbook: ").append(Utilities.describeSpellbook(spellbookVar)).append("\n");
         sb.append("Hitpoints: Current ")
                 .append(client.getBoostedSkillLevel(Skill.HITPOINTS))

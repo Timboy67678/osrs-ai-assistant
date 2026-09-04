@@ -511,6 +511,47 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testExecuteGetPlayerSlayerTaskIncludesMortimerTask() {
+        JsonObject args = new JsonObject();
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "taskName")).thenReturn("Wyrms");
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "amount")).thenReturn("83");
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "slayerMaster")).thenReturn("Mortimer");
+        Mockito.when(client.getVarbitValue(4068)).thenReturn(193); // Slayer Points
+        Mockito.when(client.getVarbitValue(4069)).thenReturn(118); // Standard Slayer Streak
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "streak")).thenReturn("28"); // Mortimer Streak from config
+
+        String json = aiService.executeGetPlayerSlayerTask(args);
+        Assert.assertNotNull(json);
+
+        JsonObject rootObj = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("Wyrms", rootObj.get("task").getAsString());
+        Assert.assertEquals(83, rootObj.get("quantity").getAsInt());
+        Assert.assertEquals("Mortimer", rootObj.get("slayerMaster").getAsString());
+        Assert.assertTrue(rootObj.get("isMortimerTask").getAsBoolean());
+        Assert.assertEquals(193, rootObj.get("points").getAsInt());
+        Assert.assertEquals(118, rootObj.get("standardStreak").getAsInt());
+        Assert.assertEquals(28, rootObj.get("mortimerStreak").getAsInt());
+        Assert.assertEquals(28, rootObj.get("mortimerTasksCompleted").getAsInt());
+    }
+
+    @Test
+    public void testExecuteGetPlayerCurrenciesIncludesMortimerPointsAndStreak() {
+        JsonObject args = new JsonObject();
+        Mockito.when(client.getVarbitValue(4068)).thenReturn(193);
+        Mockito.when(client.getVarbitValue(4069)).thenReturn(118);
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "streak")).thenReturn("28");
+
+        String json = aiService.executeGetPlayerCurrenciesAndPoints(args);
+        Assert.assertNotNull(json);
+
+        JsonObject rootObj = new Gson().fromJson(json, JsonObject.class);
+        JsonObject pointsObj = rootObj.getAsJsonObject("pointsAndCurrencies");
+        Assert.assertEquals(193, pointsObj.get("slayerPoints").getAsInt());
+        Assert.assertEquals(118, pointsObj.get("slayerStreak").getAsInt());
+        Assert.assertEquals(28, pointsObj.get("mortimerSlayerStreak").getAsInt());
+    }
+
+    @Test
     public void extractSearchQueryCleansConversationalPrefixes() {
         Assert.assertEquals("super antipoison",
                 AiService.extractSearchQuery("what are the ingredients for super antipoison?"));
@@ -1360,5 +1401,44 @@ public class AiServiceTest {
         Assert.assertEquals(100, root.getAsJsonObject("kingdomOfMiscellania").get("favourPercent").getAsInt());
         Assert.assertEquals("Fully Grown / Ready to fight",
                 root.getAsJsonObject("hespori").get("status").getAsString());
+    }
+
+    @Test
+    public void testExecuteGetPlayerLocationDetailsWilderness() {
+        Mockito.when(client.getWorldType()).thenReturn(EnumSet.noneOf(net.runelite.api.WorldType.class));
+        net.runelite.api.Player localPlayer = Mockito.mock(net.runelite.api.Player.class);
+        Mockito.when(client.getLocalPlayer()).thenReturn(localPlayer);
+
+        // Test 1: Active Wilderness HUD Widget with Level text
+        net.runelite.api.widgets.Widget wildyWidget = Mockito.mock(net.runelite.api.widgets.Widget.class);
+        Mockito.when(client.getWidget(net.runelite.api.widgets.ComponentID.PVP_WILDERNESS_LEVEL)).thenReturn(wildyWidget);
+        Mockito.when(wildyWidget.isHidden()).thenReturn(false);
+        Mockito.when(wildyWidget.getText()).thenReturn("Level: 42");
+
+        String json = aiService.executeGetPlayerLocationDetails(new JsonObject());
+        JsonObject root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals(42, root.get("wildernessLevel").getAsInt());
+        Assert.assertTrue(root.get("inWilderness").getAsBoolean());
+
+        // Test 2: Fallback to WorldPoint coordinates (Y=3700 -> Level 23)
+        Mockito.when(wildyWidget.getText()).thenReturn(null);
+        net.runelite.api.coords.WorldPoint wpWildy = new net.runelite.api.coords.WorldPoint(3100, 3700, 0);
+        Mockito.when(localPlayer.getWorldLocation()).thenReturn(wpWildy);
+
+        json = aiService.executeGetPlayerLocationDetails(new JsonObject());
+        root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals(23, root.get("wildernessLevel").getAsInt());
+        Assert.assertTrue(root.get("inWilderness").getAsBoolean());
+
+        // Test 3: Safe Area (Lumbridge Y=3222, Varbit=0)
+        Mockito.when(client.getWidget(net.runelite.api.widgets.ComponentID.PVP_WILDERNESS_LEVEL)).thenReturn(null);
+        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.IN_WILDERNESS)).thenReturn(0);
+        net.runelite.api.coords.WorldPoint wpSafe = new net.runelite.api.coords.WorldPoint(3222, 3222, 0);
+        Mockito.when(localPlayer.getWorldLocation()).thenReturn(wpSafe);
+
+        json = aiService.executeGetPlayerLocationDetails(new JsonObject());
+        root = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertFalse(root.get("inWilderness").getAsBoolean());
+        Assert.assertTrue(!root.has("wildernessLevel") || root.get("wildernessLevel").getAsInt() == 0);
     }
 }

@@ -11,6 +11,13 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.Element;
+import javax.swing.text.View;
+import javax.swing.text.ViewFactory;
+import javax.swing.text.html.BlockView;
+import javax.swing.text.html.HTMLEditorKit;
+import javax.swing.text.html.InlineView;
+import javax.swing.text.html.ParagraphView;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -172,6 +179,8 @@ public class OsrsAiPanel extends PluginPanel {
         // Row 0: Buttons (3 equal columns)
         JPanel buttonPanel = new JPanel(new GridLayout(1, 3, 2, 0));
         buttonPanel.setOpaque(false);
+        buttonPanel.setPreferredSize(new Dimension(0, 26));
+        buttonPanel.setMinimumSize(new Dimension(0, 24));
         buttonPanel.add(newChatButton);
         buttonPanel.add(deleteChatButton);
         buttonPanel.add(detachButton);
@@ -189,6 +198,7 @@ public class OsrsAiPanel extends PluginPanel {
         c.gridwidth = 1;
         c.weightx = 1.0;
         c.fill = GridBagConstraints.HORIZONTAL;
+        chatSessionComboBox.setMinimumSize(new Dimension(0, 24));
         topBar.add(chatSessionComboBox, c);
 
         JButton profilesBtn = new JButton("⚙");
@@ -209,15 +219,53 @@ public class OsrsAiPanel extends PluginPanel {
         warningLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
         warningLabel.setForeground(ColorScheme.BRAND_ORANGE);
         warningLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        warningLabel.setPreferredSize(new Dimension(0, 16));
+        warningLabel.setMinimumSize(new Dimension(0, 16));
         updateWarningLabel();
         c.gridy = 2;
         c.gridx = 0;
         c.gridwidth = 2;
         c.weightx = 1.0;
+        c.insets = new Insets(4, 2, 4, 2);
         c.fill = GridBagConstraints.HORIZONTAL;
         topBar.add(warningLabel, c);
 
         chatViewPanel.add(topBar, BorderLayout.NORTH);
+
+        HTMLEditorKit wrapEditorKit = new HTMLEditorKit() {
+            @Override
+            public ViewFactory getViewFactory() {
+                return new HTMLFactory() {
+                    @Override
+                    public View create(Element elem) {
+                        View v = super.create(elem);
+                        if (v instanceof InlineView) {
+                            return new InlineView(elem) {
+                                @Override
+                                public float getMinimumSpan(int axis) {
+                                    return axis == View.X_AXIS ? 0 : super.getMinimumSpan(axis);
+                                }
+                            };
+                        } else if (v instanceof ParagraphView) {
+                            return new ParagraphView(elem) {
+                                @Override
+                                public float getMinimumSpan(int axis) {
+                                    return axis == View.X_AXIS ? 0 : super.getMinimumSpan(axis);
+                                }
+                            };
+                        } else if (v != null && v.getClass() == BlockView.class) {
+                            return new BlockView(elem, ((BlockView) v).getAxis()) {
+                                @Override
+                                public float getMinimumSpan(int axis) {
+                                    return axis == View.X_AXIS ? 0 : super.getMinimumSpan(axis);
+                                }
+                            };
+                        }
+                        return v;
+                    }
+                };
+            }
+        };
 
         chatArea = new JEditorPane() {
             @Override
@@ -228,21 +276,32 @@ public class OsrsAiPanel extends PluginPanel {
             @Override
             public Dimension getPreferredSize() {
                 Container parent = getParent();
-                if (parent instanceof JViewport && parent.getWidth() > 0) {
-                    setSize(parent.getWidth(), Short.MAX_VALUE);
-                }
-                return super.getPreferredSize();
+                int w = (parent instanceof JViewport && parent.getWidth() > 0)
+                        ? parent.getWidth()
+                        : (getWidth() > 0 ? getWidth() : PluginPanel.PANEL_WIDTH - 30);
+                setSize(w, 1);
+                Dimension d = super.getPreferredSize();
+                d.width = w;
+                return d;
+            }
+
+            @Override
+            public Dimension getMinimumSize() {
+                return new Dimension(0, 0);
             }
         };
+        chatArea.setEditorKitForContentType("text/html", wrapEditorKit);
+        chatArea.setEditorKit(wrapEditorKit);
         chatArea.setEditable(false);
-        chatArea.setContentType("text/html");
         chatArea.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         chatArea.setBorder(null);
         chatArea.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, true); // Use inherited font
 
         chatScrollPane = new JScrollPane(chatArea);
+        chatScrollPane.setMinimumSize(new Dimension(0, 0));
         chatScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         chatScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        chatScrollPane.getViewport().addChangeListener(e -> chatArea.revalidate());
         chatViewPanel.add(chatScrollPane, BorderLayout.CENTER);
 
         JPanel inputPanel = new JPanel();
@@ -255,9 +314,12 @@ public class OsrsAiPanel extends PluginPanel {
 
         chatViewPanel.add(inputPanel, BorderLayout.SOUTH);
 
+        contentPanel.setMinimumSize(new Dimension(0, 0));
+        dockedHostPanel.setMinimumSize(new Dimension(0, 0));
         contentPanel.add(chatViewPanel, "CHAT");
 
         JPanel profilesPanel = createProfilesPanel();
+        profilesPanel.setMinimumSize(new Dimension(0, 0));
         contentPanel.add(profilesPanel, "PROFILES");
 
         dockedHostPanel.add(contentPanel, BorderLayout.CENTER);
@@ -391,6 +453,7 @@ public class OsrsAiPanel extends PluginPanel {
         int y = loadInt("windowY", -1);
 
         detachedFrame.getContentPane().add(contentPanel);
+        detachedFrame.setMinimumSize(new Dimension(150, 200));
         detachedFrame.setSize(w, h);
         if (x >= 0 && y >= 0 && isLocationOnScreen(x, y, w, h)) {
             detachedFrame.setLocation(x, y);
@@ -402,6 +465,8 @@ public class OsrsAiPanel extends PluginPanel {
             @Override
             public void componentResized(ComponentEvent e) {
                 saveWindowBounds();
+                chatArea.revalidate();
+                chatArea.repaint();
             }
 
             @Override
@@ -413,7 +478,11 @@ public class OsrsAiPanel extends PluginPanel {
         detachedFrame.setVisible(true);
         detachButton.setText("Attach");
         saveConfig("windowDetached", true);
-        SwingUtilities.invokeLater(this::scrollToBottom);
+        SwingUtilities.invokeLater(() -> {
+            chatArea.revalidate();
+            chatArea.repaint();
+            scrollToBottom();
+        });
     }
 
     private void attachToSidebar() {
@@ -428,9 +497,15 @@ public class OsrsAiPanel extends PluginPanel {
         dockedHostPanel.add(contentPanel, BorderLayout.CENTER);
         dockedHostPanel.revalidate();
         dockedHostPanel.repaint();
+        chatArea.revalidate();
+        chatArea.repaint();
         detachButton.setText("Detach");
         saveConfig("windowDetached", false);
-        SwingUtilities.invokeLater(this::scrollToBottom);
+        SwingUtilities.invokeLater(() -> {
+            chatArea.revalidate();
+            chatArea.repaint();
+            scrollToBottom();
+        });
     }
 
     private void saveWindowBounds() {
@@ -509,11 +584,11 @@ public class OsrsAiPanel extends PluginPanel {
                 share = plugin.getConfig().shareCharacterInfo();
             }
             if (share) {
-                warningLabel.setText(
-                        "<html><div style='text-align: center;'>⚠️ Sends query & game context to external AI APIs</div></html>");
+                warningLabel.setText("⚠️ External AI (query + context)");
+                warningLabel.setToolTipText("Sends query & game context to external AI APIs");
             } else {
-                warningLabel.setText(
-                        "<html><div style='text-align: center;'>⚠️ Sends query text to external AI APIs</div></html>");
+                warningLabel.setText("⚠️ External AI (query only)");
+                warningLabel.setToolTipText("Sends query text to external AI APIs");
             }
             warningLabel.revalidate();
             warningLabel.repaint();
@@ -581,7 +656,10 @@ public class OsrsAiPanel extends PluginPanel {
     }
 
     private String formatInlineMarkdown(String text) {
-        String html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        String pre = text.replaceAll("(?<!https?:)(/)([^\\s/<>])", "/ $2")
+                .replaceAll("([^\\s])—", "$1 —")
+                .replaceAll("—([^\\s])", "— $1");
+        String html = pre.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
         html = html.replaceAll("`(.*?)`",
                 "<code style='background-color:#2a2a2a; padding:1px 3px; border-radius:3px;'>$1</code>");
         html = html.replaceAll("\\*\\*(.*?)\\*\\*", "<b>$1</b>");
@@ -870,16 +948,17 @@ public class OsrsAiPanel extends PluginPanel {
     public void scrollToBottom() {
         runOnEdt(() -> {
             SwingUtilities.invokeLater(() -> {
-                if (chatArea != null) {
-                    try {
-                        chatArea.setCaretPosition(chatArea.getDocument().getLength());
-                    } catch (Exception ignored) {
-                    }
-                }
                 if (chatScrollPane != null) {
                     JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
-                    if (vertical != null) {
-                        vertical.setValue(vertical.getMaximum());
+                    JViewport viewport = chatScrollPane.getViewport();
+                    if (vertical != null && viewport != null) {
+                        int extent = viewport.getExtentSize().height;
+                        int max = vertical.getMaximum();
+                        if (max > extent) {
+                            vertical.setValue(max - extent);
+                        } else {
+                            vertical.setValue(0);
+                        }
                     }
                 }
             });

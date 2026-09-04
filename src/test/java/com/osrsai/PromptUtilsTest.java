@@ -25,9 +25,13 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
         Assert.assertTrue(prompt.contains("get_player_transportation"));
         Assert.assertTrue(prompt.contains("MANDATORY WIKI VERIFICATION"));
-        Assert.assertTrue(prompt.contains("USER COUNTER-CLAIMS & OVERRIDING MISTAKES"));
         Assert.assertTrue(prompt.contains("DRAGON COMBAT & DRAGONFIRE PROTECTION"));
-        Assert.assertTrue(prompt.contains("SLAYER TASKS, SLAYER XP & SLAYER HELMET MECHANICS"));
+        Assert.assertTrue(prompt.contains("SLAYER TASKS, TASK VARIANTS & MANDATORY PROTECTION EQUIPMENT"));
+        Assert.assertTrue(prompt.contains("BASE VS BOOSTED LEVEL REQUIREMENTS"));
+        Assert.assertTrue(prompt.contains("HARDCORE IRONMAN (HCIM)"));
+        Assert.assertTrue(prompt.contains("PROJECT REBALANCE & COMBAT WEAKNESSES"));
+        Assert.assertTrue(prompt.contains("get_player_sailing_status"));
+        Assert.assertTrue(prompt.contains("poiName"));
     }
 
     @Test

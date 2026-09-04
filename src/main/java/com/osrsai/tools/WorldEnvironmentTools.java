@@ -10,10 +10,14 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.widgets.ComponentID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
 
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Tool implementations for world environment scanning (NPCs, other players,
@@ -23,6 +27,8 @@ import java.util.function.Supplier;
  */
 @Slf4j
 public class WorldEnvironmentTools {
+    private static final Pattern PATTERN_DIGITS = Pattern.compile("\\d+");
+
     private static final int DEFAULT_SURROUNDINGS_SCAN_RADIUS = 15;
     private static final int MAX_SURROUNDINGS_SCAN_RADIUS = 30;
     private static final int MIN_SURROUNDINGS_SCAN_RADIUS = 1;
@@ -30,9 +36,6 @@ public class WorldEnvironmentTools {
     private static final int MAX_SURROUNDINGS_PLAYER_COUNT = 15;
     private static final int MAX_SURROUNDINGS_GROUND_ITEM_COUNT = 15;
     private static final int OBJECT_SCAN_MAX_RADIUS = 10;
-
-    private static final int VARBIT_SPELLBOOK = 4070;
-    private static final int VARBIT_WILDERNESS_LEVEL = 5963;
 
     private static final int POH_LEVEL_PORTAL_CHAMBER = 50;
     private static final int POH_LEVEL_PORTAL_NEXUS = 72;
@@ -415,13 +418,49 @@ public class WorldEnvironmentTools {
         JsonObject result = new JsonObject();
         Player localPlayer = client.getLocalPlayer();
 
-        int wildyLevel = 0;
+        boolean inWilderness = false;
         try {
-            wildyLevel = client.getVarbitValue(VARBIT_WILDERNESS_LEVEL);
+            inWilderness = client.getVarbitValue(Varbits.IN_WILDERNESS) == 1;
         } catch (Exception ignored) {
         }
-        result.addProperty("wildernessLevel", wildyLevel);
-        result.addProperty("inWilderness", wildyLevel > 0);
+
+        int wildyLevel = 0;
+        // 1. Primary: read the exact level displayed by the game in the Wilderness HUD
+        // widget
+        try {
+            Widget wildyWidget = client.getWidget(ComponentID.PVP_WILDERNESS_LEVEL);
+            if (wildyWidget != null && !wildyWidget.isHidden() && wildyWidget.getText() != null) {
+                String text = wildyWidget.getText().replaceAll("<[^>]*>", "").trim();
+                Matcher matcher = PATTERN_DIGITS.matcher(text);
+                if (matcher.find()) {
+                    wildyLevel = Integer.parseInt(matcher.group());
+                    inWilderness = true;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        // 2. Fallback: calculate level from player coordinates (Y >= 3520, 8 tiles per
+        // level)
+        if (wildyLevel <= 0 && localPlayer != null) {
+            WorldPoint wp = localPlayer.getWorldLocation();
+            if (wp != null) {
+                int y = wp.getY();
+                if (y >= 3520 && y <= 4000) {
+                    wildyLevel = (y - 3520) / 8 + 1;
+                    inWilderness = true;
+                } else if (y >= 9920 && y <= 10400 && inWilderness) {
+                    // Underground Wilderness (e.g. Wilderness GWD, Rev Caves, Deep Wilderness
+                    // Dungeon)
+                    wildyLevel = (y - 9920) / 8 + 1;
+                }
+            }
+        }
+
+        result.addProperty("inWilderness", inWilderness || wildyLevel > 0);
+        if (inWilderness || wildyLevel > 0) {
+            result.addProperty("wildernessLevel", wildyLevel);
+        }
 
         boolean isMulti = false;
         try {
@@ -504,7 +543,7 @@ public class WorldEnvironmentTools {
         JsonObject magicObj = new JsonObject();
         int spellbookVal = 0;
         try {
-            spellbookVal = client.getVarbitValue(VARBIT_SPELLBOOK);
+            spellbookVal = client.getVarbitValue(Varbits.SPELLBOOK);
         } catch (Exception ignored) {
         }
         String spellbookName = Utilities.describeSpellbook(spellbookVal);

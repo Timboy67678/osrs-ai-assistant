@@ -8,6 +8,9 @@
     <!-- Suppress injected-client warning logs for cache overlay mismatches -->
     <logger name="injected-client" level="ERROR" />
 
+    <!-- Suppress noisy worldhopper ping timeout warnings -->
+    <logger name="net.runelite.client.plugins.worldhopper.ping" level="ERROR" />
+
     <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>
