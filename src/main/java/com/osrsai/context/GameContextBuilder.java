@@ -75,15 +75,21 @@ public class GameContextBuilder {
         sb.append("Account Type: ").append(Utilities.describeAccountTypeFromVarbit(accountTypeVarbit)).append("\n");
         sb.append("World: ").append(client.getWorld()).append("\n");
         sb.append("Total Level: ").append(client.getTotalLevel()).append("\n");
-        sb.append("Combat & Key Skills: ")
-                .append("Attack ").append(client.getRealSkillLevel(Skill.ATTACK)).append(", ")
-                .append("Strength ").append(client.getRealSkillLevel(Skill.STRENGTH)).append(", ")
-                .append("Defence ").append(client.getRealSkillLevel(Skill.DEFENCE)).append(", ")
-                .append("Ranged ").append(client.getRealSkillLevel(Skill.RANGED)).append(", ")
-                .append("Prayer ").append(client.getRealSkillLevel(Skill.PRAYER)).append(", ")
-                .append("Magic ").append(client.getRealSkillLevel(Skill.MAGIC)).append(", ")
-                .append("Hitpoints ").append(client.getRealSkillLevel(Skill.HITPOINTS)).append(", ")
-                .append("Slayer ").append(client.getRealSkillLevel(Skill.SLAYER)).append("\n");
+        sb.append("Player Skill Levels (Base): ");
+        List<String> skillList = new ArrayList<>();
+        for (Skill s : Skill.values()) {
+            if (s == Skill.OVERALL) {
+                continue;
+            }
+            try {
+                int lvl = client.getRealSkillLevel(s);
+                if (lvl > 0) {
+                    skillList.add(s.getName() + " " + lvl);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        sb.append(String.join(", ", skillList)).append("\n");
         int spellbookVar = client.getVarbitValue(Varbits.SPELLBOOK);
         sb.append("Active Spellbook: ").append(Utilities.describeSpellbook(spellbookVar)).append("\n");
         sb.append("Hitpoints: Current ")

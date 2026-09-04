@@ -32,6 +32,7 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("PROJECT REBALANCE & COMBAT WEAKNESSES"));
         Assert.assertTrue(prompt.contains("get_player_sailing_status"));
         Assert.assertTrue(prompt.contains("poiName"));
+        Assert.assertTrue(prompt.contains("STRICT LEVEL GATING & TRAINING METHOD VIABILITY"));
     }
 
     @Test
