@@ -1,8 +1,10 @@
 package com.osrsai;
 
 import com.osrsai.ui.OsrsAiPanel;
+import java.awt.GraphicsEnvironment;
 import java.lang.reflect.Method;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
 public class OsrsAiPanelTest {
@@ -24,6 +26,7 @@ public class OsrsAiPanelTest {
 
     @Test
     public void testChatWrappingAdaptsToWidth() throws Exception {
+        Assume.assumeFalse("Skipping UI test in headless environment", GraphicsEnvironment.isHeadless());
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try {
                 javax.swing.JFrame frame = new javax.swing.JFrame();
@@ -79,6 +82,7 @@ public class OsrsAiPanelTest {
 
     @Test
     public void testDetachedPositioning() throws Exception {
+        Assume.assumeFalse("Skipping UI test in headless environment", GraphicsEnvironment.isHeadless());
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try {
                 OsrsAiPanel panel = new OsrsAiPanel(null, null);

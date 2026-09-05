@@ -39,6 +39,12 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+test {
+    if (System.getProperty('java.awt.headless') != null) {
+        systemProperty 'java.awt.headless', System.getProperty('java.awt.headless')
+    }
+}
+
 tasks.register('run', JavaExec) {
     group = 'runelite'
     classpath = sourceSets.test.runtimeClasspath
