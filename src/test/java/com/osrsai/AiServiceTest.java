@@ -535,6 +535,30 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testExecuteGetPlayerSlayerTaskInfersMortimerMasterWhenConfigMasterNull() {
+        JsonObject args = new JsonObject();
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "taskName")).thenReturn("Basilisks");
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "amount")).thenReturn("35");
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "slayerMaster")).thenReturn(null);
+        Mockito.when(client.getVarbitValue(4068)).thenReturn(223); // Slayer Points
+        Mockito.when(client.getVarbitValue(4069)).thenReturn(118); // Standard Slayer Streak
+        Mockito.when(configManager.getRSProfileConfiguration("slayer", "streak")).thenReturn("50"); // Mortimer Streak from config
+
+        String json = aiService.executeGetPlayerSlayerTask(args);
+        Assert.assertNotNull(json);
+
+        JsonObject rootObj = new Gson().fromJson(json, JsonObject.class);
+        Assert.assertEquals("Basilisks", rootObj.get("task").getAsString());
+        Assert.assertEquals(35, rootObj.get("quantity").getAsInt());
+        Assert.assertEquals("Mortimer", rootObj.get("slayerMaster").getAsString());
+        Assert.assertTrue(rootObj.get("isMortimerTask").getAsBoolean());
+        Assert.assertEquals(223, rootObj.get("points").getAsInt());
+        Assert.assertEquals(118, rootObj.get("standardStreak").getAsInt());
+        Assert.assertEquals(50, rootObj.get("mortimerStreak").getAsInt());
+        Assert.assertEquals(50, rootObj.get("mortimerTasksCompleted").getAsInt());
+    }
+
+    @Test
     public void testExecuteGetPlayerCurrenciesIncludesMortimerPointsAndStreak() {
         JsonObject args = new JsonObject();
         Mockito.when(client.getVarbitValue(4068)).thenReturn(193);

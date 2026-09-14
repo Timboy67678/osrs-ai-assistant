@@ -33,6 +33,9 @@ public class PromptUtilsTest {
         Assert.assertTrue(prompt.contains("get_player_sailing_status"));
         Assert.assertTrue(prompt.contains("poiName"));
         Assert.assertTrue(prompt.contains("STRICT LEVEL GATING & TRAINING METHOD VIABILITY"));
+        Assert.assertTrue(prompt.contains("NEVER recommend a 2-handed weapon"));
+        Assert.assertTrue(prompt.contains("ONLY Turoths and Kurasks REQUIRE Leaf-bladed weapons"));
+        Assert.assertTrue(prompt.contains("prioritize Black Mask / Slayer Helmet"));
     }
 
     @Test

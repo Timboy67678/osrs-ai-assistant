@@ -956,7 +956,13 @@ public class PlayerStateTools {
 
         // 2. Mortimer Streak & Tasks Completed Resolution
         int mortimerStreakVal = resolveMortimerStreak(streakStr, standardStreakVal, slayerMaster);
-        boolean isMortimerMaster = slayerMaster != null && "Mortimer".equalsIgnoreCase(slayerMaster.trim());
+        boolean isMortimerMaster = (slayerMaster != null && "Mortimer".equalsIgnoreCase(slayerMaster.trim()))
+                || (mortimerStreakVal > 0 && mortimerStreakVal != standardStreakVal && streakStr != null && !streakStr.isEmpty()
+                    && Integer.toString(mortimerStreakVal).equals(streakStr.trim()));
+
+        if (isMortimerMaster && (slayerMaster == null || slayerMaster.isEmpty() || "None".equalsIgnoreCase(slayerMaster.trim()))) {
+            slayerMaster = "Mortimer";
+        }
 
         result.addProperty("points", pointsVal);
         result.addProperty("streak", standardStreakVal);
