@@ -237,6 +237,10 @@ public final class LocationResolver {
             WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset,
                     worldPoint.getPlane());
 
+            if (normalized.getY() >= 5000 || normalized.getY() < 2000) {
+                continue;
+            }
+
             RegionAlias alias = REGION_ALIASES.get(normalized.getRegionID());
             if (alias != null) {
                 return (forAi ? formatAlias(alias) : alias.displayName) + " (underground)";
@@ -411,6 +415,10 @@ public final class LocationResolver {
 
             WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset,
                     worldPoint.getPlane());
+
+            if (normalized.getY() >= 5000 || normalized.getY() < 2000) {
+                continue;
+            }
 
             NamedArea area = findProvinceFallback(normalized);
             if (area != null) {

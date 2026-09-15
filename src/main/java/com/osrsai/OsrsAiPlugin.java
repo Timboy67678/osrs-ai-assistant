@@ -6,8 +6,13 @@ import com.osrsai.ui.OsrsAiPanel;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
+import net.runelite.api.InventoryID;
+import net.runelite.api.events.CommandExecuted;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -68,7 +73,7 @@ public class OsrsAiPlugin extends Plugin {
 
         BufferedImage rawIcon = ImageUtil.loadImageResource(getClass(), "/com/osrsai/icon.png");
         BufferedImage icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-        java.awt.Graphics2D g = icon.createGraphics();
+        Graphics2D g = icon.createGraphics();
         g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
                 java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(rawIcon, 0, 0, 16, 16, null);
@@ -145,8 +150,8 @@ public class OsrsAiPlugin extends Plugin {
      * @param event the {@link net.runelite.api.events.ItemContainerChanged} event
      */
     @Subscribe
-    public void onItemContainerChanged(net.runelite.api.events.ItemContainerChanged event) {
-        if (event.getContainerId() == net.runelite.api.InventoryID.BANK.getId()) {
+    public void onItemContainerChanged(ItemContainerChanged event) {
+        if (event.getContainerId() == InventoryID.BANK.getId()) {
             aiService.updateCachedBank(event.getItemContainer());
         }
     }
@@ -155,7 +160,7 @@ public class OsrsAiPlugin extends Plugin {
      * Listens for in-game chat commands (e.g. ::commandName).
      */
     @Subscribe
-    public void onCommandExecuted(net.runelite.api.events.CommandExecuted commandExecuted) {
+    public void onCommandExecuted(CommandExecuted commandExecuted) {
     }
 
     /**

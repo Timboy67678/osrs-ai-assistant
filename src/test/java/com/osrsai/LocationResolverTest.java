@@ -80,6 +80,24 @@ public class LocationResolverTest {
                 locationResolver.describe(new WorldPoint(2868, 9817, 0), false, null));
         Assert.assertEquals("Entrana Dungeon",
                 locationResolver.describe(new WorldPoint(2834, 9835, 0), false, null));
+        Assert.assertEquals("Iorwerth Dungeon",
+                locationResolver.describe(new WorldPoint(3226, 12436, 0), false, null));
+        Assert.assertEquals("Iorwerth Dungeon (also known as: Prifddinas Underground)",
+                locationResolver.describeForAi(new WorldPoint(3226, 12436, 0), false, null));
+        Assert.assertEquals("Smoke Dungeon",
+                locationResolver.describe(new WorldPoint(3226, 9360, 0), false, null));
+        Assert.assertEquals("Chasm of Fire",
+                locationResolver.describe(new WorldPoint(1435, 10077, 0), false, null));
+        Assert.assertEquals("Temple of the Eye (Guardians of the Rift)",
+                locationResolver.describe(new WorldPoint(3615, 9480, 0), false, null));
+        Assert.assertEquals("Giants' Foundry",
+                locationResolver.describe(new WorldPoint(3361, 11470, 0), false, null));
+        Assert.assertEquals("Darkfrost (Hueycoatl Lair)",
+                locationResolver.describe(new WorldPoint(1500, 3280, 0), false, null));
+        Assert.assertEquals("Jormungand's Prison (Basilisk Knights)",
+                locationResolver.describe(new WorldPoint(2450, 10200, 0), false, null));
+        Assert.assertEquals("Guthixian Temple (Tormented Demons)",
+                locationResolver.describe(new WorldPoint(4050, 3480, 0), false, null));
     }
 
     @Test
