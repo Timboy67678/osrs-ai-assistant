@@ -49,8 +49,9 @@ public class OpenAiProviderHandler implements ProviderHandler {
             bodyObj.addProperty("max_completion_tokens", 16384);
         } else {
             bodyObj.addProperty("temperature", LOW_TEMPERATURE);
-            bodyObj.addProperty("max_tokens", 8192);
-            bodyObj.addProperty("max_completion_tokens", 8192);
+            // OpenAI rejects requests that set both limits and prefers max_completion_tokens; many
+            // OpenAI-compatible servers (Grok, Ollama, LM Studio) only understand max_tokens.
+            bodyObj.addProperty(isOpenAiApi() ? "max_completion_tokens" : "max_tokens", 8192);
         }
 
         JsonArray messages = new JsonArray();
@@ -69,6 +70,10 @@ public class OpenAiProviderHandler implements ProviderHandler {
         bodyObj.add("tools", buildOpenAiTools(shareCharInfo));
 
         return bodyObj;
+    }
+
+    private boolean isOpenAiApi() {
+        return apiUrl != null && apiUrl.contains("api.openai.com");
     }
 
     /**

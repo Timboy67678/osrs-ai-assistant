@@ -24,10 +24,17 @@ public class OpenAiProviderHandlerTest {
         OpenAiProviderHandler handler = new OpenAiProviderHandler("http://localhost:11434/v1/chat/completions");
         JsonObject body = handler.buildRequestBody("gpt-4o", "ctx", "recent", "q", true);
 
-        Assert.assertTrue(body.has("max_tokens"));
         Assert.assertEquals(8192, body.get("max_tokens").getAsInt());
-        Assert.assertTrue(body.has("max_completion_tokens"));
+        Assert.assertFalse("only one token limit may be sent", body.has("max_completion_tokens"));
+    }
+
+    @Test
+    public void testOpenAiApiUsesOnlyMaxCompletionTokens() {
+        OpenAiProviderHandler handler = new OpenAiProviderHandler("https://api.openai.com/v1/chat/completions");
+        JsonObject body = handler.buildRequestBody("gpt-4o", "ctx", "recent", "q", true);
+
         Assert.assertEquals(8192, body.get("max_completion_tokens").getAsInt());
+        Assert.assertFalse("OpenAI rejects max_tokens alongside max_completion_tokens", body.has("max_tokens"));
     }
 
     @Test
