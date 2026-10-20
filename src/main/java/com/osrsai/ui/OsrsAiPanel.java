@@ -655,8 +655,27 @@ public class OsrsAiPanel extends PluginPanel {
         return html.toString();
     }
 
+    private static final java.util.regex.Pattern URL_PATTERN = java.util.regex.Pattern.compile("https?://\\S+");
+
+    /**
+     * Adds wrap opportunities after slashes so long paths can wrap in the narrow sidebar. Plain text gets a
+     * visible space; URLs get a zero-width space so they still read as a single, intact link.
+     */
+    static String addSlashWrapPoints(String text) {
+        StringBuilder out = new StringBuilder();
+        java.util.regex.Matcher m = URL_PATTERN.matcher(text);
+        int last = 0;
+        while (m.find()) {
+            out.append(text.substring(last, m.start()).replaceAll("(/)([^\\s/<>])", "/ $2"));
+            out.append(m.group().replaceAll("(?<=[^/]/)(?=[^/])", "​"));
+            last = m.end();
+        }
+        out.append(text.substring(last).replaceAll("(/)([^\\s/<>])", "/ $2"));
+        return out.toString();
+    }
+
     private String formatInlineMarkdown(String text) {
-        String pre = text.replaceAll("(?<!https?:)(/)([^\\s/<>])", "/ $2")
+        String pre = addSlashWrapPoints(text)
                 .replaceAll("([^\\s])—", "$1 —")
                 .replaceAll("—([^\\s])", "— $1");
         String html = pre.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
@@ -760,7 +779,7 @@ public class OsrsAiPanel extends PluginPanel {
             }
 
             String msg = turn.message;
-            if ("Assistant".equals(turn.sender) && msg.length() > 350) {
+            if ("AI".equals(turn.sender) && msg.length() > 350) {
                 msg = msg.substring(0, 347) + "...";
             }
 
@@ -782,6 +801,10 @@ public class OsrsAiPanel extends PluginPanel {
             inputField.setEnabled(!thinking);
             sendButton.setEnabled(!thinking);
             sendButton.setText(thinking ? "Thinking..." : "Ask");
+            // Responses are appended to the active session, so keep it fixed until the answer arrives.
+            chatSessionComboBox.setEnabled(!thinking);
+            newChatButton.setEnabled(!thinking);
+            deleteChatButton.setEnabled(!thinking);
         });
     }
 

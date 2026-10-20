@@ -25,6 +25,55 @@ public class OsrsAiPanelTest {
     }
 
     @Test
+    public void slashWrapPointsKeepUrlsIntact() throws Exception {
+        Method wrap = OsrsAiPanel.class.getDeclaredMethod("addSlashWrapPoints", String.class);
+        wrap.setAccessible(true);
+
+        String out = (String) wrap.invoke(null,
+                "Use runes/staves, see https://oldschool.runescape.wiki/w/Abyssal_whip for details");
+
+        Assert.assertTrue(out.contains("runes/ staves"));
+        Assert.assertEquals("URL text must be unchanged apart from zero-width break points",
+                "https://oldschool.runescape.wiki/w/Abyssal_whip",
+                out.substring(out.indexOf("https"), out.indexOf(" for")).replace("​", ""));
+        Assert.assertFalse(out.contains("https:// "));
+    }
+
+    @Test
+    public void recentConversationTruncatesLongAiReplies() {
+        OsrsAiPanel panel = new OsrsAiPanel(null, null);
+        StringBuilder longReply = new StringBuilder();
+        for (int i = 0; i < 100; i++) {
+            longReply.append("word ");
+        }
+        panel.addMessage("You", "hi");
+        panel.addMessage("AI", longReply.toString());
+
+        String context = panel.getRecentConversationContext("next question");
+        String aiLine = context.substring(context.indexOf("AI: "));
+        Assert.assertTrue("AI reply should be truncated, was " + aiLine.length(), aiLine.length() <= 4 + 350);
+        Assert.assertTrue(aiLine.endsWith("..."));
+    }
+
+    @Test
+    public void sessionControlsLockedWhileThinking() throws Exception {
+        OsrsAiPanel panel = new OsrsAiPanel(null, null);
+        panel.setThinking(true);
+        javax.swing.SwingUtilities.invokeAndWait(() -> { });
+        for (String name : new String[] { "chatSessionComboBox", "newChatButton", "deleteChatButton" }) {
+            java.lang.reflect.Field f = OsrsAiPanel.class.getDeclaredField(name);
+            f.setAccessible(true);
+            Assert.assertFalse(name + " should be disabled while thinking",
+                    ((javax.swing.JComponent) f.get(panel)).isEnabled());
+        }
+        panel.setThinking(false);
+        javax.swing.SwingUtilities.invokeAndWait(() -> { });
+        java.lang.reflect.Field f = OsrsAiPanel.class.getDeclaredField("newChatButton");
+        f.setAccessible(true);
+        Assert.assertTrue(((javax.swing.JComponent) f.get(panel)).isEnabled());
+    }
+
+    @Test
     public void testChatWrappingAdaptsToWidth() throws Exception {
         Assume.assumeFalse("Skipping UI test in headless environment", GraphicsEnvironment.isHeadless());
         javax.swing.SwingUtilities.invokeAndWait(() -> {
