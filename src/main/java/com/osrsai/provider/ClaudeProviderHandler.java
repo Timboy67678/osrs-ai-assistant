@@ -18,8 +18,9 @@ import okhttp3.RequestBody;
  * and parses response structures for tool use blocks and text content.
  */
 public class ClaudeProviderHandler implements ProviderHandler {
-    private static final double LOW_TEMPERATURE = 0.2d;
     private static final String CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
+    private static final String FALLBACK_BETA = "server-side-fallback-2026-07-01";
+    private static final int MAX_TOKENS = 16000;
 
     @Override
     public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
@@ -27,8 +28,12 @@ public class ClaudeProviderHandler implements ProviderHandler {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
         bodyObj.addProperty("system", AiService.buildSystemPrompt(context, recentConversation));
-        bodyObj.addProperty("max_tokens", 8192);
-        bodyObj.addProperty("temperature", LOW_TEMPERATURE);
+        // Current Claude models reject custom sampling parameters such as temperature.
+        bodyObj.addProperty("max_tokens", MAX_TOKENS);
+        if (supportsServerFallback(modelId)) {
+            // If a safety classifier declines the request, let the API retry it on a suitable model.
+            bodyObj.addProperty("fallbacks", "default");
+        }
 
         JsonArray messages = new JsonArray();
         JsonObject userMessage = new JsonObject();
@@ -41,6 +46,17 @@ public class ClaudeProviderHandler implements ProviderHandler {
         bodyObj.add("tools", buildClaudeTools(shareCharInfo));
 
         return bodyObj;
+    }
+
+    /**
+     * Server-side refusal fallbacks exist for the Opus, Sonnet 5.5 and Fable lines; Haiku has none.
+     */
+    static boolean supportsServerFallback(String modelId) {
+        if (modelId == null) {
+            return false;
+        }
+        String m = modelId.toLowerCase(Locale.ROOT);
+        return m.startsWith("claude-opus-5") || m.startsWith("claude-sonnet-5-5") || m.startsWith("claude-fable-5");
     }
 
     /**
@@ -161,6 +177,10 @@ public class ClaudeProviderHandler implements ProviderHandler {
 
     @Override
     public String extractResponseText(JsonObject responseRoot) {
+        if (responseRoot != null && responseRoot.has("stop_reason") && !responseRoot.get("stop_reason").isJsonNull()
+                && "refusal".equals(responseRoot.get("stop_reason").getAsString())) {
+            return "Claude declined to answer this request. Try rephrasing your question.";
+        }
         if (responseRoot != null && responseRoot.has("content")) {
             JsonArray content = responseRoot.getAsJsonArray("content");
             StringBuilder sb = new StringBuilder();
@@ -179,13 +199,18 @@ public class ClaudeProviderHandler implements ProviderHandler {
 
     @Override
     public Request buildHttpRequest(String modelId, String apiKey, String clientId, String jsonBody) {
-        RequestBody body = RequestBody.create(jsonBody, MediaType.parse("application/json"));
-        return new Request.Builder()
+        // RuneLite ships OkHttp 3.x at runtime, which only has the (MediaType, String) overload.
+        @SuppressWarnings("deprecation")
+        RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
+        Request.Builder builder = new Request.Builder()
                 .url(CLAUDE_API_URL)
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", "2023-06-01")
                 .header("content-type", "application/json")
-                .post(body)
-                .build();
+                .post(body);
+        if (supportsServerFallback(modelId)) {
+            builder.header("anthropic-beta", FALLBACK_BETA);
+        }
+        return builder.build();
     }
 }

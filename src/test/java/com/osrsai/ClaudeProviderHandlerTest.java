@@ -15,13 +15,24 @@ public class ClaudeProviderHandlerTest {
 
     @Test
     public void testBuildRequestBodyIncludesSystemAndMessagesAndTools() {
-        JsonObject body = handler.buildRequestBody("claude-3-7-sonnet-20250219", "Game Context", "Recent Chat", "Where am I?", true);
+        JsonObject body = handler.buildRequestBody("claude-sonnet-5-5", "Game Context", "Recent Chat", "Where am I?", true);
 
-        Assert.assertEquals("claude-3-7-sonnet-20250219", body.get("model").getAsString());
+        Assert.assertEquals("claude-sonnet-5-5", body.get("model").getAsString());
         Assert.assertTrue(body.has("system"));
         Assert.assertTrue(body.has("messages"));
         Assert.assertTrue(body.has("tools"));
-        Assert.assertEquals(8192, body.get("max_tokens").getAsInt());
+        Assert.assertEquals(16000, body.get("max_tokens").getAsInt());
+        Assert.assertFalse("current Claude models reject temperature", body.has("temperature"));
+        Assert.assertEquals("default", body.get("fallbacks").getAsString());
+    }
+
+    @Test
+    public void testHaikuOmitsServerFallback() {
+        JsonObject body = handler.buildRequestBody("claude-haiku-5-5", "Ctx", "None", "Hi", true);
+        Assert.assertFalse(body.has("fallbacks"));
+        Assert.assertNull(handler.buildHttpRequest("claude-haiku-5-5", "k", null, "{}").header("anthropic-beta"));
+        Assert.assertEquals("server-side-fallback-2026-07-01",
+                handler.buildHttpRequest("claude-sonnet-5-5", "k", null, "{}").header("anthropic-beta"));
     }
 
     @Test
@@ -54,6 +65,12 @@ public class ClaudeProviderHandlerTest {
         Assert.assertEquals(2, messages.size());
         Assert.assertEquals("assistant", messages.get(0).getAsJsonObject().get("role").getAsString());
         Assert.assertEquals("user", messages.get(1).getAsJsonObject().get("role").getAsString());
+    }
+
+    @Test
+    public void testRefusalProducesReadableMessage() {
+        JsonObject root = gson.fromJson("{\"stop_reason\":\"refusal\",\"content\":[]}", JsonObject.class);
+        Assert.assertTrue(handler.extractResponseText(root).startsWith("Claude declined"));
     }
 
     @Test

@@ -20,15 +20,17 @@ public enum AiProvider {
     @SerializedName(value = "GEMINI_2_5_PRO", alternate = { "GEMINI_PRO", "gemini_pro", "gemini_2_5_pro" })
     GEMINI_2_5_PRO("Gemini 2.5 Pro", "gemini-2.5-pro", ProviderType.GEMINI),
 
-    // Anthropic Claude
-    @SerializedName(value = "CLAUDE_3_7", alternate = { "CLAUDE", "claude", "claude_3_7" })
-    CLAUDE_3_7("Claude Sonnet 3.7", "claude-3-7-sonnet-20250219", ProviderType.CLAUDE),
+    // Anthropic Claude. Older Claude 3.x entries were retired by Anthropic; their saved
+    // names map onto the current models so existing profiles keep working.
+    @SerializedName(value = "CLAUDE_OPUS_5_5", alternate = { "claude_opus_5_5" })
+    CLAUDE_OPUS_5_5("Claude Opus 5.5", "claude-opus-5-5", ProviderType.CLAUDE),
 
-    @SerializedName(value = "CLAUDE_3_5", alternate = { "claude_3_5" })
-    CLAUDE_3_5("Claude Sonnet 3.5", "claude-3-5-sonnet-20241022", ProviderType.CLAUDE),
+    @SerializedName(value = "CLAUDE_SONNET_5_5", alternate = { "claude_sonnet_5_5", "CLAUDE", "claude",
+            "CLAUDE_3_7", "claude_3_7", "CLAUDE_3_5", "claude_3_5" })
+    CLAUDE_SONNET_5_5("Claude Sonnet 5.5", "claude-sonnet-5-5", ProviderType.CLAUDE),
 
-    @SerializedName(value = "CLAUDE_HAIKU", alternate = { "claude_haiku" })
-    CLAUDE_HAIKU("Claude Haiku 3.5", "claude-3-5-haiku-20241022", ProviderType.CLAUDE),
+    @SerializedName(value = "CLAUDE_HAIKU_5_5", alternate = { "claude_haiku_5_5", "CLAUDE_HAIKU", "claude_haiku" })
+    CLAUDE_HAIKU_5_5("Claude Haiku 5.5", "claude-haiku-5-5", ProviderType.CLAUDE),
 
     // OpenAI
     @SerializedName(value = "OPENAI", alternate = { "openai" })

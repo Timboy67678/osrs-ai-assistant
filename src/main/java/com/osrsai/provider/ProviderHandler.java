@@ -16,7 +16,7 @@ public interface ProviderHandler {
          * conversation context to the AI API.
          *
          * @param modelId            the API model identifier (e.g. "gpt-4o",
-         *                           "gemini-2.5-flash", "claude-3-5-sonnet-20240620")
+         *                           "gemini-2.5-flash", "claude-sonnet-5-5")
          * @param context            full player game context string
          * @param recentConversation recent chat turn history
          * @param question           current user prompt

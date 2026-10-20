@@ -438,7 +438,7 @@ public class AiServiceTest {
 
         String legacyClaudeJson = "{\"id\":\"3\",\"name\":\"My Claude\",\"provider\":\"CLAUDE\",\"apiKey\":\"test\"}";
         AiProfile p3 = g.fromJson(legacyClaudeJson, AiProfile.class);
-        Assert.assertEquals(AiProvider.CLAUDE_3_7, p3.getProvider());
+        Assert.assertEquals(AiProvider.CLAUDE_SONNET_5_5, p3.getProvider());
     }
 
     @Test
