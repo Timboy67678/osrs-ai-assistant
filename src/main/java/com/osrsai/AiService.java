@@ -25,7 +25,6 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import okhttp3.*;
-import org.jetbrains.annotations.NotNull;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -343,7 +342,7 @@ public class AiService {
 
         clientHttp.newCall(request).enqueue(new Callback() {
             @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+            public void onFailure(Call call, IOException e) {
                 log.error("Failed to call AI API", e);
                 SwingUtilities.invokeLater(() -> {
                     panel.setThinking(false);
@@ -352,7 +351,7 @@ public class AiService {
             }
 
             @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+            public void onResponse(Call call, Response response) throws IOException {
                 try (Response resp = response) {
                     if (!resp.isSuccessful()) {
                         String errBody = "";

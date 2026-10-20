@@ -23,8 +23,6 @@ dependencies {
     testImplementation "net.runelite:jshell:$runeLiteVersion"
     testImplementation 'ch.qos.logback:logback-classic:1.2.9'
 
-    compileOnly 'com.google.code.gson:gson:2.10.1'
-    compileOnly 'com.squareup.okhttp3:okhttp:4.12.0'
 }
 
 group = 'com.osrsai'
