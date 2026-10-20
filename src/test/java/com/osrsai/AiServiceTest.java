@@ -439,6 +439,13 @@ public class AiServiceTest {
         String legacyClaudeJson = "{\"id\":\"3\",\"name\":\"My Claude\",\"provider\":\"CLAUDE\",\"apiKey\":\"test\"}";
         AiProfile p3 = g.fromJson(legacyClaudeJson, AiProfile.class);
         Assert.assertEquals(AiProvider.CLAUDE_SONNET_5_5, p3.getProvider());
+
+        Assert.assertEquals(AiProvider.OPENAI_GPT_6_SOL,
+                g.fromJson("{\"provider\":\"OPENAI_O1\"}", AiProfile.class).getProvider());
+        Assert.assertEquals(AiProvider.OPENAI_GPT_6_SOL,
+                g.fromJson("{\"provider\":\"OPENAI_O3_MINI\"}", AiProfile.class).getProvider());
+        Assert.assertEquals(AiProvider.GROK_4_3,
+                g.fromJson("{\"provider\":\"GROK_3_REASONING\"}", AiProfile.class).getProvider());
     }
 
     @Test

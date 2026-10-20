@@ -32,32 +32,29 @@ public enum AiProvider {
     @SerializedName(value = "CLAUDE_HAIKU_5_5", alternate = { "claude_haiku_5_5", "CLAUDE_HAIKU", "claude_haiku" })
     CLAUDE_HAIKU_5_5("Claude Haiku 5.5", "claude-haiku-5-5", ProviderType.CLAUDE),
 
-    // OpenAI
+    // OpenAI. o1 and o3-mini shut down on 2026-10-23; saved profiles map onto GPT-6 Sol, the
+    // replacement OpenAI recommends. GPT-4o and GPT-4o Mini are removed from the API on 2027-01-14.
+    @SerializedName(value = "OPENAI_GPT_6_SOL", alternate = { "openai_gpt_6_sol", "OPENAI_O1", "openai_o1",
+            "OPENAI_O3_MINI", "openai_o3_mini" })
+    OPENAI_GPT_6_SOL("OpenAI GPT-6 Sol", "gpt-6-sol", ProviderType.OPENAI),
+
+    @SerializedName(value = "OPENAI_GPT_6_LUNA", alternate = { "openai_gpt_6_luna" })
+    OPENAI_GPT_6_LUNA("OpenAI GPT-6 Luna", "gpt-6-luna", ProviderType.OPENAI),
+
     @SerializedName(value = "OPENAI", alternate = { "openai" })
-    OPENAI("OpenAI GPT-4o", "gpt-4o", ProviderType.OPENAI),
+    OPENAI("OpenAI GPT-4o (retiring Jan 2027)", "gpt-4o", ProviderType.OPENAI),
 
     @SerializedName(value = "OPENAI_MINI", alternate = { "openai_mini" })
-    OPENAI_MINI("OpenAI GPT-4o Mini", "gpt-4o-mini", ProviderType.OPENAI),
+    OPENAI_MINI("OpenAI GPT-4o Mini (retiring Jan 2027)", "gpt-4o-mini", ProviderType.OPENAI),
 
-    @SerializedName(value = "OPENAI_O3_MINI", alternate = { "openai_o3_mini" })
-    OPENAI_O3_MINI("OpenAI o3-mini", "o3-mini", ProviderType.OPENAI),
-
-    @SerializedName(value = "OPENAI_O1", alternate = { "openai_o1" })
-    OPENAI_O1("OpenAI o1", "o1", ProviderType.OPENAI),
-
-    // xAI Grok
-    @SerializedName(value = "GROK_4_3", alternate = { "GROK", "grok", "grok_4_3" })
+    // xAI Grok. grok-3 and grok-3-reasoning were retired by xAI; saved profiles map onto Grok 4.3.
+    @SerializedName(value = "GROK_4_3", alternate = { "GROK", "grok", "grok_4_3", "GROK_3", "grok_3",
+            "GROK_3_REASONING", "grok_3_reasoning" })
     GROK_4_3("Grok 4.3", "grok-4.3", ProviderType.GROK),
 
     @SerializedName(value = "GROK_4_20_REASONING", alternate = { "GROK_REASONING", "grok_reasoning",
             "grok_4_20_reasoning" })
     GROK_4_20_REASONING("Grok 4.20 Reasoning", "grok-4.20-0309-reasoning", ProviderType.GROK),
-
-    @SerializedName(value = "GROK_3", alternate = { "grok_3" })
-    GROK_3("Grok 3", "grok-3", ProviderType.GROK),
-
-    @SerializedName(value = "GROK_3_REASONING", alternate = { "grok_3_reasoning" })
-    GROK_3_REASONING("Grok 3 Reasoning", "grok-3-reasoning", ProviderType.GROK),
 
     // Custom
     @SerializedName(value = "CUSTOM", alternate = { "custom" })

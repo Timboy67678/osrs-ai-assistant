@@ -38,8 +38,8 @@
   - Built-in **AI Profile Manager** to easily create, configure, and switch between multiple AI profiles and providers.
   - **Google Gemini:** Gemini 3.6 Flash, Gemini 2.5 Flash, Gemini 2.5 Pro.
   - **Anthropic Claude:** Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5.
-  - **OpenAI:** GPT-4o, GPT-4o Mini, o3-mini, o1.
-  - **xAI Grok:** Grok 4.20 Reasoning, Grok 4.3, Grok 3, Grok 3 Reasoning.
+  - **OpenAI:** GPT-6 Sol, GPT-6 Luna, GPT-4o and GPT-4o Mini (both retiring January 2027).
+  - **xAI Grok:** Grok 4.20 Reasoning, Grok 4.3.
   - **Custom / Local AI:** Connect to Ollama, LM Studio, LocalAI, vLLM, or any OpenAI-compatible API endpoint with custom model IDs.
 - **🗂️ Multi-Session & Window Flexibility:**
   - Create, switch, and delete multiple chat sessions with persistent local history.
@@ -99,7 +99,7 @@ Open **RuneLite Settings (wrench icon)**, search for **OSRS AI Assistant**, or o
 
 ### AI Profile Manager (In-Plugin UI Panel)
 Click the profile selector or settings icon in the top header of the AI Assistant panel to manage AI profiles:
-- **Preset Selection:** Choose from popular ready-to-use presets (Grok 4.20 Reasoning, Gemini 2.5 Flash, Claude Sonnet 5.5, GPT-4o, etc.).
+- **Preset Selection:** Choose from popular ready-to-use presets (Grok 4.20 Reasoning, Gemini 2.5 Flash, Claude Sonnet 5.5, GPT-6 Sol, etc.).
 - **API Key & Org ID:** Securely configure API keys per profile.
 - **Custom / Local AI:** Point to local OpenAI-compatible endpoints (e.g. `http://localhost:11434/v1/chat/completions`) with custom model names.
 

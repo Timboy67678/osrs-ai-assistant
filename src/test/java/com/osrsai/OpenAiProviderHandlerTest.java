@@ -38,6 +38,16 @@ public class OpenAiProviderHandlerTest {
     }
 
     @Test
+    public void testGpt6UsesReasoningSettings() {
+        OpenAiProviderHandler handler = new OpenAiProviderHandler("https://api.openai.com/v1/chat/completions");
+        JsonObject body = handler.buildRequestBody("gpt-6-sol", "ctx", "recent", "q", true);
+
+        Assert.assertFalse("GPT-5+ rejects custom temperature", body.has("temperature"));
+        Assert.assertFalse(body.has("max_tokens"));
+        Assert.assertEquals(16384, body.get("max_completion_tokens").getAsInt());
+    }
+
+    @Test
     public void testExtractResponseTextHandlesChoicesAndOutputs() {
         OpenAiProviderHandler handler = new OpenAiProviderHandler("http://localhost:11434/v1/chat/completions");
 

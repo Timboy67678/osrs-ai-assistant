@@ -41,8 +41,12 @@ public class OpenAiProviderHandler implements ProviderHandler {
         bodyObj.addProperty("model", modelId);
 
         String lowerModel = modelId != null ? modelId.toLowerCase() : "";
+        // GPT-5 and later, like the o-series, reject custom temperature and max_tokens.
         boolean isReasoningModel = lowerModel.startsWith("o1")
                 || lowerModel.startsWith("o3")
+                || lowerModel.startsWith("o4")
+                || lowerModel.startsWith("gpt-5")
+                || lowerModel.startsWith("gpt-6")
                 || lowerModel.contains("reasoning")
                 || lowerModel.contains("r1");
         if (isReasoningModel) {
