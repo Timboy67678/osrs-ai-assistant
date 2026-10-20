@@ -24,6 +24,12 @@ public class ClaudeProviderHandlerTest {
         Assert.assertEquals(16000, body.get("max_tokens").getAsInt());
         Assert.assertFalse("current Claude models reject temperature", body.has("temperature"));
         Assert.assertEquals("default", body.get("fallbacks").getAsString());
+
+        Assert.assertEquals("ephemeral", body.getAsJsonObject("cache_control").get("type").getAsString());
+        com.google.gson.JsonArray tools = body.getAsJsonArray("tools");
+        Assert.assertTrue("last tool carries the shared-prefix cache breakpoint",
+                tools.get(tools.size() - 1).getAsJsonObject().has("cache_control"));
+        Assert.assertFalse(tools.get(0).getAsJsonObject().has("cache_control"));
     }
 
     @Test

@@ -44,8 +44,17 @@ public class ClaudeProviderHandler implements ProviderHandler {
         bodyObj.add("messages", messages);
 
         bodyObj.add("tools", buildClaudeTools(shareCharInfo));
+        // Automatic caching moves a breakpoint to the end of the conversation, so each step of a
+        // tool loop re-reads everything sent in the previous step from cache.
+        bodyObj.add("cache_control", ephemeralCacheControl());
 
         return bodyObj;
+    }
+
+    private static JsonObject ephemeralCacheControl() {
+        JsonObject cacheControl = new JsonObject();
+        cacheControl.addProperty("type", "ephemeral");
+        return cacheControl;
     }
 
     /**
@@ -106,6 +115,10 @@ public class ClaudeProviderHandler implements ProviderHandler {
             schema.add("required", required);
             tool.add("input_schema", schema);
             tools.add(tool);
+        }
+        if (tools.size() > 0) {
+            // Tool definitions are identical for every question, so cache them as a shared prefix.
+            tools.get(tools.size() - 1).getAsJsonObject().add("cache_control", ephemeralCacheControl());
         }
         return tools;
     }
