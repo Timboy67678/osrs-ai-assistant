@@ -99,24 +99,16 @@ public class UtilitiesTest {
     }
 
     @Test
-    public void testDescribeDiaryStatus() {
-        Assert.assertEquals("Not Started", Utilities.describeDiaryStatus(0, 10));
-        Assert.assertEquals("In Progress (4/10 tasks)", Utilities.describeDiaryStatus(4, 10));
-        Assert.assertEquals("Completed", Utilities.describeDiaryStatus(10, 10));
-        Assert.assertEquals("Completed", Utilities.describeDiaryStatus(12, 10));
-    }
-
-    @Test
     public void testGetDiaryStatusWithClient() {
         Client client = mock(Client.class);
         when(client.getVarbitValue(100)).thenReturn(0);
-        when(client.getVarbitValue(101)).thenReturn(5);
-        when(client.getVarbitValue(102)).thenReturn(10);
+        when(client.getVarbitValue(101)).thenReturn(1);
+        when(client.getVarbitValue(102)).thenReturn(2);
 
-        Assert.assertEquals("Not Started", Utilities.getDiaryStatus(client, 100, 10));
-        Assert.assertEquals("In Progress (5/10 tasks)", Utilities.getDiaryStatus(client, 101, 10));
-        Assert.assertEquals("Completed", Utilities.getDiaryStatus(client, 102, 10));
-        Assert.assertEquals("Not Started", Utilities.getDiaryStatus(null, 100, 10));
+        Assert.assertEquals("Not completed", Utilities.getDiaryStatus(client, 100));
+        Assert.assertEquals("Completed", Utilities.getDiaryStatus(client, 101));
+        Assert.assertEquals("Completed", Utilities.getDiaryStatus(client, 102));
+        Assert.assertEquals("Not completed", Utilities.getDiaryStatus(null, 100));
     }
 
     @Test

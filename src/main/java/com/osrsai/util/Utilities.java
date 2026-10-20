@@ -200,41 +200,22 @@ public class Utilities {
     }
 
     /**
-     * Formats achievement diary task progression into a human-readable status
-     * string.
-     *
-     * @param completedTasks number of completed tasks
-     * @param maxTasks       total number of tasks required
-     * @return status description ("Not Started", "Completed", or "In Progress (X/Y
-     *         tasks)")
-     */
-    public static String describeDiaryStatus(int completedTasks, int maxTasks) {
-        if (completedTasks <= 0) {
-            return "Not Started";
-        }
-        if (completedTasks >= maxTasks) {
-            return "Completed";
-        }
-        return "In Progress (" + completedTasks + "/" + maxTasks + " tasks)";
-    }
-
-    /**
-     * Resolves an achievement diary tier's status from a client and varbit ID.
+     * Resolves an achievement diary tier's status. The diary varbits are completion
+     * flags (non-zero once the tier is done), not task counts, so partial progress
+     * cannot be read from them.
      *
      * @param client   RuneLite {@link Client} instance
-     * @param varbitId diary varbit identifier
-     * @param maxTasks total number of tasks required
-     * @return status description
+     * @param varbitId diary tier completion varbit
+     * @return "Completed" or "Not completed"
      */
-    public static String getDiaryStatus(Client client, int varbitId, int maxTasks) {
+    public static String getDiaryStatus(Client client, int varbitId) {
         if (client == null) {
-            return "Not Started";
+            return "Not completed";
         }
         try {
-            int val = client.getVarbitValue(varbitId);
-            return describeDiaryStatus(val, maxTasks);
+            return client.getVarbitValue(varbitId) > 0 ? "Completed" : "Not completed";
         } catch (Exception ignored) {
-            return "Not Started";
+            return "Not completed";
         }
     }
 

@@ -1013,9 +1013,22 @@ public class AiServiceTest {
     }
 
     @Test
+    public void testZaffBattlestavesUseVarrockDiaryCompletionFlags() {
+        Mockito.when(client.getVarbitValue(VarbitID.VARROCK_DIARY_EASY_COMPLETE)).thenReturn(1);
+        Mockito.when(client.getVarbitValue(VarbitID.VARROCK_DIARY_MEDIUM_COMPLETE)).thenReturn(1);
+        Mockito.when(client.getVarbitValue(VarbitID.VARROCK_DIARY_HARD_COMPLETE)).thenReturn(1);
+
+        JsonObject root = new Gson().fromJson(aiService.executeGetPlayerFarmingAndTimers(new JsonObject()),
+                JsonObject.class);
+        JsonObject zaff = root.getAsJsonObject("dailyTaskCollectibles").getAsJsonObject("zaffBattlestaves");
+        Assert.assertNotNull("Zaff battlestaves should be reported once a Varrock diary tier is done", zaff);
+        Assert.assertEquals(60, zaff.get("discountBattlestavesAvailablePerDay").getAsInt());
+    }
+
+    @Test
     public void testGetPlayerAchievementDiariesTool() throws Exception {
-        // Varbit value >= maxTasks = Completed for Achievement Diaries
-        Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_EASY_COMPLETE)).thenReturn(11);
+        // Diary varbits are completion flags: 1 once the tier is done
+        Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_EASY_COMPLETE)).thenReturn(1);
         Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_MEDIUM_COMPLETE)).thenReturn(0);
         Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_HARD_COMPLETE)).thenReturn(0);
         Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_ELITE_COMPLETE)).thenReturn(0);
@@ -1031,7 +1044,8 @@ public class AiServiceTest {
 
         com.google.gson.JsonObject kandarin = root.getAsJsonObject("diaries").getAsJsonObject("Kandarin");
         Assert.assertEquals("Completed", kandarin.get("Easy").getAsString());
-        Assert.assertEquals("Not Started", kandarin.get("Medium").getAsString());
+        Assert.assertEquals("Not completed", kandarin.get("Medium").getAsString());
+
     }
 
     @Test

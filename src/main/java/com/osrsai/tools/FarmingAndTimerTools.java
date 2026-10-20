@@ -319,13 +319,13 @@ public class FarmingAndTimerTools {
         int varrockDiaryElite = client != null ? client.getVarbitValue(VarbitID.VARROCK_DIARY_ELITE_COMPLETE) : 0;
 
         int zaffDailyCount = 0;
-        if (varrockDiaryElite >= 5) {
+        if (varrockDiaryElite > 0) {
             zaffDailyCount = 120;
-        } else if (varrockDiaryHard >= 10) {
+        } else if (varrockDiaryHard > 0) {
             zaffDailyCount = 60;
-        } else if (varrockDiaryMed >= 13) {
+        } else if (varrockDiaryMed > 0) {
             zaffDailyCount = 30;
-        } else if (varrockDiaryEasy >= 14) {
+        } else if (varrockDiaryEasy > 0) {
             zaffDailyCount = 15;
         }
 

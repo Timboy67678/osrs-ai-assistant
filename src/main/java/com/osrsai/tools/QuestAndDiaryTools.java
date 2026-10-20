@@ -198,16 +198,12 @@ public class QuestAndDiaryTools {
         return gson.toJson(result);
     }
 
-    private JsonObject createDiaryProgress(
-            int easyVarbit, int easyMax,
-            int medVarbit, int medMax,
-            int hardVarbit, int hardMax,
-            int eliteVarbit, int eliteMax) {
+    private JsonObject createDiaryProgress(int easyVarbit, int medVarbit, int hardVarbit, int eliteVarbit) {
         JsonObject obj = new JsonObject();
-        obj.addProperty("Easy", Utilities.getDiaryStatus(client, easyVarbit, easyMax));
-        obj.addProperty("Medium", Utilities.getDiaryStatus(client, medVarbit, medMax));
-        obj.addProperty("Hard", Utilities.getDiaryStatus(client, hardVarbit, hardMax));
-        obj.addProperty("Elite", Utilities.getDiaryStatus(client, eliteVarbit, eliteMax));
+        obj.addProperty("Easy", Utilities.getDiaryStatus(client, easyVarbit));
+        obj.addProperty("Medium", Utilities.getDiaryStatus(client, medVarbit));
+        obj.addProperty("Hard", Utilities.getDiaryStatus(client, hardVarbit));
+        obj.addProperty("Elite", Utilities.getDiaryStatus(client, eliteVarbit));
         return obj;
     }
 
@@ -215,65 +211,65 @@ public class QuestAndDiaryTools {
         JsonObject result = new JsonObject();
         JsonObject diaries = new JsonObject();
         diaries.add("Ardougne", createDiaryProgress(
-                VarbitID.ARDOUGNE_DIARY_EASY_COMPLETE, 11,
-                VarbitID.ARDOUGNE_DIARY_MEDIUM_COMPLETE, 13,
-                VarbitID.ARDOUGNE_DIARY_HARD_COMPLETE, 12,
-                VarbitID.ARDOUGNE_DIARY_ELITE_COMPLETE, 8));
+                VarbitID.ARDOUGNE_DIARY_EASY_COMPLETE,
+                VarbitID.ARDOUGNE_DIARY_MEDIUM_COMPLETE,
+                VarbitID.ARDOUGNE_DIARY_HARD_COMPLETE,
+                VarbitID.ARDOUGNE_DIARY_ELITE_COMPLETE));
         diaries.add("Desert", createDiaryProgress(
-                VarbitID.DESERT_DIARY_EASY_COMPLETE, 11,
-                VarbitID.DESERT_DIARY_MEDIUM_COMPLETE, 12,
-                VarbitID.DESERT_DIARY_HARD_COMPLETE, 10,
-                VarbitID.DESERT_DIARY_ELITE_COMPLETE, 6));
+                VarbitID.DESERT_DIARY_EASY_COMPLETE,
+                VarbitID.DESERT_DIARY_MEDIUM_COMPLETE,
+                VarbitID.DESERT_DIARY_HARD_COMPLETE,
+                VarbitID.DESERT_DIARY_ELITE_COMPLETE));
         diaries.add("Falador", createDiaryProgress(
-                VarbitID.FALADOR_DIARY_EASY_COMPLETE, 11,
-                VarbitID.FALADOR_DIARY_MEDIUM_COMPLETE, 14,
-                VarbitID.FALADOR_DIARY_HARD_COMPLETE, 11,
-                VarbitID.FALADOR_DIARY_ELITE_COMPLETE, 6));
+                VarbitID.FALADOR_DIARY_EASY_COMPLETE,
+                VarbitID.FALADOR_DIARY_MEDIUM_COMPLETE,
+                VarbitID.FALADOR_DIARY_HARD_COMPLETE,
+                VarbitID.FALADOR_DIARY_ELITE_COMPLETE));
         diaries.add("Fremennik", createDiaryProgress(
-                VarbitID.FREMENNIK_DIARY_EASY_COMPLETE, 10,
-                VarbitID.FREMENNIK_DIARY_MEDIUM_COMPLETE, 9,
-                VarbitID.FREMENNIK_DIARY_HARD_COMPLETE, 10,
-                VarbitID.FREMENNIK_DIARY_ELITE_COMPLETE, 6));
+                VarbitID.FREMENNIK_DIARY_EASY_COMPLETE,
+                VarbitID.FREMENNIK_DIARY_MEDIUM_COMPLETE,
+                VarbitID.FREMENNIK_DIARY_HARD_COMPLETE,
+                VarbitID.FREMENNIK_DIARY_ELITE_COMPLETE));
         diaries.add("Kandarin", createDiaryProgress(
-                VarbitID.KANDARIN_DIARY_EASY_COMPLETE, 11,
-                VarbitID.KANDARIN_DIARY_MEDIUM_COMPLETE, 11,
-                VarbitID.KANDARIN_DIARY_HARD_COMPLETE, 11,
-                VarbitID.KANDARIN_DIARY_ELITE_COMPLETE, 7));
+                VarbitID.KANDARIN_DIARY_EASY_COMPLETE,
+                VarbitID.KANDARIN_DIARY_MEDIUM_COMPLETE,
+                VarbitID.KANDARIN_DIARY_HARD_COMPLETE,
+                VarbitID.KANDARIN_DIARY_ELITE_COMPLETE));
         diaries.add("Karamja", createDiaryProgress(
-                VarbitID.ATJUN_EASY_DONE, 10,
-                VarbitID.ATJUN_MED_DONE, 19,
-                VarbitID.ATJUN_HARD_DONE, 10,
-                VarbitID.KARAMJA_DIARY_ELITE_COMPLETE, 5));
+                VarbitID.ATJUN_EASY_DONE,
+                VarbitID.ATJUN_MED_DONE,
+                VarbitID.ATJUN_HARD_DONE,
+                VarbitID.KARAMJA_DIARY_ELITE_COMPLETE));
         diaries.add("Kourend", createDiaryProgress(
-                VarbitID.KOUREND_DIARY_EASY_COMPLETE, 12,
-                VarbitID.KOUREND_DIARY_MEDIUM_COMPLETE, 13,
-                VarbitID.KOUREND_DIARY_HARD_COMPLETE, 10,
-                VarbitID.KOUREND_DIARY_ELITE_COMPLETE, 8));
+                VarbitID.KOUREND_DIARY_EASY_COMPLETE,
+                VarbitID.KOUREND_DIARY_MEDIUM_COMPLETE,
+                VarbitID.KOUREND_DIARY_HARD_COMPLETE,
+                VarbitID.KOUREND_DIARY_ELITE_COMPLETE));
         diaries.add("Lumbridge", createDiaryProgress(
-                VarbitID.LUMBRIDGE_DIARY_EASY_COMPLETE, 12,
-                VarbitID.LUMBRIDGE_DIARY_MEDIUM_COMPLETE, 12,
-                VarbitID.LUMBRIDGE_DIARY_HARD_COMPLETE, 11,
-                VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE, 6));
+                VarbitID.LUMBRIDGE_DIARY_EASY_COMPLETE,
+                VarbitID.LUMBRIDGE_DIARY_MEDIUM_COMPLETE,
+                VarbitID.LUMBRIDGE_DIARY_HARD_COMPLETE,
+                VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE));
         diaries.add("Morytania", createDiaryProgress(
-                VarbitID.MORYTANIA_DIARY_EASY_COMPLETE, 11,
-                VarbitID.MORYTANIA_DIARY_MEDIUM_COMPLETE, 11,
-                VarbitID.MORYTANIA_DIARY_HARD_COMPLETE, 11,
-                VarbitID.MORYTANIA_DIARY_ELITE_COMPLETE, 6));
+                VarbitID.MORYTANIA_DIARY_EASY_COMPLETE,
+                VarbitID.MORYTANIA_DIARY_MEDIUM_COMPLETE,
+                VarbitID.MORYTANIA_DIARY_HARD_COMPLETE,
+                VarbitID.MORYTANIA_DIARY_ELITE_COMPLETE));
         diaries.add("Varrock", createDiaryProgress(
-                VarbitID.VARROCK_DIARY_EASY_COMPLETE, 14,
-                VarbitID.VARROCK_DIARY_MEDIUM_COMPLETE, 13,
-                VarbitID.VARROCK_DIARY_HARD_COMPLETE, 10,
-                VarbitID.VARROCK_DIARY_ELITE_COMPLETE, 5));
+                VarbitID.VARROCK_DIARY_EASY_COMPLETE,
+                VarbitID.VARROCK_DIARY_MEDIUM_COMPLETE,
+                VarbitID.VARROCK_DIARY_HARD_COMPLETE,
+                VarbitID.VARROCK_DIARY_ELITE_COMPLETE));
         diaries.add("Western", createDiaryProgress(
-                VarbitID.WESTERN_DIARY_EASY_COMPLETE, 11,
-                VarbitID.WESTERN_DIARY_MEDIUM_COMPLETE, 13,
-                VarbitID.WESTERN_DIARY_HARD_COMPLETE, 13,
-                VarbitID.WESTERN_DIARY_ELITE_COMPLETE, 7));
+                VarbitID.WESTERN_DIARY_EASY_COMPLETE,
+                VarbitID.WESTERN_DIARY_MEDIUM_COMPLETE,
+                VarbitID.WESTERN_DIARY_HARD_COMPLETE,
+                VarbitID.WESTERN_DIARY_ELITE_COMPLETE));
         diaries.add("Wilderness", createDiaryProgress(
-                VarbitID.WILDERNESS_DIARY_EASY_COMPLETE, 12,
-                VarbitID.WILDERNESS_DIARY_MEDIUM_COMPLETE, 12,
-                VarbitID.WILDERNESS_DIARY_HARD_COMPLETE, 10,
-                VarbitID.WILDERNESS_DIARY_ELITE_COMPLETE, 7));
+                VarbitID.WILDERNESS_DIARY_EASY_COMPLETE,
+                VarbitID.WILDERNESS_DIARY_MEDIUM_COMPLETE,
+                VarbitID.WILDERNESS_DIARY_HARD_COMPLETE,
+                VarbitID.WILDERNESS_DIARY_ELITE_COMPLETE));
         result.add("diaries", diaries);
         return gson.toJson(result);
     }
