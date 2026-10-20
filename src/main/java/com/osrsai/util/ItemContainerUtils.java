@@ -159,12 +159,12 @@ public class ItemContainerUtils {
         class BankItem {
             final String name;
             final long qty;
-            final int gePrice;
+            final long gePrice;
             final int haPrice;
             final boolean equipable;
             final long totalSortVal;
 
-            BankItem(String name, long qty, int gePrice, int haPrice, boolean equipable) {
+            BankItem(String name, long qty, long gePrice, int haPrice, boolean equipable) {
                 this.name = name;
                 this.qty = qty;
                 this.gePrice = gePrice;
@@ -186,7 +186,7 @@ public class ItemContainerUtils {
             String name = entry.getKey();
             long qty = entry.getValue();
             int itemId = itemIds.get(name);
-            int price = 0;
+            long price = 0;
             if (itemManager != null) {
                 try {
                     price = itemManager.getItemPrice(itemId);
@@ -199,7 +199,7 @@ public class ItemContainerUtils {
             int haPrice = itemHaPrices.getOrDefault(name, 0);
 
             // Apply minimum value filter if present based on account type preference
-            int checkVal = isIron ? haPrice : price;
+            long checkVal = isIron ? haPrice : price;
             if (minValue > 0 && checkVal < minValue) {
                 continue;
             }
@@ -383,7 +383,7 @@ public class ItemContainerUtils {
                 : "Item " + itemId;
         obj.addProperty("name", itemName);
 
-        int gePrice = 0;
+        long gePrice = 0;
         if (itemManager != null) {
             try {
                 gePrice = itemManager.getItemPrice(itemId);

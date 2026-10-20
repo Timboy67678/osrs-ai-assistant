@@ -1338,7 +1338,7 @@ public class AiServiceTest {
         Mockito.when(comp.getName()).thenReturn("Prayer potion(4)");
         Mockito.when(comp.getPlaceholderTemplateId()).thenReturn(-1);
         Mockito.when(itemManager.getItemComposition(2434)).thenReturn(comp);
-        Mockito.when(itemManager.getItemPrice(2434)).thenReturn(10000);
+        Mockito.when(itemManager.getItemPrice(2434)).thenReturn(10000L);
 
         aiService.updateCachedBank(bankContainer);
 
@@ -1359,8 +1359,8 @@ public class AiServiceTest {
         Mockito.when(comp.getName()).thenReturn("Rune 2h sword");
         Mockito.when(comp.getHaPrice()).thenReturn(38400);
         Mockito.when(itemManager.getItemComposition(1319)).thenReturn(comp);
-        Mockito.when(itemManager.getItemPrice(1319)).thenReturn(37000);
-        Mockito.when(itemManager.getItemPrice(561)).thenReturn(100); // Nature rune
+        Mockito.when(itemManager.getItemPrice(1319)).thenReturn(37000L);
+        Mockito.when(itemManager.getItemPrice(561)).thenReturn(100L); // Nature rune
 
         JsonObject args = new JsonObject();
         com.google.gson.JsonArray ids = new com.google.gson.JsonArray();
@@ -1384,10 +1384,10 @@ public class AiServiceTest {
         net.runelite.api.GrandExchangeOffer mockOffer = Mockito.mock(net.runelite.api.GrandExchangeOffer.class);
         Mockito.when(mockOffer.getState()).thenReturn(net.runelite.api.GrandExchangeOfferState.BUYING);
         Mockito.when(mockOffer.getItemId()).thenReturn(2434);
-        Mockito.when(mockOffer.getPrice()).thenReturn(10500);
+        Mockito.when(mockOffer.getPrice()).thenReturn(10500L);
         Mockito.when(mockOffer.getTotalQuantity()).thenReturn(100);
         Mockito.when(mockOffer.getQuantitySold()).thenReturn(50);
-        Mockito.when(mockOffer.getSpent()).thenReturn(525000);
+        Mockito.when(mockOffer.getSpent()).thenReturn(525000L);
 
         net.runelite.api.GrandExchangeOffer[] offers = new net.runelite.api.GrandExchangeOffer[] { mockOffer };
         Mockito.when(client.getGrandExchangeOffers()).thenReturn(offers);

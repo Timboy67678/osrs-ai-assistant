@@ -484,7 +484,7 @@ public class PlayerStateTools {
                 itemDetail.addProperty("name", itemName);
                 itemDetail.addProperty("qty", item.getQuantity());
 
-                int gePrice = 0;
+                long gePrice = 0;
                 if (itemManager != null) {
                     try {
                         gePrice = itemManager.getItemPrice(item.getId());

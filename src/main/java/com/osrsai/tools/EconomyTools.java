@@ -175,7 +175,7 @@ public class EconomyTools {
         JsonObject result = new JsonObject();
         JsonObject itemsData = new JsonObject();
 
-        int natureRunePrice = 0;
+        long natureRunePrice = 0;
         try {
             natureRunePrice = itemManager != null ? itemManager.getItemPrice(ITEM_ID_NATURE_RUNE)
                     : DEFAULT_NATURE_RUNE_PRICE;
@@ -217,10 +217,10 @@ public class EconomyTools {
             } catch (Exception ignored) {
             }
             String itemName = (comp != null && comp.getName() != null) ? comp.getName() : "Item " + itemId;
-            int gePrice = itemManager != null ? itemManager.getItemPrice(itemId) : 0;
+            long gePrice = itemManager != null ? itemManager.getItemPrice(itemId) : 0;
             int haPrice = comp != null ? comp.getHaPrice() : 0;
             int lowAlchPrice = comp != null ? (int) Math.floor(haPrice * LOW_ALCH_MULTIPLIER) : 0;
-            int alchProfit = (haPrice > 0 && gePrice > 0) ? (haPrice - (gePrice + natureRunePrice)) : 0;
+            long alchProfit = (haPrice > 0 && gePrice > 0) ? (haPrice - (gePrice + natureRunePrice)) : 0;
 
             JsonObject itemObj = new JsonObject();
             itemObj.addProperty("itemId", itemId);

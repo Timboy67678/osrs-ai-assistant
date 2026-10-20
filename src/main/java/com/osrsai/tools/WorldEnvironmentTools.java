@@ -306,7 +306,7 @@ public class WorldEnvironmentTools {
                                     }
                                     String itemName = (comp != null && comp.getName() != null) ? comp.getName()
                                             : "Item " + item.getId();
-                                    int gePrice = itemManager != null ? itemManager.getItemPrice(item.getId()) : 0;
+                                    long gePrice = itemManager != null ? itemManager.getItemPrice(item.getId()) : 0;
                                     int haPrice = comp != null ? comp.getHaPrice() : 0;
                                     int dist = Math.max(Math.abs(x - centerTileX), Math.abs(y - centerTileY));
 
@@ -323,11 +323,11 @@ public class WorldEnvironmentTools {
                         }
                     }
                     groundItemsFound.sort((a, b) -> {
-                        int valA = Math.max(a.get("gePrice").getAsInt(), a.get("haPrice").getAsInt())
-                                * a.get("quantity").getAsInt();
-                        int valB = Math.max(b.get("gePrice").getAsInt(), b.get("haPrice").getAsInt())
-                                * b.get("quantity").getAsInt();
-                        return Integer.compare(valB, valA);
+                        long valA = Math.max(a.get("gePrice").getAsLong(), a.get("haPrice").getAsLong())
+                                * a.get("quantity").getAsLong();
+                        long valB = Math.max(b.get("gePrice").getAsLong(), b.get("haPrice").getAsLong())
+                                * b.get("quantity").getAsLong();
+                        return Long.compare(valB, valA);
                     });
                     int giCount = 0;
                     for (JsonObject gObj : groundItemsFound) {
