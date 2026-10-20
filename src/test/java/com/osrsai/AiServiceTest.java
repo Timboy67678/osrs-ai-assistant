@@ -29,7 +29,11 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.config.ConfigManager;
 import com.osrsai.provider.AiProfile;
 import com.osrsai.provider.AiProvider;
+import com.osrsai.tools.FarmingAndTimerTools;
+import com.osrsai.tools.OsrsToolRegistry;
+import com.osrsai.tools.QuestAndDiaryTools;
 import com.osrsai.util.ItemContainerUtils;
+import com.osrsai.util.PromptUtils;
 import com.osrsai.util.Utilities;
 import com.osrsai.util.WikiSearchUtil;
 import java.util.Arrays;
@@ -250,8 +254,8 @@ public class AiServiceTest {
 
     @Test
     public void testKingdomLiveVarps() {
-        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_FAVOUR)).thenReturn(127);
-        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_COFFER)).thenReturn(1250000);
+        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_FAVOUR)).thenReturn(127);
+        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_COFFER)).thenReturn(1250000);
 
         String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
         JsonObject root = new Gson().fromJson(json, JsonObject.class);
@@ -265,8 +269,8 @@ public class AiServiceTest {
 
     @Test
     public void testKingdomCachedAndEstimated() {
-        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_FAVOUR)).thenReturn(0);
-        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_COFFER)).thenReturn(0);
+        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_FAVOUR)).thenReturn(0);
+        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_COFFER)).thenReturn(0);
 
         Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "approval")).thenReturn("127");
         Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "coffer")).thenReturn("1250000");
@@ -287,8 +291,8 @@ public class AiServiceTest {
 
     @Test
     public void testKingdomMultiDayDecay() {
-        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_FAVOUR)).thenReturn(0);
-        Mockito.when(client.getVarpValue(AiService.VARP_KINGDOM_COFFER)).thenReturn(0);
+        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_FAVOUR)).thenReturn(0);
+        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_COFFER)).thenReturn(0);
 
         // 3 days ago, 127 approval, 1.25M coffer
         java.time.Instant threeDaysAgo = java.time.Instant.now().minus(java.time.Duration.ofDays(3));
@@ -319,7 +323,7 @@ public class AiServiceTest {
         net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
         Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId()))
                 .thenReturn(mockStruct);
-        Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
+        Mockito.when(mockStruct.getIntValue(QuestAndDiaryTools.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
         Mockito.when(client.getVarbitValue(101)).thenReturn(10);
 
         final int[] currentQuestStatus = new int[] { 1 };
@@ -354,7 +358,7 @@ public class AiServiceTest {
         net.runelite.api.StructComposition mockStruct = Mockito.mock(net.runelite.api.StructComposition.class);
         Mockito.when(client.getStructComposition(net.runelite.api.Quest.COOKS_ASSISTANT.getId()))
                 .thenReturn(mockStruct);
-        Mockito.when(mockStruct.getIntValue(AiService.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
+        Mockito.when(mockStruct.getIntValue(QuestAndDiaryTools.QUEST_STRUCT_PARAM_VARBIT)).thenReturn(101);
         Mockito.when(client.getVarbitValue(101)).thenReturn(10);
 
         final int[] currentQuestStatus = new int[] { 1 };
@@ -481,7 +485,7 @@ public class AiServiceTest {
 
     @Test
     public void buildSystemPromptIncludesGroundingRules() {
-        String prompt = AiService.buildSystemPrompt("Location Name: Grand Exchange", "You: Where am I?");
+        String prompt = PromptUtils.buildSystemPrompt("Location Name: Grand Exchange", "You: Where am I?");
 
         Assert.assertTrue(prompt.contains("GROUNDING RULES"));
         Assert.assertTrue(prompt.contains("GAME CONTEXT"));
@@ -496,7 +500,7 @@ public class AiServiceTest {
     @Test
     public void trimToPromptBudgetCapsLongText() {
         String text = "1234567890";
-        String trimmed = AiService.trimToPromptBudget(text, 8, "...[cut]");
+        String trimmed = PromptUtils.trimToPromptBudget(text, 8, "...[cut]");
 
         Assert.assertTrue(trimmed.endsWith("...[cut]"));
         Assert.assertTrue(trimmed.length() <= 8);
@@ -504,8 +508,8 @@ public class AiServiceTest {
 
     @Test
     public void trimToPromptBudgetNormalizesEmptyText() {
-        Assert.assertEquals("None", AiService.trimToPromptBudget("   ", 10, "...[cut]"));
-        Assert.assertEquals("abc", AiService.trimToPromptBudget("  abc  ", 10, "...[cut]"));
+        Assert.assertEquals("None", PromptUtils.trimToPromptBudget("   ", 10, "...[cut]"));
+        Assert.assertEquals("abc", PromptUtils.trimToPromptBudget("  abc  ", 10, "...[cut]"));
     }
 
     @Test
@@ -588,21 +592,21 @@ public class AiServiceTest {
     @Test
     public void extractSearchQueryCleansConversationalPrefixes() {
         Assert.assertEquals("super antipoison",
-                AiService.extractSearchQuery("what are the ingredients for super antipoison?"));
-        Assert.assertEquals("super antipoison", AiService.extractSearchQuery("how to make super antipoison"));
-        Assert.assertEquals("grand exchange", AiService.extractSearchQuery("where is the grand exchange?"));
-        Assert.assertEquals("king roald", AiService.extractSearchQuery("tell me about king roald"));
-        Assert.assertEquals("guthix rest", AiService.extractSearchQuery("recipe for guthix rest"));
-        Assert.assertEquals("hello", AiService.extractSearchQuery("hello"));
+                WikiSearchUtil.extractSearchQuery("what are the ingredients for super antipoison?"));
+        Assert.assertEquals("super antipoison", WikiSearchUtil.extractSearchQuery("how to make super antipoison"));
+        Assert.assertEquals("grand exchange", WikiSearchUtil.extractSearchQuery("where is the grand exchange?"));
+        Assert.assertEquals("king roald", WikiSearchUtil.extractSearchQuery("tell me about king roald"));
+        Assert.assertEquals("guthix rest", WikiSearchUtil.extractSearchQuery("recipe for guthix rest"));
+        Assert.assertEquals("hello", WikiSearchUtil.extractSearchQuery("hello"));
     }
 
     @Test
     public void extractSearchQueryCleansConversationalSuffixes() {
-        Assert.assertEquals("blood runes", AiService.extractSearchQuery("blood runes buy shops locations"));
-        Assert.assertEquals("blood rune", AiService.extractSearchQuery("blood rune shop locations OSRS"));
-        Assert.assertEquals("dagannoth", AiService.extractSearchQuery("Dagannoth elemental weakness"));
-        Assert.assertEquals("blood runes", AiService.extractSearchQuery("where can i buy blood runes"));
-        Assert.assertEquals("fire rune", AiService.extractSearchQuery("how to get a fire rune drop rate"));
+        Assert.assertEquals("blood runes", WikiSearchUtil.extractSearchQuery("blood runes buy shops locations"));
+        Assert.assertEquals("blood rune", WikiSearchUtil.extractSearchQuery("blood rune shop locations OSRS"));
+        Assert.assertEquals("dagannoth", WikiSearchUtil.extractSearchQuery("Dagannoth elemental weakness"));
+        Assert.assertEquals("blood runes", WikiSearchUtil.extractSearchQuery("where can i buy blood runes"));
+        Assert.assertEquals("fire rune", WikiSearchUtil.extractSearchQuery("how to get a fire rune drop rate"));
     }
 
     @Test
@@ -781,7 +785,7 @@ public class AiServiceTest {
         Mockito.when(client.getItemDefinition(12002)).thenReturn(bankComp);
 
         // Invoke the tool via registry executor
-        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+        AiService.ToolDefinition def = OsrsToolRegistry.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_clues"))
                 .findFirst()
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
@@ -822,7 +826,7 @@ public class AiServiceTest {
         Mockito.when(client.getSkillExperience(Skill.STRENGTH)).thenReturn(200000000);
 
         // Retrieve tool definition
-        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+        AiService.ToolDefinition def = OsrsToolRegistry.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_skills"))
                 .findFirst()
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
@@ -900,7 +904,7 @@ public class AiServiceTest {
         Mockito.when(itemManager.getItemComposition(444)).thenReturn(comp);
 
         // Retrieve tool definition
-        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+        AiService.ToolDefinition def = OsrsToolRegistry.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_bank"))
                 .findFirst()
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
@@ -980,7 +984,7 @@ public class AiServiceTest {
         Mockito.when(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.CA_TASK_COMPLETED_0)).thenReturn(1 << 5);
 
         // Retrieve tool definition
-        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+        AiService.ToolDefinition def = OsrsToolRegistry.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_combat_achievements"))
                 .findFirst()
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
@@ -1040,7 +1044,7 @@ public class AiServiceTest {
         Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_HARD_COMPLETE)).thenReturn(0);
         Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_ELITE_COMPLETE)).thenReturn(0);
 
-        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+        AiService.ToolDefinition def = OsrsToolRegistry.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_achievement_diaries"))
                 .findFirst()
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
@@ -1067,7 +1071,7 @@ public class AiServiceTest {
                 + "[[Category:Test]]\n"
                 + "[[File:Image.png]]\n"
                 + "'''bold''' and ''italic''.";
-        String cleaned = AiService.cleanWikitext(raw);
+        String cleaned = WikiSearchUtil.cleanWikitext(raw);
         System.out.println("Cleaned: " + cleaned);
         Assert.assertFalse(cleaned.contains("comment"));
         Assert.assertFalse(cleaned.contains("wikitable"));
@@ -1095,7 +1099,7 @@ public class AiServiceTest {
         Mockito.when(configManager.getRSProfileConfiguration("killcount", "barrows chests")).thenReturn("85");
 
         // Retrieve tool definition
-        AiService.ToolDefinition def = AiService.getToolRegistry().stream()
+        AiService.ToolDefinition def = OsrsToolRegistry.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_combat_achievements"))
                 .findFirst()
                 .orElseThrow(() -> new java.util.NoSuchElementException("Tool not found"));
@@ -1118,7 +1122,7 @@ public class AiServiceTest {
         Mockito.when(client.getRealSkillLevel(net.runelite.api.Skill.MAGIC)).thenReturn(75);
         Mockito.when(client.getBoostedSkillLevel(net.runelite.api.Skill.MAGIC)).thenReturn(75);
         Mockito.when(client.getRealSkillLevel(net.runelite.api.Skill.CONSTRUCTION)).thenReturn(83);
-        Mockito.when(client.getVarbitValue(AiService.VARBIT_SPELLBOOK)).thenReturn(0); // Standard spellbook
+        Mockito.when(client.getVarbitValue(VarbitID.SPELLBOOK)).thenReturn(0); // Standard spellbook
 
         String json = aiService.executeGetPlayerTransportation(new JsonObject());
         Assert.assertNotNull(json);

@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.SoundEffectID;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -32,7 +31,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,13 +49,6 @@ public class AiService {
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions";
     static final int MAX_DEPTH_COUNT = 15;
     private static final long CLIENT_THREAD_TOOL_TIMEOUT_SECONDS = 30;
-
-    // Constants maintained for backwards compatibility
-    public static final int VARP_KINGDOM_FAVOUR = 73;
-    public static final int VARP_KINGDOM_COFFER = 74;
-    public static final int QUEST_STRUCT_PARAM_VARBIT = 299;
-    public static final int QUEST_STRUCT_PARAM_VARP = 300;
-    public static final int VARBIT_SPELLBOOK = 4070;
 
     @Inject
     private Client client;
@@ -580,49 +571,12 @@ public class AiService {
         }
     }
 
-    public static List<ToolDefinition> getToolRegistry() {
-        return OsrsToolRegistry.getToolRegistry();
-    }
-
     // ==========================================
     // Delegated Tool Executors & Helper Methods
     // ==========================================
 
-    public static String buildSystemPrompt(String context, String recentConversation) {
-        return PromptUtils.buildSystemPrompt(context, recentConversation);
-    }
-
-    public static String trimToPromptBudget(String text, int maxChars, String truncationLabel) {
-        return PromptUtils.trimToPromptBudget(text, maxChars, truncationLabel);
-    }
-
-    public static String trimToPromptBudget(String text, int maxChars, String truncationLabel, boolean keepEnd) {
-        return PromptUtils.trimToPromptBudget(text, maxChars, truncationLabel, keepEnd);
-    }
-
-    public static String extractSearchQuery(String question) {
-        return WikiSearchUtil.extractSearchQuery(question);
-    }
-
-    public static String cleanWikitext(String wikitext) {
-        return WikiSearchUtil.cleanWikitext(wikitext);
-    }
-
     public String buildGameContext() {
         return getGameContextBuilder().buildGameContext();
-    }
-
-    public boolean setShortestPathTarget(WorldPoint targetPoint, WorldPoint startPoint,
-            Map<String, Object> configOverrides) {
-        return getShortestPathHandler().setShortestPathTarget(targetPoint, startPoint, configOverrides);
-    }
-
-    public boolean setShortestPathTarget(WorldPoint targetPoint) {
-        return getShortestPathHandler().setShortestPathTarget(targetPoint);
-    }
-
-    public boolean clearShortestPathTarget() {
-        return getShortestPathHandler().clearShortestPathTarget();
     }
 
     public String executeSetShortestPathTarget(JsonObject args) {

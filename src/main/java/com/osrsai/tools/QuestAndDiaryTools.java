@@ -20,8 +20,8 @@ import java.util.*;
  */
 @Slf4j
 public class QuestAndDiaryTools {
-    private static final int QUEST_STRUCT_PARAM_VARBIT = 299;
-    private static final int QUEST_STRUCT_PARAM_VARP = 300;
+    public static final int QUEST_STRUCT_PARAM_VARBIT = 299;
+    public static final int QUEST_STRUCT_PARAM_VARP = 300;
 
     private static final int CA_BOSS_ENUM = 3971;
     private static final int CA_TIER_EASY_ENUM = 3981;

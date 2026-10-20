@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.osrsai.AiService;
+import com.osrsai.tools.OsrsToolRegistry;
+import com.osrsai.util.PromptUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -28,7 +30,7 @@ public class GeminiProviderHandler implements ProviderHandler {
     @Override
     public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
             boolean shareCharInfo) {
-        String fullPrompt = AiService.buildSystemPrompt(context, recentConversation)
+        String fullPrompt = PromptUtils.buildSystemPrompt(context, recentConversation)
                 + "\n\nCURRENT USER QUESTION:\n"
                 + question;
 
@@ -64,7 +66,7 @@ public class GeminiProviderHandler implements ProviderHandler {
      */
     private JsonArray buildGeminiTools(boolean shareCharInfo) {
         JsonArray declarations = new JsonArray();
-        for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
+        for (AiService.ToolDefinition def : OsrsToolRegistry.getToolRegistry()) {
             if (def.requiresCharacterInfo && !shareCharInfo) {
                 continue;
             }

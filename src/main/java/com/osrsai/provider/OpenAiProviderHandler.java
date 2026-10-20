@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.osrsai.AiService;
+import com.osrsai.tools.OsrsToolRegistry;
+import com.osrsai.util.PromptUtils;
 import java.util.ArrayList;
 import java.util.List;
 import okhttp3.MediaType;
@@ -61,7 +63,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
         JsonArray messages = new JsonArray();
         JsonObject systemMessage = new JsonObject();
         systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", AiService.buildSystemPrompt(context, recentConversation));
+        systemMessage.addProperty("content", PromptUtils.buildSystemPrompt(context, recentConversation));
 
         JsonObject userMessage = new JsonObject();
         userMessage.addProperty("role", "user");
@@ -89,7 +91,7 @@ public class OpenAiProviderHandler implements ProviderHandler {
      */
     protected JsonArray buildOpenAiTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
-        for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
+        for (AiService.ToolDefinition def : OsrsToolRegistry.getToolRegistry()) {
             if (def.requiresCharacterInfo && !shareCharInfo) {
                 continue;
             }

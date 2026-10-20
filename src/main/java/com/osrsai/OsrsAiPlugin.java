@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
-import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -154,13 +153,6 @@ public class OsrsAiPlugin extends Plugin {
         if (event.getContainerId() == InventoryID.BANK) {
             aiService.updateCachedBank(event.getItemContainer());
         }
-    }
-
-    /**
-     * Listens for in-game chat commands (e.g. ::commandName).
-     */
-    @Subscribe
-    public void onCommandExecuted(CommandExecuted commandExecuted) {
     }
 
     /**

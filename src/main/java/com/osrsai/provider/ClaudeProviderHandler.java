@@ -3,6 +3,8 @@ package com.osrsai.provider;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.osrsai.AiService;
+import com.osrsai.tools.OsrsToolRegistry;
+import com.osrsai.util.PromptUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -27,7 +29,7 @@ public class ClaudeProviderHandler implements ProviderHandler {
             boolean shareCharInfo) {
         JsonObject bodyObj = new JsonObject();
         bodyObj.addProperty("model", modelId);
-        bodyObj.addProperty("system", AiService.buildSystemPrompt(context, recentConversation));
+        bodyObj.addProperty("system", PromptUtils.buildSystemPrompt(context, recentConversation));
         // Current Claude models reject custom sampling parameters such as temperature.
         bodyObj.addProperty("max_tokens", MAX_TOKENS);
         if (supportsServerFallback(modelId)) {
@@ -78,7 +80,7 @@ public class ClaudeProviderHandler implements ProviderHandler {
      */
     private JsonArray buildClaudeTools(boolean shareCharInfo) {
         JsonArray tools = new JsonArray();
-        for (AiService.ToolDefinition def : AiService.getToolRegistry()) {
+        for (AiService.ToolDefinition def : OsrsToolRegistry.getToolRegistry()) {
             if (def.requiresCharacterInfo && !shareCharInfo) {
                 continue;
             }

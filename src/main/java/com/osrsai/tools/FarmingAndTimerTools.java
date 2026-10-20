@@ -36,8 +36,8 @@ public class FarmingAndTimerTools {
     private static final int HESPORI_STAGE_READY = 7;
 
     private static final int VARP_TEARS_OF_GUTHIX_COOLDOWN = 452;
-    private static final int VARP_KINGDOM_FAVOUR = 73;
-    private static final int VARP_KINGDOM_COFFER = 74;
+    public static final int VARP_KINGDOM_FAVOUR = 73;
+    public static final int VARP_KINGDOM_COFFER = 74;
 
     private final Client client;
     private final ConfigManager configManager;
