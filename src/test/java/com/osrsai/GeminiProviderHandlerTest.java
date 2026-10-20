@@ -64,4 +64,12 @@ public class GeminiProviderHandlerTest {
         String text = handler.extractResponseText(root);
         Assert.assertEquals("You are standing at the Grand Exchange.", text);
     }
+
+    @Test
+    public void testApiKeySentAsHeaderNotInUrl() {
+        okhttp3.Request request = handler.buildHttpRequest("gemini-2.5-flash", "secret-key", null, "{}");
+        Assert.assertEquals("secret-key", request.header("x-goog-api-key"));
+        Assert.assertFalse(request.url().toString().contains("secret-key"));
+        Assert.assertNull(request.url().queryParameter("key"));
+    }
 }
