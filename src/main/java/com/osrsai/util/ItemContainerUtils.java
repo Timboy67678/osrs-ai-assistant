@@ -2,14 +2,14 @@ package com.osrsai.util;
 
 import com.google.gson.JsonObject;
 import net.runelite.api.Client;
-import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.client.game.ItemManager;
-import net.runelite.http.api.item.ItemEquipmentStats;
+import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.http.api.item.ItemPrice;
-import net.runelite.http.api.item.ItemStats;
+import net.runelite.client.game.ItemStats;
+import net.runelite.api.gameval.InventoryID;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -325,7 +325,7 @@ public class ItemContainerUtils {
     public static boolean isEquipableItem(ItemManager itemManager, int itemId, String itemName) {
         if (itemManager != null) {
             try {
-                ItemStats stats = itemManager.getItemStats(itemId, false);
+                ItemStats stats = itemManager.getItemStats(itemId);
                 if (stats != null && stats.isEquipable()) {
                     return true;
                 }
@@ -396,7 +396,7 @@ public class ItemContainerUtils {
         obj.addProperty("gePrice", gePrice);
         obj.addProperty("haPrice", comp != null ? comp.getHaPrice() : 0);
 
-        ItemStats stats = (itemManager != null) ? itemManager.getItemStats(itemId, false) : null;
+        ItemStats stats = (itemManager != null) ? itemManager.getItemStats(itemId) : null;
         if (stats == null) {
             obj.addProperty("equipable", false);
             return obj;
@@ -447,7 +447,7 @@ public class ItemContainerUtils {
         Set<Integer> checkedIds = new HashSet<>();
 
         if (client != null) {
-            ItemContainer eq = client.getItemContainer(InventoryID.EQUIPMENT);
+            ItemContainer eq = client.getItemContainer(InventoryID.WORN);
             if (eq != null) {
                 for (Item item : eq.getItems()) {
                     if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {
@@ -457,7 +457,7 @@ public class ItemContainerUtils {
                     }
                 }
             }
-            ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+            ItemContainer inv = client.getItemContainer(InventoryID.INV);
             if (inv != null) {
                 for (Item item : inv.getItems()) {
                     if (item != null && item.getId() > 0 && checkedIds.add(item.getId())) {

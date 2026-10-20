@@ -2,9 +2,9 @@ package com.osrsai;
 
 import com.osrsai.util.Utilities;
 import net.runelite.api.Client;
-import net.runelite.api.Varbits;
 import org.junit.Assert;
 import org.junit.Test;
+import net.runelite.api.gameval.VarbitID;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -46,28 +46,28 @@ public class UtilitiesTest {
     public void testIsIronman() {
         Client client = mock(Client.class);
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(0);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(0);
         Assert.assertFalse(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(1);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(1);
         Assert.assertTrue(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(2);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(2);
         Assert.assertTrue(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(3);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(3);
         Assert.assertTrue(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(4);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(4);
         Assert.assertTrue(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(5);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(5);
         Assert.assertTrue(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(6);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(6);
         Assert.assertTrue(Utilities.isIronman(client));
 
-        when(client.getVarbitValue(Varbits.ACCOUNT_TYPE)).thenReturn(7);
+        when(client.getVarbitValue(VarbitID.IRONMAN)).thenReturn(7);
         Assert.assertFalse(Utilities.isIronman(client));
 
         Assert.assertFalse(Utilities.isIronman(null));

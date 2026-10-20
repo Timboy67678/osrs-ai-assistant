@@ -9,6 +9,7 @@ import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.widgets.Widget;
+import net.runelite.api.gameval.VarbitID;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,7 +71,7 @@ public class GameContextBuilder {
 
         Integer accountTypeVarbit = null;
         if (client.getLocalPlayer() != null) {
-            accountTypeVarbit = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
+            accountTypeVarbit = client.getVarbitValue(VarbitID.IRONMAN);
         }
         sb.append("Account Type: ").append(Utilities.describeAccountTypeFromVarbit(accountTypeVarbit)).append("\n");
         sb.append("World: ").append(client.getWorld()).append("\n");
@@ -78,7 +79,7 @@ public class GameContextBuilder {
         sb.append("Player Skill Levels (Base): ");
         List<String> skillList = new ArrayList<>();
         for (Skill s : Skill.values()) {
-            if (s == Skill.OVERALL) {
+            if (isOverall(s)) {
                 continue;
             }
             try {
@@ -90,7 +91,7 @@ public class GameContextBuilder {
             }
         }
         sb.append(String.join(", ", skillList)).append("\n");
-        int spellbookVar = client.getVarbitValue(Varbits.SPELLBOOK);
+        int spellbookVar = client.getVarbitValue(VarbitID.SPELLBOOK);
         sb.append("Active Spellbook: ").append(Utilities.describeSpellbook(spellbookVar)).append("\n");
         sb.append("Hitpoints: Current ")
                 .append(client.getBoostedSkillLevel(Skill.HITPOINTS))
@@ -379,5 +380,11 @@ public class GameContextBuilder {
         }
 
         return InstanceTemplates.findMatch(chunks[plane][chunkX][chunkY]);
+    }
+
+    // Skill.OVERALL is deprecated but still returned by Skill.values(), so it must be filtered out.
+    @SuppressWarnings("deprecation")
+    private static boolean isOverall(Skill s) {
+        return s == Skill.OVERALL;
     }
 }

@@ -8,10 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
-import net.runelite.api.Varbits;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
+import net.runelite.api.gameval.VarbitID;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -131,7 +131,7 @@ public class FarmingAndTimerTools {
 
         // 2. Hespori Boss Growth
         JsonObject hespori = new JsonObject();
-        int hesporiVar = client != null ? client.getVarbitValue(Varbits.FARMING_7908) : 0;
+        int hesporiVar = client != null ? client.getVarbitValue(VarbitID.FARMING_TRANSMIT_J) : 0;
         hespori.addProperty("stateVarbit", hesporiVar);
         hespori.addProperty("status", hesporiVar >= HESPORI_STAGE_READY ? "Fully Grown / Ready to fight"
                 : (hesporiVar > 0 ? "Growing" : "Empty / Cleared"));
@@ -313,10 +313,10 @@ public class FarmingAndTimerTools {
 
         // 5. Daily Task Collectibles (Zaff Battlestaves, etc.)
         JsonObject dailyTasks = new JsonObject();
-        int varrockDiaryEasy = client != null ? client.getVarbitValue(Varbits.DIARY_VARROCK_EASY) : 0;
-        int varrockDiaryMed = client != null ? client.getVarbitValue(Varbits.DIARY_VARROCK_MEDIUM) : 0;
-        int varrockDiaryHard = client != null ? client.getVarbitValue(Varbits.DIARY_VARROCK_HARD) : 0;
-        int varrockDiaryElite = client != null ? client.getVarbitValue(Varbits.DIARY_VARROCK_ELITE) : 0;
+        int varrockDiaryEasy = client != null ? client.getVarbitValue(VarbitID.VARROCK_DIARY_EASY_COMPLETE) : 0;
+        int varrockDiaryMed = client != null ? client.getVarbitValue(VarbitID.VARROCK_DIARY_MEDIUM_COMPLETE) : 0;
+        int varrockDiaryHard = client != null ? client.getVarbitValue(VarbitID.VARROCK_DIARY_HARD_COMPLETE) : 0;
+        int varrockDiaryElite = client != null ? client.getVarbitValue(VarbitID.VARROCK_DIARY_ELITE_COMPLETE) : 0;
 
         int zaffDailyCount = 0;
         if (varrockDiaryElite >= 5) {

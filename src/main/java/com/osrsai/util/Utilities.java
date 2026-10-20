@@ -1,8 +1,8 @@
 package com.osrsai.util;
 
 import net.runelite.api.Client;
-import net.runelite.api.Varbits;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.api.gameval.VarbitID;
 
 import java.util.regex.Pattern;
 
@@ -117,7 +117,7 @@ public class Utilities {
             return false;
         }
         try {
-            int accountType = client.getVarbitValue(Varbits.ACCOUNT_TYPE);
+            int accountType = client.getVarbitValue(VarbitID.IRONMAN);
             return AccountType.fromVarbit(accountType).isIronman();
         } catch (Exception ex) {
             return false;

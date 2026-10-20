@@ -10,9 +10,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
+import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.InterfaceID;
 
 import java.util.*;
 import java.util.function.Supplier;
@@ -194,7 +196,7 @@ public class WorldEnvironmentTools {
 
         // 1. Nearby NPCs & Monsters
         JsonArray npcList = new JsonArray();
-        Iterable<? extends NPC> npcs = wv != null ? wv.npcs() : client.getNpcs();
+        Iterable<? extends NPC> npcs = wv != null ? wv.npcs() : null;
         if (npcs != null) {
             List<NPC> sortedNpcs = new ArrayList<>();
             for (NPC npc : npcs) {
@@ -236,7 +238,7 @@ public class WorldEnvironmentTools {
 
         // 2. Nearby Players (Wilderness / Threat Awareness)
         JsonArray playerList = new JsonArray();
-        Iterable<? extends Player> players = wv != null ? wv.players() : client.getPlayers();
+        Iterable<? extends Player> players = wv != null ? wv.players() : null;
         if (players != null) {
             List<Player> sortedPlayers = new ArrayList<>();
             for (Player p : players) {
@@ -271,7 +273,7 @@ public class WorldEnvironmentTools {
 
         // 3. Ground Items in render distance
         JsonArray groundItemList = new JsonArray();
-        Scene scene = (wv != null && wv.getScene() != null) ? wv.getScene() : client.getScene();
+        Scene scene = wv != null ? wv.getScene() : null;
         if (scene != null && scene.getTiles() != null) {
             int plane = playerLoc.getPlane();
             Tile[][][] tiles = scene.getTiles();
@@ -420,7 +422,7 @@ public class WorldEnvironmentTools {
 
         boolean inWilderness = false;
         try {
-            inWilderness = client.getVarbitValue(Varbits.IN_WILDERNESS) == 1;
+            inWilderness = client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1;
         } catch (Exception ignored) {
         }
 
@@ -428,7 +430,7 @@ public class WorldEnvironmentTools {
         // 1. Primary: read the exact level displayed by the game in the Wilderness HUD
         // widget
         try {
-            Widget wildyWidget = client.getWidget(ComponentID.PVP_WILDERNESS_LEVEL);
+            Widget wildyWidget = client.getWidget(InterfaceID.PvpIcons.WILDERNESSLEVEL);
             if (wildyWidget != null && !wildyWidget.isHidden() && wildyWidget.getText() != null) {
                 String text = wildyWidget.getText().replaceAll("<[^>]*>", "").trim();
                 Matcher matcher = PATTERN_DIGITS.matcher(text);
@@ -464,7 +466,7 @@ public class WorldEnvironmentTools {
 
         boolean isMulti = false;
         try {
-            isMulti = client.getVarbitValue(Varbits.MULTICOMBAT_AREA) == 1;
+            isMulti = client.getVarbitValue(VarbitID.MULTIWAY_INDICATOR) == 1;
         } catch (Exception ignored) {
         }
         result.addProperty("multiCombat", isMulti);
@@ -506,7 +508,7 @@ public class WorldEnvironmentTools {
 
         boolean stafflessFairyRings = false;
         try {
-            int lumbridgeElite = client.getVarbitValue(Varbits.DIARY_LUMBRIDGE_ELITE);
+            int lumbridgeElite = client.getVarbitValue(VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE);
             stafflessFairyRings = (lumbridgeElite == 1);
         } catch (Exception ignored) {
         }
@@ -543,7 +545,7 @@ public class WorldEnvironmentTools {
         JsonObject magicObj = new JsonObject();
         int spellbookVal = 0;
         try {
-            spellbookVal = client.getVarbitValue(Varbits.SPELLBOOK);
+            spellbookVal = client.getVarbitValue(VarbitID.SPELLBOOK);
         } catch (Exception ignored) {
         }
         String spellbookName = Utilities.describeSpellbook(spellbookVal);
@@ -590,9 +592,9 @@ public class WorldEnvironmentTools {
         JsonArray found = new JsonArray();
         Set<String> uniqueFoundNames = new HashSet<>();
 
-        List<InventoryID> containersToScan = Arrays.asList(
-                InventoryID.INVENTORY,
-                InventoryID.EQUIPMENT,
+        List<Integer> containersToScan = Arrays.asList(
+                InventoryID.INV,
+                InventoryID.WORN,
                 InventoryID.BANK);
 
         String[] keywords = new String[] {
@@ -608,7 +610,7 @@ public class WorldEnvironmentTools {
                 "mythical cape"
         };
 
-        for (InventoryID invId : containersToScan) {
+        for (int invId : containersToScan) {
             ItemContainer container = client.getItemContainer(invId);
             if (container == null)
                 continue;
@@ -640,7 +642,7 @@ public class WorldEnvironmentTools {
                         uniqueFoundNames.add(name);
                         JsonObject itemObj = new JsonObject();
                         itemObj.addProperty("name", name);
-                        itemObj.addProperty("location", invId.name().toLowerCase());
+                        itemObj.addProperty("location", invId == InventoryID.WORN ? "equipment" : invId == InventoryID.BANK ? "bank" : "inventory");
                         found.add(itemObj);
                         break;
                     }

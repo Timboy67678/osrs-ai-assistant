@@ -2,6 +2,7 @@ package com.osrsai;
 
 import com.google.inject.Provides;
 import com.osrsai.ui.OsrsAiPanel;
+import net.runelite.api.gameval.InventoryID;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
-import net.runelite.api.InventoryID;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.config.ConfigManager;
@@ -151,7 +151,7 @@ public class OsrsAiPlugin extends Plugin {
      */
     @Subscribe
     public void onItemContainerChanged(ItemContainerChanged event) {
-        if (event.getContainerId() == InventoryID.BANK.getId()) {
+        if (event.getContainerId() == InventoryID.BANK) {
             aiService.updateCachedBank(event.getItemContainer());
         }
     }

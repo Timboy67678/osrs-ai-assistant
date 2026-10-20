@@ -13,8 +13,9 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
-import net.runelite.http.api.item.ItemEquipmentStats;
-import net.runelite.http.api.item.ItemStats;
+import net.runelite.client.game.ItemEquipmentStats;
+import net.runelite.client.game.ItemStats;
+import net.runelite.api.gameval.InventoryID;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -448,7 +449,7 @@ public class PlayerStateTools {
     public String executeGetPlayerInventory(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject invItems = new JsonObject();
-        ItemContainer invContainer = client.getItemContainer(InventoryID.INVENTORY);
+        ItemContainer invContainer = client.getItemContainer(InventoryID.INV);
         if (invContainer != null) {
             invItems = ItemContainerUtils.aggregateItemsWithPrices(client, itemManager, invContainer, null, 0);
         }
@@ -459,7 +460,7 @@ public class PlayerStateTools {
     public String executeGetPlayerEquipment(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject eqSlots = new JsonObject();
-        ItemContainer eqContainer = client.getItemContainer(InventoryID.EQUIPMENT);
+        ItemContainer eqContainer = client.getItemContainer(InventoryID.WORN);
         if (eqContainer != null) {
             Item[] items = eqContainer.getItems();
             for (int i = 0; i < items.length; i++) {
@@ -497,7 +498,7 @@ public class PlayerStateTools {
                 itemDetail.addProperty("gePrice", gePrice);
                 itemDetail.addProperty("haPrice", comp != null ? comp.getHaPrice() : 0);
 
-                ItemStats stats = (itemManager != null) ? itemManager.getItemStats(item.getId(), false) : null;
+                ItemStats stats = (itemManager != null) ? itemManager.getItemStats(item.getId()) : null;
                 if (stats != null && stats.getEquipment() != null) {
                     ItemEquipmentStats eq = stats.getEquipment();
                     boolean hasCombatStats = eq.getAstab() != 0 || eq.getAslash() != 0 || eq.getAcrush() != 0
@@ -792,7 +793,7 @@ public class PlayerStateTools {
         Map<String, Long> nameCounts = new LinkedHashMap<>();
 
         List<ItemContainer> containers = new ArrayList<>();
-        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+        ItemContainer inv = client.getItemContainer(InventoryID.INV);
         if (inv != null) {
             containers.add(inv);
         }

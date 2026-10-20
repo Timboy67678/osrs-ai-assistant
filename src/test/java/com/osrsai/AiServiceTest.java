@@ -7,6 +7,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import java.util.*;
+import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.InterfaceID;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -751,13 +754,13 @@ public class AiServiceTest {
         ItemContainer invMock = Mockito.mock(ItemContainer.class);
         Item clueInInv = new Item(12001, 1);
         Mockito.when(invMock.getItems()).thenReturn(new Item[] { clueInInv });
-        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.INVENTORY)).thenReturn(invMock);
+        Mockito.when(client.getItemContainer(InventoryID.INV)).thenReturn(invMock);
 
         // Mock items in bank
         ItemContainer bankMock = Mockito.mock(ItemContainer.class);
         Item clueInBank = new Item(12002, 1);
         Mockito.when(bankMock.getItems()).thenReturn(new Item[] { clueInBank });
-        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(bankMock);
+        Mockito.when(client.getItemContainer(InventoryID.BANK)).thenReturn(bankMock);
 
         // Mock ItemCompositions
         ItemComposition invComp = Mockito.mock(ItemComposition.class);
@@ -881,7 +884,7 @@ public class AiServiceTest {
         ItemContainer bankMock = Mockito.mock(ItemContainer.class);
         Item goldOre = new Item(444, 100);
         Mockito.when(bankMock.getItems()).thenReturn(new Item[] { goldOre });
-        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(bankMock);
+        Mockito.when(client.getItemContainer(InventoryID.BANK)).thenReturn(bankMock);
 
         // Mock ItemComposition for Gold ore
         ItemComposition comp = Mockito.mock(ItemComposition.class);
@@ -925,14 +928,14 @@ public class AiServiceTest {
     @Test
     public void testGetPlayerCombatAchievementsTool() throws Exception {
         // Mock Varbits for Combat Achievements Tiers
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_EASY)).thenReturn(2); // Completed
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MEDIUM)).thenReturn(1); // In
+        Mockito.when(client.getVarbitValue(VarbitID.CA_TIER_STATUS_EASY)).thenReturn(2); // Completed
+        Mockito.when(client.getVarbitValue(VarbitID.CA_TIER_STATUS_MEDIUM)).thenReturn(1); // In
                                                                                                                     // Progress
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_HARD)).thenReturn(0); // Not
+        Mockito.when(client.getVarbitValue(VarbitID.CA_TIER_STATUS_HARD)).thenReturn(0); // Not
                                                                                                                   // Started
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_ELITE)).thenReturn(0);
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_MASTER)).thenReturn(0);
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.COMBAT_ACHIEVEMENT_TIER_GRANDMASTER)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.CA_TIER_STATUS_ELITE)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.CA_TIER_STATUS_MASTER)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.CA_TIER_STATUS_GRANDMASTER)).thenReturn(0);
 
         // Mock ConfigManager profile and keys
         String profileKey = "rsprofile.12345";
@@ -1012,10 +1015,10 @@ public class AiServiceTest {
     @Test
     public void testGetPlayerAchievementDiariesTool() throws Exception {
         // Varbit value >= maxTasks = Completed for Achievement Diaries
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_EASY)).thenReturn(11);
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_MEDIUM)).thenReturn(0);
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_HARD)).thenReturn(0);
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.DIARY_KANDARIN_ELITE)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_EASY_COMPLETE)).thenReturn(11);
+        Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_MEDIUM_COMPLETE)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_HARD_COMPLETE)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.KANDARIN_DIARY_ELITE_COMPLETE)).thenReturn(0);
 
         AiService.ToolDefinition def = AiService.getToolRegistry().stream()
                 .filter(d -> d.name.equals("get_player_achievement_diaries"))
@@ -1161,7 +1164,7 @@ public class AiServiceTest {
         ItemContainer mockInv = Mockito.mock(ItemContainer.class);
         Item mockPlank = new Item(testItemIdPlank, testPlankQuantity);
         Mockito.when(mockInv.getItems()).thenReturn(new Item[] { mockPlank });
-        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.INVENTORY)).thenReturn(mockInv);
+        Mockito.when(client.getItemContainer(InventoryID.INV)).thenReturn(mockInv);
 
         ItemComposition mockComp = Mockito.mock(ItemComposition.class);
         Mockito.when(mockComp.getName()).thenReturn("Oak plank");
@@ -1324,7 +1327,7 @@ public class AiServiceTest {
     @Test
     public void testOfflineBankCachingReturnsCachedItemsWhenBankClosed() {
         // When bank container is null and no cache, returns error
-        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(null);
+        Mockito.when(client.getItemContainer(InventoryID.BANK)).thenReturn(null);
         String jsonError = aiService.executeGetPlayerBank(new JsonObject());
         JsonObject rootError = new Gson().fromJson(jsonError, JsonObject.class);
         Assert.assertEquals("error", rootError.get("status").getAsString());
@@ -1343,7 +1346,7 @@ public class AiServiceTest {
         aiService.updateCachedBank(bankContainer);
 
         // Bank is closed now
-        Mockito.when(client.getItemContainer(net.runelite.api.InventoryID.BANK)).thenReturn(null);
+        Mockito.when(client.getItemContainer(InventoryID.BANK)).thenReturn(null);
         String jsonCached = aiService.executeGetPlayerBank(new JsonObject());
         JsonObject rootCached = new Gson().fromJson(jsonCached, JsonObject.class);
         Assert.assertEquals("success", rootCached.get("status").getAsString());
@@ -1435,7 +1438,7 @@ public class AiServiceTest {
 
         // Test 1: Active Wilderness HUD Widget with Level text
         net.runelite.api.widgets.Widget wildyWidget = Mockito.mock(net.runelite.api.widgets.Widget.class);
-        Mockito.when(client.getWidget(net.runelite.api.widgets.ComponentID.PVP_WILDERNESS_LEVEL)).thenReturn(wildyWidget);
+        Mockito.when(client.getWidget(InterfaceID.PvpIcons.WILDERNESSLEVEL)).thenReturn(wildyWidget);
         Mockito.when(wildyWidget.isHidden()).thenReturn(false);
         Mockito.when(wildyWidget.getText()).thenReturn("Level: 42");
 
@@ -1455,8 +1458,8 @@ public class AiServiceTest {
         Assert.assertTrue(root.get("inWilderness").getAsBoolean());
 
         // Test 3: Safe Area (Lumbridge Y=3222, Varbit=0)
-        Mockito.when(client.getWidget(net.runelite.api.widgets.ComponentID.PVP_WILDERNESS_LEVEL)).thenReturn(null);
-        Mockito.when(client.getVarbitValue(net.runelite.api.Varbits.IN_WILDERNESS)).thenReturn(0);
+        Mockito.when(client.getWidget(InterfaceID.PvpIcons.WILDERNESSLEVEL)).thenReturn(null);
+        Mockito.when(client.getVarbitValue(VarbitID.INSIDE_WILDERNESS)).thenReturn(0);
         net.runelite.api.coords.WorldPoint wpSafe = new net.runelite.api.coords.WorldPoint(3222, 3222, 0);
         Mockito.when(localPlayer.getWorldLocation()).thenReturn(wpSafe);
 

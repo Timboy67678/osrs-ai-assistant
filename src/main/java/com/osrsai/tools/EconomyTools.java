@@ -7,6 +7,7 @@ import com.osrsai.util.ItemContainerUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.client.game.ItemManager;
+import net.runelite.api.gameval.InventoryID;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -8,9 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
-import net.runelite.api.Varbits;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.api.gameval.VarbitID;
 
 import java.util.*;
 
@@ -215,65 +215,65 @@ public class QuestAndDiaryTools {
         JsonObject result = new JsonObject();
         JsonObject diaries = new JsonObject();
         diaries.add("Ardougne", createDiaryProgress(
-                Varbits.DIARY_ARDOUGNE_EASY, 11,
-                Varbits.DIARY_ARDOUGNE_MEDIUM, 13,
-                Varbits.DIARY_ARDOUGNE_HARD, 12,
-                Varbits.DIARY_ARDOUGNE_ELITE, 8));
+                VarbitID.ARDOUGNE_DIARY_EASY_COMPLETE, 11,
+                VarbitID.ARDOUGNE_DIARY_MEDIUM_COMPLETE, 13,
+                VarbitID.ARDOUGNE_DIARY_HARD_COMPLETE, 12,
+                VarbitID.ARDOUGNE_DIARY_ELITE_COMPLETE, 8));
         diaries.add("Desert", createDiaryProgress(
-                Varbits.DIARY_DESERT_EASY, 11,
-                Varbits.DIARY_DESERT_MEDIUM, 12,
-                Varbits.DIARY_DESERT_HARD, 10,
-                Varbits.DIARY_DESERT_ELITE, 6));
+                VarbitID.DESERT_DIARY_EASY_COMPLETE, 11,
+                VarbitID.DESERT_DIARY_MEDIUM_COMPLETE, 12,
+                VarbitID.DESERT_DIARY_HARD_COMPLETE, 10,
+                VarbitID.DESERT_DIARY_ELITE_COMPLETE, 6));
         diaries.add("Falador", createDiaryProgress(
-                Varbits.DIARY_FALADOR_EASY, 11,
-                Varbits.DIARY_FALADOR_MEDIUM, 14,
-                Varbits.DIARY_FALADOR_HARD, 11,
-                Varbits.DIARY_FALADOR_ELITE, 6));
+                VarbitID.FALADOR_DIARY_EASY_COMPLETE, 11,
+                VarbitID.FALADOR_DIARY_MEDIUM_COMPLETE, 14,
+                VarbitID.FALADOR_DIARY_HARD_COMPLETE, 11,
+                VarbitID.FALADOR_DIARY_ELITE_COMPLETE, 6));
         diaries.add("Fremennik", createDiaryProgress(
-                Varbits.DIARY_FREMENNIK_EASY, 10,
-                Varbits.DIARY_FREMENNIK_MEDIUM, 9,
-                Varbits.DIARY_FREMENNIK_HARD, 10,
-                Varbits.DIARY_FREMENNIK_ELITE, 6));
+                VarbitID.FREMENNIK_DIARY_EASY_COMPLETE, 10,
+                VarbitID.FREMENNIK_DIARY_MEDIUM_COMPLETE, 9,
+                VarbitID.FREMENNIK_DIARY_HARD_COMPLETE, 10,
+                VarbitID.FREMENNIK_DIARY_ELITE_COMPLETE, 6));
         diaries.add("Kandarin", createDiaryProgress(
-                Varbits.DIARY_KANDARIN_EASY, 11,
-                Varbits.DIARY_KANDARIN_MEDIUM, 11,
-                Varbits.DIARY_KANDARIN_HARD, 11,
-                Varbits.DIARY_KANDARIN_ELITE, 7));
+                VarbitID.KANDARIN_DIARY_EASY_COMPLETE, 11,
+                VarbitID.KANDARIN_DIARY_MEDIUM_COMPLETE, 11,
+                VarbitID.KANDARIN_DIARY_HARD_COMPLETE, 11,
+                VarbitID.KANDARIN_DIARY_ELITE_COMPLETE, 7));
         diaries.add("Karamja", createDiaryProgress(
-                Varbits.DIARY_KARAMJA_EASY, 10,
-                Varbits.DIARY_KARAMJA_MEDIUM, 19,
-                Varbits.DIARY_KARAMJA_HARD, 10,
-                Varbits.DIARY_KARAMJA_ELITE, 5));
+                VarbitID.ATJUN_EASY_DONE, 10,
+                VarbitID.ATJUN_MED_DONE, 19,
+                VarbitID.ATJUN_HARD_DONE, 10,
+                VarbitID.KARAMJA_DIARY_ELITE_COMPLETE, 5));
         diaries.add("Kourend", createDiaryProgress(
-                Varbits.DIARY_KOUREND_EASY, 12,
-                Varbits.DIARY_KOUREND_MEDIUM, 13,
-                Varbits.DIARY_KOUREND_HARD, 10,
-                Varbits.DIARY_KOUREND_ELITE, 8));
+                VarbitID.KOUREND_DIARY_EASY_COMPLETE, 12,
+                VarbitID.KOUREND_DIARY_MEDIUM_COMPLETE, 13,
+                VarbitID.KOUREND_DIARY_HARD_COMPLETE, 10,
+                VarbitID.KOUREND_DIARY_ELITE_COMPLETE, 8));
         diaries.add("Lumbridge", createDiaryProgress(
-                Varbits.DIARY_LUMBRIDGE_EASY, 12,
-                Varbits.DIARY_LUMBRIDGE_MEDIUM, 12,
-                Varbits.DIARY_LUMBRIDGE_HARD, 11,
-                Varbits.DIARY_LUMBRIDGE_ELITE, 6));
+                VarbitID.LUMBRIDGE_DIARY_EASY_COMPLETE, 12,
+                VarbitID.LUMBRIDGE_DIARY_MEDIUM_COMPLETE, 12,
+                VarbitID.LUMBRIDGE_DIARY_HARD_COMPLETE, 11,
+                VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE, 6));
         diaries.add("Morytania", createDiaryProgress(
-                Varbits.DIARY_MORYTANIA_EASY, 11,
-                Varbits.DIARY_MORYTANIA_MEDIUM, 11,
-                Varbits.DIARY_MORYTANIA_HARD, 11,
-                Varbits.DIARY_MORYTANIA_ELITE, 6));
+                VarbitID.MORYTANIA_DIARY_EASY_COMPLETE, 11,
+                VarbitID.MORYTANIA_DIARY_MEDIUM_COMPLETE, 11,
+                VarbitID.MORYTANIA_DIARY_HARD_COMPLETE, 11,
+                VarbitID.MORYTANIA_DIARY_ELITE_COMPLETE, 6));
         diaries.add("Varrock", createDiaryProgress(
-                Varbits.DIARY_VARROCK_EASY, 14,
-                Varbits.DIARY_VARROCK_MEDIUM, 13,
-                Varbits.DIARY_VARROCK_HARD, 10,
-                Varbits.DIARY_VARROCK_ELITE, 5));
+                VarbitID.VARROCK_DIARY_EASY_COMPLETE, 14,
+                VarbitID.VARROCK_DIARY_MEDIUM_COMPLETE, 13,
+                VarbitID.VARROCK_DIARY_HARD_COMPLETE, 10,
+                VarbitID.VARROCK_DIARY_ELITE_COMPLETE, 5));
         diaries.add("Western", createDiaryProgress(
-                Varbits.DIARY_WESTERN_EASY, 11,
-                Varbits.DIARY_WESTERN_MEDIUM, 13,
-                Varbits.DIARY_WESTERN_HARD, 13,
-                Varbits.DIARY_WESTERN_ELITE, 7));
+                VarbitID.WESTERN_DIARY_EASY_COMPLETE, 11,
+                VarbitID.WESTERN_DIARY_MEDIUM_COMPLETE, 13,
+                VarbitID.WESTERN_DIARY_HARD_COMPLETE, 13,
+                VarbitID.WESTERN_DIARY_ELITE_COMPLETE, 7));
         diaries.add("Wilderness", createDiaryProgress(
-                Varbits.DIARY_WILDERNESS_EASY, 12,
-                Varbits.DIARY_WILDERNESS_MEDIUM, 12,
-                Varbits.DIARY_WILDERNESS_HARD, 10,
-                Varbits.DIARY_WILDERNESS_ELITE, 7));
+                VarbitID.WILDERNESS_DIARY_EASY_COMPLETE, 12,
+                VarbitID.WILDERNESS_DIARY_MEDIUM_COMPLETE, 12,
+                VarbitID.WILDERNESS_DIARY_HARD_COMPLETE, 10,
+                VarbitID.WILDERNESS_DIARY_ELITE_COMPLETE, 7));
         result.add("diaries", diaries);
         return gson.toJson(result);
     }
@@ -305,12 +305,12 @@ public class QuestAndDiaryTools {
     public String executeGetPlayerCombatAchievements(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject tiers = new JsonObject();
-        tiers.addProperty("Easy", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_EASY));
-        tiers.addProperty("Medium", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_MEDIUM));
-        tiers.addProperty("Hard", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_HARD));
-        tiers.addProperty("Elite", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_ELITE));
-        tiers.addProperty("Master", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_MASTER));
-        tiers.addProperty("Grandmaster", getCombatAchievementTierStatus(Varbits.COMBAT_ACHIEVEMENT_TIER_GRANDMASTER));
+        tiers.addProperty("Easy", getCombatAchievementTierStatus(VarbitID.CA_TIER_STATUS_EASY));
+        tiers.addProperty("Medium", getCombatAchievementTierStatus(VarbitID.CA_TIER_STATUS_MEDIUM));
+        tiers.addProperty("Hard", getCombatAchievementTierStatus(VarbitID.CA_TIER_STATUS_HARD));
+        tiers.addProperty("Elite", getCombatAchievementTierStatus(VarbitID.CA_TIER_STATUS_ELITE));
+        tiers.addProperty("Master", getCombatAchievementTierStatus(VarbitID.CA_TIER_STATUS_MASTER));
+        tiers.addProperty("Grandmaster", getCombatAchievementTierStatus(VarbitID.CA_TIER_STATUS_GRANDMASTER));
         result.add("tiers", tiers);
 
         String filterTier = (args != null && args.has("tier")) ? args.get("tier").getAsString().trim().toLowerCase()

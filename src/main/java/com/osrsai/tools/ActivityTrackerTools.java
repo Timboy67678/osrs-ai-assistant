@@ -11,6 +11,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.api.gameval.InventoryID;
 
 import java.lang.reflect.Field;
 
@@ -46,13 +47,13 @@ public class ActivityTrackerTools {
 
     public String executeGetPlayerClues(JsonObject args) {
         JsonObject result = new JsonObject();
-        result.add("inventoryClues", extractClueItems(InventoryID.INVENTORY, "Inventory"));
+        result.add("inventoryClues", extractClueItems(InventoryID.INV, "Inventory"));
         result.add("bankClues", extractClueItems(InventoryID.BANK, "Bank"));
         result.add("activeClue", extractActiveClueDetails());
         return gson.toJson(result);
     }
 
-    private JsonArray extractClueItems(InventoryID inventoryId, String location) {
+    private JsonArray extractClueItems(int inventoryId, String location) {
         JsonArray clueItems = new JsonArray();
         ItemContainer container = client.getItemContainer(inventoryId);
         if (container != null) {
@@ -260,7 +261,7 @@ public class ActivityTrackerTools {
         if (includeCargo) {
             JsonArray cargoArray = new JsonArray();
             try {
-                ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+                ItemContainer inv = client.getItemContainer(InventoryID.INV);
                 if (inv != null) {
                     for (Item item : inv.getItems()) {
                         if (item != null && item.getId() > 0) {
