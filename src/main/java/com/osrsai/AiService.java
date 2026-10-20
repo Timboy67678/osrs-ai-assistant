@@ -34,8 +34,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -48,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class AiService {
     private static final String DEFAULT_CUSTOM_ENDPOINT = "http://localhost:11434/v1/chat/completions";
     static final int MAX_DEPTH_COUNT = 15;
+    private static final long CLIENT_THREAD_TOOL_TIMEOUT_SECONDS = 30;
 
     // Constants maintained for backwards compatibility
     public static final int VARP_KINGDOM_FAVOUR = 73;
@@ -377,7 +380,8 @@ public class AiService {
                     }
                     String responseBody = resp.body().string();
                     JsonObject root = gson.fromJson(responseBody, JsonObject.class);
-                    log.info("Received response from AI provider {}: {}", provider,
+                    // Full responses can include the player's game details, so keep them out of INFO logs.
+                    log.debug("Received response from AI provider {}: {}", provider,
                             root != null ? root.toString() : responseBody.replaceAll("\\s+", " ").trim());
 
                     boolean hasToolCalls = false;
@@ -389,7 +393,7 @@ public class AiService {
                     }
 
                     if (hasToolCalls && !toolCalls.isEmpty()) {
-                        log.info("AI requested tool calls: {}", gson.toJson(toolCalls));
+                        log.debug("AI requested tool calls: {}", gson.toJson(toolCalls));
                         executeToolsAsync(toolCalls).whenComplete((results, ex) -> {
                             if (ex != null) {
                                 log.error("Error executing tools", ex);
@@ -400,14 +404,24 @@ public class AiService {
                                 return;
                             }
 
-                            handler.updateRequestWithToolResults(requestBody, root, results);
+                            // Exceptions thrown inside whenComplete are swallowed, which would leave the
+                            // panel stuck on "Thinking...", so report them explicitly.
+                            try {
+                                handler.updateRequestWithToolResults(requestBody, root, results);
 
-                            if (depth + 1 >= maxDepth) {
-                                handler.disableToolCalling(requestBody);
+                                if (depth + 1 >= maxDepth) {
+                                    handler.disableToolCalling(requestBody);
+                                }
+
+                                executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody,
+                                        depth + 1, panel);
+                            } catch (Throwable t) {
+                                log.error("Failed to continue the request after tool execution", t);
+                                SwingUtilities.invokeLater(() -> {
+                                    panel.setThinking(false);
+                                    panel.addMessage("System", "Error continuing after tool calls: " + t.getMessage());
+                                });
                             }
-
-                            executeRequestLoop(provider, modelId, endpoint, apiKey, clientId, requestBody, depth + 1,
-                                    panel);
                         });
                     } else {
                         String aiResponseText = handler.extractResponseText(root);
@@ -469,7 +483,13 @@ public class AiService {
                                 clientFuture.completeExceptionally(t);
                             }
                         });
-                        clientFuture.join();
+                        try {
+                            clientFuture.get(CLIENT_THREAD_TOOL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                        } catch (TimeoutException e) {
+                            throw new Exception("Timed out waiting for the game client to run " + tc.name);
+                        } catch (ExecutionException ignored) {
+                            // The cause is captured in clientThreadError and rethrown below.
+                        }
                         if (clientThreadError.get() != null) {
                             throw new Exception(clientThreadError.get());
                         }
