@@ -215,7 +215,6 @@ public class ClaudeProviderHandler implements ProviderHandler {
     @Override
     public Request buildHttpRequest(String modelId, String apiKey, String clientId, String jsonBody) {
         // RuneLite ships OkHttp 3.x at runtime, which only has the (MediaType, String) overload.
-        @SuppressWarnings("deprecation")
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), jsonBody);
         Request.Builder builder = new Request.Builder()
                 .url(CLAUDE_API_URL)
