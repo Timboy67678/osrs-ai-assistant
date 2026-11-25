@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.osrsai.context.GameContextBuilder;
+import com.osrsai.context.SailingState;
 import com.osrsai.util.LocationResolver;
 import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
@@ -34,13 +35,6 @@ import net.runelite.api.gameval.InventoryID;
  */
 @Slf4j
 public class ActivityTrackerTools {
-    private static final int VARBIT_SAILING_STATE = 9999;
-    private static final int DEFAULT_VESSEL_HULL_HEALTH_PERCENT = 100;
-    private static final int DEFAULT_VESSEL_SPEED_KNOTS = 0;
-    private static final String DEFAULT_VESSEL_SHIP_TYPE = "Skiff / Small Boat";
-    private static final String DEFAULT_VESSEL_SAIL_TRIM = "Full";
-    private static final String DEFAULT_VESSEL_WIND_VECTOR = "Tailwind (NW)";
-    private static final String DEFAULT_VESSEL_ANCHOR_STATUS = "Raised";
 
     private final Client client;
     private final ItemManager itemManager;
@@ -218,6 +212,11 @@ public class ActivityTrackerTools {
         }
     }
 
+    /**
+     * Sailing level, boat state from the game's Sailing varbits, location, and the contents of
+     * any boat cargo holds the client has loaded. Values the game doesn't expose (speed, wind,
+     * sail trim, boat name and type) are deliberately not reported.
+     */
     public String executeGetPlayerSailingStatus(JsonObject args) {
         JsonObject result = new JsonObject();
         boolean includeCargo = true;
@@ -226,73 +225,38 @@ public class ActivityTrackerTools {
         }
 
         JsonObject skillData = new JsonObject();
-        Skill sailingSkill = null;
-        for (Skill s : Skill.values()) {
-            if ("SAILING".equalsIgnoreCase(s.name())) {
-                sailingSkill = s;
-                break;
-            }
-        }
-        if (sailingSkill != null) {
-            try {
-                int realLvl = client.getRealSkillLevel(sailingSkill);
-                int boostLvl = client.getBoostedSkillLevel(sailingSkill);
-                int exp = client.getSkillExperience(sailingSkill);
-                skillData.addProperty("realLevel", realLvl);
-                skillData.addProperty("boostedLevel", boostLvl);
-                skillData.addProperty("experience", exp);
-            } catch (Exception ignored) {
-            }
-        } else {
-            skillData.addProperty("status", "Sailing skill API pending/available via client updates");
+        try {
+            skillData.addProperty("realLevel", client.getRealSkillLevel(Skill.SAILING));
+            skillData.addProperty("boostedLevel", client.getBoostedSkillLevel(Skill.SAILING));
+            skillData.addProperty("experience", client.getSkillExperience(Skill.SAILING));
+        } catch (RuntimeException e) {
+            skillData.addProperty("status", "Sailing level unavailable");
         }
         result.add("sailingSkill", skillData);
 
-        GameContextBuilder.VesselWidgetData wData = (gameContextBuilder != null)
-                ? gameContextBuilder.scanVesselWidgets()
-                : new GameContextBuilder.VesselWidgetData();
-
-        JsonObject vessel = new JsonObject();
-        boolean aboardVessel = wData.foundVesselUi;
-        String shipType = (wData.shipName != null) ? wData.shipName : DEFAULT_VESSEL_SHIP_TYPE;
-        int hullHealthPct = DEFAULT_VESSEL_HULL_HEALTH_PERCENT;
-        if (wData.currentHp > 0 && wData.maxHp > 0) {
-            hullHealthPct = (int) Math.round(((double) wData.currentHp / wData.maxHp) * 100.0);
-            vessel.addProperty("currentHullHp", wData.currentHp);
-            vessel.addProperty("maxHullHp", wData.maxHp);
-        }
-        int speedKnots = DEFAULT_VESSEL_SPEED_KNOTS;
-        String sailTrim = DEFAULT_VESSEL_SAIL_TRIM;
-        String windVector = DEFAULT_VESSEL_WIND_VECTOR;
-        String anchorState = DEFAULT_VESSEL_ANCHOR_STATUS;
-
-        try {
-            int sailingStateVarbit = client.getVarbitValue(VARBIT_SAILING_STATE);
-            if (sailingStateVarbit > 0) {
-                aboardVessel = true;
+        SailingState sailing = SailingState.read(client);
+        JsonObject boat = new JsonObject();
+        boat.addProperty("onBoat", sailing.onBoat);
+        if (sailing.onBoat) {
+            if (sailing.hasHullHp()) {
+                boat.addProperty("hullHp", sailing.hullHp);
+                boat.addProperty("maxHullHp", sailing.maxHullHp);
+                boat.addProperty("hullHealthPercent",
+                        (int) Math.round(100.0 * sailing.hullHp / sailing.maxHullHp));
             }
-        } catch (Exception ignored) {
-        }
-
-        vessel.addProperty("aboardVessel", aboardVessel);
-        vessel.addProperty("shipName", shipType);
-        vessel.addProperty("shipType", shipType);
-        vessel.addProperty("hullHealthPercent", hullHealthPct);
-        vessel.addProperty("speedKnots", speedKnots);
-        vessel.addProperty("sailTrim", sailTrim);
-        vessel.addProperty("windVector", windVector);
-        vessel.addProperty("anchorStatus", anchorState);
-        if (wData.sailingActivity != null) {
-            vessel.addProperty("activeActivity", wData.sailingActivity);
-        }
-        if (!wData.facilities.isEmpty()) {
-            JsonArray facArray = new JsonArray();
-            for (String fac : wData.facilities) {
-                facArray.add(fac);
+            if (sailing.repairKits >= 0) {
+                boat.addProperty("repairKits", sailing.repairKits);
             }
-            vessel.add("facilities", facArray);
+            if (sailing.maxWindCharges > 0 && sailing.windCharges >= 0) {
+                boat.addProperty("windCharges", sailing.windCharges);
+                boat.addProperty("maxWindCharges", sailing.maxWindCharges);
+            }
+            boat.addProperty("playerAtHelm", sailing.atHelm);
+            boat.addProperty("playerAtSails", sailing.atSails);
         }
-        result.add("vesselStatus", vessel);
+        boat.addProperty("note", "Boat speed, wind direction, sail trim and the boat's name and type are not"
+                + " available to this plugin. Don't state them.");
+        result.add("boat", boat);
 
         JsonObject locObj = new JsonObject();
         Player localPlayer = client.getLocalPlayer();
@@ -314,32 +278,34 @@ public class ActivityTrackerTools {
         result.add("location", locObj);
 
         if (includeCargo) {
-            JsonArray cargoArray = new JsonArray();
-            try {
-                ItemContainer inv = client.getItemContainer(InventoryID.INV);
-                if (inv != null) {
-                    for (Item item : inv.getItems()) {
-                        if (item != null && item.getId() > 0) {
-                            ItemComposition comp = itemManager != null ? itemManager.getItemComposition(item.getId())
-                                    : null;
-                            if (comp != null && comp.getName() != null) {
-                                String lower = comp.getName().toLowerCase();
-                                if (lower.contains("plank") || lower.contains("sail") || lower.contains("cannon")
-                                        || lower.contains("salvage") || lower.contains("rum") || lower.contains("fish")
-                                        || lower.contains("ore") || lower.contains("wood")) {
-                                    JsonObject cItem = new JsonObject();
-                                    cItem.addProperty("id", item.getId());
-                                    cItem.addProperty("name", comp.getName());
-                                    cItem.addProperty("quantity", item.getQuantity());
-                                    cargoArray.add(cItem);
-                                }
-                            }
-                        }
-                    }
+            JsonArray holds = new JsonArray();
+            for (int i = 0; i < SailingState.CARGO_HOLDS.length; i++) {
+                ItemContainer hold = client.getItemContainer(SailingState.CARGO_HOLDS[i]);
+                if (hold == null) {
+                    continue;
                 }
-            } catch (Exception ignored) {
+                JsonArray items = new JsonArray();
+                for (Item item : hold.getItems()) {
+                    if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) {
+                        continue;
+                    }
+                    ItemComposition comp = itemManager != null ? itemManager.getItemComposition(item.getId()) : null;
+                    JsonObject entry = new JsonObject();
+                    entry.addProperty("id", item.getId());
+                    entry.addProperty("name", comp != null ? comp.getName() : "Item " + item.getId());
+                    entry.addProperty("quantity", item.getQuantity());
+                    items.add(entry);
+                }
+                JsonObject holdObj = new JsonObject();
+                holdObj.addProperty("boat", i + 1);
+                holdObj.add("items", items);
+                holds.add(holdObj);
             }
-            result.add("cargoHoldItems", cargoArray);
+            result.add("cargoHolds", holds);
+            result.addProperty("cargoNote", holds.size() == 0
+                    ? "No cargo hold contents are loaded. The game only sends a cargo hold's contents once the"
+                            + " player has opened it this session."
+                    : "Cargo hold contents as last seen this session; they may have changed since.");
         }
 
         return gson.toJson(result);

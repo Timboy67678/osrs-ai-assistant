@@ -157,7 +157,7 @@ public class OsrsToolRegistry {
                                 true, true, AiService::executeClearShortestPathTarget));
 
                 registry.add(new AiService.ToolDefinition("get_player_sailing_status",
-                                "Get the player's Sailing level and, when aboard, their ship's name, hull HP, current activity, facilities, cargo and location.",
+                                "Get the player's Sailing level, whether they are on their boat and, if so, its hull HP, repair kits and wind charges, plus the contents of any boat cargo holds opened this session.",
                                 true, true, AiService::executeGetPlayerSailingStatus)
                                 .addParam("includeCargo", "boolean",
                                                 "Set false to leave out the cargo list.",

@@ -8,13 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.widgets.Widget;
 import net.runelite.api.gameval.VarbitID;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Pattern;
 
 
 
@@ -32,18 +29,6 @@ public class GameContextBuilder {
         this.client = client;
         this.config = config;
         this.locationResolver = locationResolver;
-    }
-
-    /**
-     * Telemetry data structure extracted from active vessel sailing widgets.
-     */
-    public static class VesselWidgetData {
-        public boolean foundVesselUi = false;
-        public String shipName = null;
-        public int currentHp = -1;
-        public int maxHp = -1;
-        public String sailingActivity = null;
-        public List<String> facilities = new ArrayList<>();
     }
 
     /**
@@ -118,22 +103,16 @@ public class GameContextBuilder {
             }
         }
 
-        VesselWidgetData vData = scanVesselWidgets();
-        if (vData.foundVesselUi) {
-            sb.append("\nCURRENTLY ABOARD VESSEL:\n");
-            sb.append("Vessel Status: ABOARD VESSEL\n");
-            sb.append("Vessel Name: ").append(vData.shipName != null ? vData.shipName : "Sailing Vessel").append("\n");
-            if (vData.currentHp > 0 && vData.maxHp > 0) {
-                int hpPct = (int) Math.round(((double) vData.currentHp / vData.maxHp) * 100.0);
-                sb.append("Hull Health: ").append(vData.currentHp).append("/").append(vData.maxHp)
-                        .append(" (").append(hpPct).append("%)\n");
+        SailingState sailing = SailingState.read(client);
+        if (sailing.onBoat) {
+            sb.append("\nON A BOAT (Sailing):\n");
+            if (sailing.hasHullHp()) {
+                sb.append("Hull HP: ").append(sailing.hullHp).append("/").append(sailing.maxHullHp).append("\n");
             }
-            if (vData.sailingActivity != null) {
-                sb.append("Current Activity: ").append(vData.sailingActivity).append("\n");
+            if (sailing.repairKits >= 0) {
+                sb.append("Repair kits: ").append(sailing.repairKits).append("\n");
             }
-            if (!vData.facilities.isEmpty()) {
-                sb.append("Active Facilities: ").append(String.join(", ", vData.facilities)).append("\n");
-            }
+            sb.append("Call get_player_sailing_status for cargo and more boat details.\n");
         }
         sb.append("\nTEMPORARY CURRENT LOCATION (where player is standing right now):\n");
         if (localPlayer != null) {
@@ -155,171 +134,6 @@ public class GameContextBuilder {
 
         return PromptUtils.trimToPromptBudget(sb.toString(), PromptUtils.MAX_CONTEXT_CHARACTERS,
                 "...[game context truncated for prompt budget]");
-    }
-
-    private static final int VARBIT_SAILING_STATE = 15200;
-    private static final Pattern PATTERN_TIMESTAMP = Pattern
-            .compile("^\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM|am|pm)?\\]");
-    private static final Pattern PATTERN_SHIP_TYPE = Pattern.compile(
-            "\\b(clipper|sloop|skiff|brig|frigate|galleon|raft|caravel|dhow|catamaran)\\b",
-            Pattern.CASE_INSENSITIVE);
-
-    private static final Set<Integer> IGNORED_WIDGET_GROUPS = Set.of(
-            162, // Chatbox
-            163, // Private Chat
-            164, // Chat channel
-            149, // Inventory
-            387, // Equipment
-            84, // Equipment screen
-            320, // Skills
-            399, // Quest list
-            629, // Achievement Diary
-            712, // Combat Achievements
-            541, // Prayer
-            218, // Spellbook
-            429, // Friends
-            432, // Ignore
-            7, // Clan
-            693, // Friends Chat
-            239, // Music
-            116, // Settings
-            261, // Options
-            216, // Emotes
-            182, // Logout
-            69, // World switcher
-            160, // Minimap / orbs
-            12, // Bank
-            213, // Bank pin
-            192, // Deposit box
-            465, // Grand Exchange
-            217, // NPC dialogue
-            231, // Player dialogue
-            193, // Options dialogue
-            229, // Message dialogue
-            219 // Dialogues
-    );
-
-    /**
-     * Scans active widgets across all roots to extract vessel sailing data.
-     *
-     * @return extracted {@link VesselWidgetData}
-     */
-    public VesselWidgetData scanVesselWidgets() {
-        VesselWidgetData data = new VesselWidgetData();
-        if (client == null) {
-            return data;
-        }
-
-        try {
-            int sailingStateVar = client.getVarbitValue(VARBIT_SAILING_STATE);
-            if (sailingStateVar > 0) {
-                data.foundVesselUi = true;
-            }
-        } catch (Exception ignored) {
-        }
-
-        Player localPlayer = client.getLocalPlayer();
-        String localPlayerName = (localPlayer != null && localPlayer.getName() != null)
-                ? localPlayer.getName().trim()
-                : "";
-
-        try {
-            Widget[] roots = client.getWidgetRoots();
-            if (roots != null) {
-                for (Widget root : roots) {
-                    scanWidgetNode(root, data, localPlayerName);
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Error scanning widgets for vessel telemetry", e);
-        }
-
-        return data;
-    }
-
-    private void scanWidgetNode(Widget widget, VesselWidgetData data, String localPlayerName) {
-        if (widget == null || widget.isSelfHidden()) {
-            return;
-        }
-
-        int groupId = widget.getId() >> 16;
-        if (IGNORED_WIDGET_GROUPS.contains(groupId)) {
-            return;
-        }
-
-        String text = widget.getText();
-        if (text != null && !text.isEmpty()) {
-            String cleanText = Utilities.PATTERN_HTML_TAGS.matcher(text).replaceAll("").trim();
-            if (!cleanText.isEmpty() && !isIgnoredText(cleanText, localPlayerName)) {
-                if (cleanText.matches("^\\d{1,4}\\s*/\\s*\\d{1,4}$")) {
-                    String[] parts = cleanText.split("/");
-                    try {
-                        data.currentHp = Integer.parseInt(parts[0].trim());
-                        data.maxHp = Integer.parseInt(parts[1].trim());
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-
-                String lower = cleanText.toLowerCase();
-                if (lower.equals("facilities") || lower.equals("steering") || lower.startsWith("repairs")
-                        || lower.equals("sail trim") || lower.equals("wind vector") || lower.equals("anchor")) {
-                    data.foundVesselUi = true;
-                    if (!data.facilities.contains(cleanText)) {
-                        data.facilities.add(cleanText);
-                    }
-                }
-
-                if (lower.contains("charting") || lower.contains("weather pattern")) {
-                    data.sailingActivity = cleanText;
-                    data.foundVesselUi = true;
-                }
-
-                if (cleanText.length() >= 3 && cleanText.length() <= 35) {
-                    if (PATTERN_SHIP_TYPE.matcher(cleanText).find()) {
-                        data.shipName = cleanText;
-                        data.foundVesselUi = true;
-                    }
-                }
-            }
-        }
-
-        Widget[] children = widget.getChildren();
-        if (children != null) {
-            for (Widget child : children) {
-                scanWidgetNode(child, data, localPlayerName);
-            }
-        }
-        Widget[] nested = widget.getNestedChildren();
-        if (nested != null) {
-            for (Widget child : nested) {
-                scanWidgetNode(child, data, localPlayerName);
-            }
-        }
-        Widget[] dynamic = widget.getDynamicChildren();
-        if (dynamic != null) {
-            for (Widget child : dynamic) {
-                scanWidgetNode(child, data, localPlayerName);
-            }
-        }
-        Widget[] staticChildren = widget.getStaticChildren();
-        if (staticChildren != null) {
-            for (Widget child : staticChildren) {
-                scanWidgetNode(child, data, localPlayerName);
-            }
-        }
-    }
-
-    private boolean isIgnoredText(String text, String localPlayerName) {
-        if (PATTERN_TIMESTAMP.matcher(text).find()) {
-            return true;
-        }
-        if (!localPlayerName.isEmpty() && text.toLowerCase().contains(localPlayerName.toLowerCase())) {
-            return true;
-        }
-        if (text.endsWith(":") || text.contains("]:")) {
-            return true;
-        }
-        return false;
     }
 
     /**

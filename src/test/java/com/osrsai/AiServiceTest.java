@@ -973,65 +973,52 @@ public class AiServiceTest {
     }
 
     @Test
-    public void testGetPlayerSailingStatusTool() {
-        final int testItemIdPlank = 1001;
-        final int testPlankQuantity = 25;
+    public void testGetPlayerSailingStatusReadsVarbitsAndRealCargoHolds() {
+        Mockito.when(client.getVarbitValue(VarbitID.SAILING_PLAYER_IS_ON_PLAYER_BOAT)).thenReturn(1);
+        Mockito.when(client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_HP)).thenReturn(150);
+        Mockito.when(client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_HP_MAX)).thenReturn(200);
+        Mockito.when(client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_REPAIRKITS)).thenReturn(3);
 
-        JsonObject args = new JsonObject();
-        args.addProperty("includeCargo", true);
+        ItemContainer hold = Mockito.mock(ItemContainer.class);
+        Mockito.when(hold.getItems()).thenReturn(new Item[] { new Item(1001, 25) });
+        Mockito.when(client.getItemContainer(InventoryID.SAILING_BOAT_2_CARGOHOLD)).thenReturn(hold);
+        ItemContainer inventory = Mockito.mock(ItemContainer.class);
+        Mockito.when(inventory.getItems()).thenReturn(new Item[] { new Item(2002, 5) });
+        Mockito.when(client.getItemContainer(InventoryID.INV)).thenReturn(inventory);
 
-        ItemContainer mockInv = Mockito.mock(ItemContainer.class);
-        Item mockPlank = new Item(testItemIdPlank, testPlankQuantity);
-        Mockito.when(mockInv.getItems()).thenReturn(new Item[] { mockPlank });
-        Mockito.when(client.getItemContainer(InventoryID.INV)).thenReturn(mockInv);
+        ItemComposition plank = Mockito.mock(ItemComposition.class);
+        Mockito.when(plank.getName()).thenReturn("Oak plank");
+        Mockito.when(itemManager.getItemComposition(1001)).thenReturn(plank);
 
-        ItemComposition mockComp = Mockito.mock(ItemComposition.class);
-        Mockito.when(mockComp.getName()).thenReturn("Oak plank");
-        Mockito.when(itemManager.getItemComposition(testItemIdPlank)).thenReturn(mockComp);
+        JsonObject root = new Gson().fromJson(aiService.executeGetPlayerSailingStatus(new JsonObject()),
+                JsonObject.class);
 
-        String json = aiService.executeGetPlayerSailingStatus(args);
-        Assert.assertNotNull(json);
+        JsonObject boat = root.getAsJsonObject("boat");
+        Assert.assertTrue(boat.get("onBoat").getAsBoolean());
+        Assert.assertEquals(150, boat.get("hullHp").getAsInt());
+        Assert.assertEquals(200, boat.get("maxHullHp").getAsInt());
+        Assert.assertEquals(75, boat.get("hullHealthPercent").getAsInt());
+        Assert.assertEquals(3, boat.get("repairKits").getAsInt());
+        Assert.assertFalse("no made-up values", boat.has("speedKnots") || boat.has("sailTrim")
+                || boat.has("windVector") || boat.has("anchorStatus") || boat.has("shipType"));
 
-        JsonObject root = new Gson().fromJson(json, JsonObject.class);
-        Assert.assertTrue(root.has("sailingSkill"));
-        Assert.assertTrue(root.has("vesselStatus"));
-        Assert.assertTrue(root.has("location"));
-        Assert.assertTrue(root.has("cargoHoldItems"));
-
-        JsonObject vessel = root.getAsJsonObject("vesselStatus");
-        Assert.assertTrue(vessel.has("shipType"));
-        Assert.assertTrue(vessel.has("hullHealthPercent"));
-        Assert.assertTrue(vessel.has("speedKnots"));
-        Assert.assertTrue(vessel.has("sailTrim"));
-
-        com.google.gson.JsonArray cargo = root.getAsJsonArray("cargoHoldItems");
-        Assert.assertEquals(1, cargo.size());
-        Assert.assertEquals("Oak plank", cargo.get(0).getAsJsonObject().get("name").getAsString());
+        JsonArray holds = root.getAsJsonArray("cargoHolds");
+        Assert.assertEquals("only the cargo hold, not the inventory", 1, holds.size());
+        Assert.assertEquals(2, holds.get(0).getAsJsonObject().get("boat").getAsInt());
+        Assert.assertEquals("Oak plank", holds.get(0).getAsJsonObject().getAsJsonArray("items").get(0)
+                .getAsJsonObject().get("name").getAsString());
     }
 
     @Test
-    public void testScanVesselWidgetsIgnoresChatboxAndPlayerNameContainingBoat() {
-        net.runelite.api.Player mockPlayer = Mockito.mock(net.runelite.api.Player.class);
-        Mockito.when(mockPlayer.getName()).thenReturn("iron timboat");
-        Mockito.when(client.getLocalPlayer()).thenReturn(mockPlayer);
+    public void testGetPlayerSailingStatusOffBoatReportsNoBoatDetails() {
+        JsonObject root = new Gson().fromJson(aiService.executeGetPlayerSailingStatus(new JsonObject()),
+                JsonObject.class);
 
-        net.runelite.api.widgets.Widget chatboxWidget = Mockito.mock(net.runelite.api.widgets.Widget.class);
-        Mockito.when(chatboxWidget.getId()).thenReturn(162 << 16); // Chatbox group
-        Mockito.when(chatboxWidget.getText()).thenReturn("[07:45:AM] iron timboat: hello world");
-
-        net.runelite.api.widgets.Widget genericChatWidget = Mockito.mock(net.runelite.api.widgets.Widget.class);
-        Mockito.when(genericChatWidget.getId()).thenReturn(0);
-        Mockito.when(genericChatWidget.getText()).thenReturn("[07:45:AM] iron timboat:");
-
-        Mockito.when(client.getWidgetRoots())
-                .thenReturn(new net.runelite.api.widgets.Widget[] { chatboxWidget, genericChatWidget });
-
-        com.osrsai.context.GameContextBuilder contextBuilder = aiService.getGameContextBuilder();
-        com.osrsai.context.GameContextBuilder.VesselWidgetData vData = contextBuilder.scanVesselWidgets();
-
-        Assert.assertFalse("Should not detect vessel UI from chat messages or player name containing boat",
-                vData.foundVesselUi);
-        Assert.assertNull(vData.shipName);
+        JsonObject boat = root.getAsJsonObject("boat");
+        Assert.assertFalse(boat.get("onBoat").getAsBoolean());
+        Assert.assertFalse(boat.has("hullHp"));
+        Assert.assertEquals(0, root.getAsJsonArray("cargoHolds").size());
+        Assert.assertTrue(root.get("cargoNote").getAsString().contains("opened it"));
     }
 
     @Test

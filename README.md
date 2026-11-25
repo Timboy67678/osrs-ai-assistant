@@ -57,7 +57,7 @@ Paid providers (Claude, OpenAI, Grok, or Gemini's paid tier) are fully optional.
   - Inspects active inventory, equipped items, and bank contents (with automatic offline snapshot caching when closed) with live GE and High Alchemy prices.
   - Scans surrounding game environment for nearby NPCs/monsters, other players (with Wilderness threat detection), valuable ground items, and interactable game objects (altars, bank booths, fairy rings, portals).
   - Monitors birdhouse run timers, Hespori growth, Tears of Guthix cooldowns, and Kingdom of Miscellania status.
-  - Tracks active vessel stats, sail trim, knot speed, cargo, and crew when sailing.
+  - Tracks your boat's hull HP, repair kits, wind charges and cargo hold contents when sailing.
 - **🗺️ Interactive Pathfinding & Navigation:**
   - Integrates with the **Shortest Path** plugin via cross-plugin communication to automatically set route overlays to coordinates or named POIs (e.g. Farming Guild, Barrows, Chasm of Fire).
 - **🛡️ Account-Type Awareness:**
@@ -98,7 +98,7 @@ The AI assistant has access to a comprehensive suite of **22 custom tools** enab
 - `get_player_combat_achievements` — Retrieves Combat Achievement tier progress (Easy through Grandmaster), boss/monster kill counts (KC), and task completion. Supports filtering by tier, boss name, completion status, or task name.
 - `get_player_clues` — Retrieves active clue scroll details (current step text, requirements, solution) and clue scroll items in inventory or bank.
 - `get_player_farming_and_timers` — Retrieves birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, Kingdom of Miscellania status, and active infobox activity timers.
-- `get_player_sailing_status` — Retrieves active vessel details, ship tier/type, hull HP/condition, sail trim, knot speed, wind direction, anchor status, cargo hold items, crew members, and sea location.
+- `get_player_sailing_status` — Retrieves the player's Sailing level, whether they're on their boat, its hull HP, repair kits and wind charges, their location, and the contents of any boat cargo holds opened this session.
 
 ### 🗺️ Environment, World & Navigation Tools
 - `get_surrounding_environment` — Scans immediate surroundings within render distance for nearby NPCs and monsters, nearby players (with Wilderness threat status), valuable unlooted ground items, and interactable game objects (altars, bank booths, fairy rings, portals).
