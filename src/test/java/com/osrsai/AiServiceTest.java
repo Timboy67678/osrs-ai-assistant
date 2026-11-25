@@ -882,32 +882,6 @@ public class AiServiceTest {
     }
 
     @Test
-    public void testCleanWikitext() {
-        String raw = "<!-- comment -->Hello [[World|Earth]]! This is a {{stub}} test.\n"
-                + "{| class=\"wikitable\"\n"
-                + "|- \n"
-                + "| Table content\n"
-                + "|}\n"
-                + "__TOC__\n"
-                + "A&nbsp;B &amp; C &lt; D &gt; E &quot;F&quot;\n"
-                + "[[Category:Test]]\n"
-                + "[[File:Image.png]]\n"
-                + "'''bold''' and ''italic''.";
-        String cleaned = WikiSearchUtil.cleanWikitext(raw);
-        System.out.println("Cleaned: " + cleaned);
-        Assert.assertFalse(cleaned.contains("comment"));
-        Assert.assertFalse(cleaned.contains("wikitable"));
-        Assert.assertFalse(cleaned.contains("Category"));
-        Assert.assertFalse(cleaned.contains("File"));
-        Assert.assertFalse(cleaned.contains("stub"));
-        Assert.assertFalse(cleaned.contains("TOC"));
-        Assert.assertTrue(cleaned.contains("A B & C < D > E \"F\""));
-        Assert.assertTrue(cleaned.contains("Earth"));
-        Assert.assertTrue(cleaned.contains("**bold**"));
-        Assert.assertTrue(cleaned.contains("*italic*"));
-    }
-
-    @Test
     public void testGetPlayerCombatAchievementsToolBossFilterKc() throws Exception {
         // Mock ConfigManager profile and keys
         String profileKey = "rsprofile.12345";

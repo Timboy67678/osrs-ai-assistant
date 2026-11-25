@@ -97,11 +97,14 @@ public class OsrsToolRegistry {
                                 true, true, AiService::executeGetPlayerClues));
 
                 registry.add(new AiService.ToolDefinition("search_osrs_wiki",
-                                "Search the Old School RuneScape Wiki for authoritative mechanics, stats, requirements, locations, quest rewards, training methods, and information. MUST be called whenever answering questions about named quests, items, gear choices, bosses, monsters (including combat distance styles, levitation/animation stances, and dungeon floor rules), updates, quest rewards, or training methods to verify exact OSRS mechanics and rewards before formulating your response.",
+                                "Look up a page on the Old School RuneScape Wiki, the authoritative source for items, monsters, bosses, quests, skills, locations and mechanics. Short pages are returned whole. Long pages return the summary and infobox (stats, requirements) plus 'availableSections'; call again with 'section' to read one, e.g. 'Drops' for drop rates or 'Rewards' for quest rewards. Check the returned 'title' is what you asked for, and only state facts that appear in the result.",
                                 false, false, AiService::executeSearchOsrsWiki)
                                 .addParam("query", "string",
-                                                "The exact entity, location, farming patch, training method, or topic to search for (e.g. 'Sharp Eye', 'Abyssal whip', 'Barrows', 'Farming patches').",
-                                                true));
+                                                "The page to look up, ideally its exact name (e.g. 'Abyssal whip', 'Vorkath', 'Dragon Slayer II', 'Slayer task/Basilisks').",
+                                                true)
+                                .addParam("section", "string",
+                                                "Optional section of the page to read, from 'availableSections' of a previous result (e.g. 'Drops', 'Locations', 'Rewards', 'Strategy').",
+                                                false));
 
                 registry.add(new AiService.ToolDefinition("get_player_combat_achievements",
                                 "Retrieve the player's Combat Achievement tier completion status (Easy, Medium, Hard, Elite, Master, Grandmaster) and boss/activity kill counts (KC).",

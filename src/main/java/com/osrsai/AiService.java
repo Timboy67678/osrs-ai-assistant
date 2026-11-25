@@ -192,8 +192,8 @@ public class AiService {
     public synchronized OkHttpClient getWikiClient() {
         if (wikiClient == null) {
             wikiClient = okHttpClient.newBuilder()
-                    .connectTimeout(5, TimeUnit.SECONDS)
-                    .readTimeout(5, TimeUnit.SECONDS)
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(15, TimeUnit.SECONDS)
                     .build();
         }
         return wikiClient;
@@ -664,30 +664,44 @@ public class AiService {
     }
 
     public String executeSearchOsrsWiki(JsonObject args) {
-        String query = (args != null && args.has("query")) ? args.get("query").getAsString() : "";
-        if (query.isEmpty()) {
-            return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
+        String query = stringArg(args, "query");
+        String section = stringArg(args, "section");
+        String result = WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query, section);
+        if (query.isEmpty() || !section.isEmpty()) {
+            return result;
         }
 
+        // Looking up a monster that is on the player's Slayer task: keep the monster's own page
+        // (it has the stats and drops) and point the model at the task guide as well.
         String cleanedQuery = WikiSearchUtil.extractSearchQuery(query).trim();
         String activeTaskName = Utilities.getConfigValue(configManager, "slayer", "taskName");
-
         if (activeTaskName != null && !activeTaskName.isEmpty()
-                && !cleanedQuery.toLowerCase().startsWith("slayer task/")) {
-            if (isQueryRelatedToSlayerTask(cleanedQuery, activeTaskName)) {
-                String slayerTaskQuery = "Slayer task/" + activeTaskName;
-                log.info("Slayer task detected. Attempting wiki search for: {}", slayerTaskQuery);
-                String slayerResult = WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, slayerTaskQuery);
-
-                if (!isNotFoundResult(slayerResult)) {
-                    return slayerResult;
+                && !cleanedQuery.toLowerCase().startsWith("slayer task/")
+                && isQueryRelatedToSlayerTask(cleanedQuery, activeTaskName)) {
+            try {
+                JsonObject obj = gson.fromJson(result, JsonObject.class);
+                if (obj != null && obj.has("status") && "success".equals(obj.get("status").getAsString())) {
+                    obj.addProperty("slayerTaskHint", "This is the player's current Slayer task. The wiki may also"
+                            + " have a task guide (locations, gear, strategy): search 'Slayer task/" + activeTaskName
+                            + "' to read it.");
+                    return gson.toJson(obj);
                 }
-                log.info("Slayer task page not found for '{}'. Falling back to original query: {}", slayerTaskQuery,
-                        query);
+            } catch (RuntimeException e) {
+                log.debug("Could not add Slayer task hint to wiki result", e);
             }
         }
+        return result;
+    }
 
-        return WikiSearchUtil.executeWikiSearch(getWikiClient(), gson, query);
+    private static String stringArg(JsonObject args, String name) {
+        if (args == null || !args.has(name) || args.get(name).isJsonNull()) {
+            return "";
+        }
+        try {
+            return args.get(name).getAsString().trim();
+        } catch (RuntimeException e) {
+            return "";
+        }
     }
 
     private boolean isQueryRelatedToSlayerTask(String query, String activeTask) {
@@ -725,18 +739,6 @@ public class AiService {
             return name.substring(0, name.length() - 1);
         }
         return name;
-    }
-
-    private boolean isNotFoundResult(String jsonResult) {
-        if (jsonResult == null || jsonResult.isEmpty()) {
-            return true;
-        }
-        try {
-            JsonObject obj = gson.fromJson(jsonResult, JsonObject.class);
-            return obj != null && obj.has("status") && "not_found".equals(obj.get("status").getAsString());
-        } catch (Exception e) {
-            return false;
-        }
     }
 
 }

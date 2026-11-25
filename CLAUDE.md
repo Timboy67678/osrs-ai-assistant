@@ -19,7 +19,8 @@ RuneLite plugin (Java 11, Gradle, Lombok) that adds an AI chat panel. The model 
   Retired model names stay as `@SerializedName` alternates so saved profiles keep loading. Never drop an alternate when replacing a model.
 - `tools/OsrsToolRegistry` — all tool definitions (name, description, params, `requiresCharacterInfo`, `runOnClientThread`, executor). Executors delegate through `AiService` to domain classes in `tools/`.
 - `util/PromptUtils` — system prompt, including many hand-written game grounding rules. Edit carefully; rules exist to stop specific wrong answers.
-- `util/WikiSearchUtil` — wiki search plus a dependency-free HTML→markdown converter (no jsoup).
+- `util/WikiSearchUtil` — `search_osrs_wiki` lookups: exact title, then wiki search (irrelevant results are offered as candidates, not returned). Long pages return summary + `availableSections`; the model requests sections by name. Connection failures return `status: error`, never "not found". Pages are cached 30 min.
+- `util/WikiHtmlParser` — dependency-free (no jsoup) HTML tree builder and Markdown renderer for wiki `action=parse` output. Icon-only stat cells are labelled from `alt`/`title`; `.hidden`/switch-resource data and wiki UI are dropped. `WikiHtmlParserTest` covers it offline with a fake HTTP layer.
 - `ui/OsrsAiPanel` — chat sessions, profile manager, detachable window.
 
 ## Constraints

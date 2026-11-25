@@ -4,12 +4,15 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.osrsai.util.WikiHtmlParser.WikiPage;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -19,25 +22,21 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for searching and parsing the Old School RuneScape Wiki via
- * MediaWiki API.
+ * Looks up pages on the Old School RuneScape Wiki for the {@code search_osrs_wiki} tool.
  * <p>
- * Cleans natural language search queries, performs API requests, caches query
- * results,
- * strips MediaWiki HTML noise, and converts article HTML into structured
- * Markdown extracts without external dependencies.
+ * A lookup resolves the query to a page (exact title first, then the wiki's search), parses it
+ * with {@link WikiHtmlParser}, and returns either the whole page or, for long pages, the summary
+ * plus a list of sections the model can request one at a time. Results always say how the page
+ * was matched, and connection failures are reported as errors rather than as "not found", so the
+ * model is never told that something doesn't exist just because the wiki was slow.
  */
 @Slf4j
 public final class WikiSearchUtil {
 
-    /**
-     * Custom User-Agent header string required by Old School RuneScape Wiki API
-     * guidelines.
-     */
+    /** Descriptive User-Agent, as the OSRS Wiki asks of automated clients. */
     public static final String OSRS_AI_USER_AGENT = "OSRS AI Assistant RuneLite Plugin - https://github.com/Timboy67678/osrs-ai-assistant";
 
     /** Endpoint URL for the Old School RuneScape Wiki MediaWiki API. */
@@ -50,96 +49,26 @@ public final class WikiSearchUtil {
     public static final String WIKI_LICENSE = "CC BY-NC-SA 3.0 (OSRS Wiki)";
 
     /**
-     * Maximum character limit for wiki article extracts passed to the AI prompt
-     * context.
+     * Most characters of page text returned by one lookup. Longer pages are returned a section at
+     * a time, which keeps each tool result small enough for local models.
      */
-    public static final int WIKI_EXTRACT_CHARS = 8000;
+    public static final int WIKI_EXTRACT_CHARS = 6000;
 
-    /**
-     * Maximum number of data rows to include when formatting wikitables/drop tables
-     * into Markdown.
-     */
-    public static final int MAX_WIKITABLE_DATA_ROWS = 35;
-
-    /**
-     * Total table row threshold (including header) for formatting truncation
-     * notice.
-     */
-    public static final int MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD = 36;
-
-    /** Maximum search candidates to retrieve from MediaWiki search API. */
+    /** Search results requested when no page has the exact title. */
     public static final int WIKI_SEARCH_SRLIMIT = 5;
 
-    /** Cache TTL in seconds (30 minutes). Stale entries are silently re-fetched. */
-    private static final long CACHE_TTL_SECONDS = 30 * 60;
+    /** Sections added to a long page's summary when present and small enough. */
+    private static final List<String> CORE_SECTIONS = List.of("Details", "Requirements", "Combat stats");
 
-    /** Maximum number of entries retained in the synchronized search cache. */
-    private static final int CACHE_MAX_ENTRIES = 500;
+    /** Section names listed for a long page. */
+    private static final int MAX_OUTLINE_ENTRIES = 60;
 
-    // =========================================================================
-    // HTML Parsing & Tokenizing Patterns
-    // =========================================================================
+    private static final long CACHE_TTL_MILLIS = 30 * 60 * 1000L;
+    private static final int PAGE_CACHE_MAX_ENTRIES = 64;
+    private static final int RESOLVE_CACHE_MAX_ENTRIES = 500;
 
-    private static final Pattern PATTERN_HTML_NOISE = Pattern.compile(
-            "(?is)<(script|style|svg|img|video|audio|figure|iframe|noscript)[^>]*>.*?</\\1>|<br\\s*/?>");
-    private static final Pattern PATTERN_HTML_CLASS_NOISE = Pattern.compile(
-            "(?is)<(div|span|sup|table|ul|ol|p)[^>]*class=[\"'][^\"']*?\\b(mw-editsection|mw-editsection-visualeditor|toc|noexcerpt|navbox|vertical-navbox|catlinks|printfooter|hatnote|dablink|ambox|cmbox|notice|reflist|references|reference|mw-empty-elt|mw-collapsible|mw-collapsed|collapsed|collapsible|infobox-cell-hidden|hidden-cell)\\b[^\"']*?[\"'][^>]*>.*?</\\1>");
-    private static final Pattern PATTERN_HTML_DISPLAY_NONE = Pattern.compile(
-            "(?is)<[a-zA-Z0-9]+[^>]*style=[\"'][^\"']*?display:\\s*none[^\"']*?[\"'][^>]*>.*?</[a-zA-Z0-9]+>");
-    private static final Pattern PATTERN_HTML_USELESS_SECTION = Pattern.compile(
-            "(?is)<h[23][^>]*>(?:<[^>]+>)*\\s*(?:changes|update history|history|gallery|references|external links|navigation)\\s*(?:</[^>]+>)*</h[23]>.*?(?=<h2|$)");
-    private static final Pattern PATTERN_HTML_INFOBOX = Pattern.compile(
-            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(infobox|questdetails|questreq|equipment-stats|quest)[^\"']*?[\"'][^>]*>(.*?)</table>");
-    private static final Pattern PATTERN_HTML_WIKITABLE = Pattern.compile(
-            "(?is)<table[^>]*class=[\"'][^\"']*?\\b(wikitable|item-drops|drop-table)[^\"']*?[\"'][^>]*>(.*?)</table>");
-    private static final Pattern PATTERN_HTML_TR = Pattern.compile("(?is)<tr[^>]*>(.*?)</tr>");
-    private static final Pattern PATTERN_HTML_TH = Pattern.compile("(?is)<th[^>]*>(.*?)</th>");
-    private static final Pattern PATTERN_HTML_TD = Pattern.compile("(?is)<td[^>]*>(.*?)</td>");
-    private static final Pattern PATTERN_HTML_H2 = Pattern.compile("(?is)<h2[^>]*>(.*?)</h2>");
-    private static final Pattern PATTERN_HTML_H3 = Pattern.compile("(?is)<h3[^>]*>(.*?)</h3>");
-    private static final Pattern PATTERN_HTML_H4 = Pattern.compile("(?is)<h4[^>]*>(.*?)</h4>");
-    private static final Pattern PATTERN_HTML_P = Pattern.compile("(?is)<p[^>]*>(.*?)</p>");
-    private static final Pattern PATTERN_HTML_LI = Pattern.compile("(?is)<li[^>]*>(.*?)</li>");
-    private static final Pattern PATTERN_HTML_TAGS = Pattern.compile("<[^>]+>");
-
-    // =========================================================================
-    // General Formatting & Cleaning Patterns
-    // =========================================================================
-
-    private static final Pattern PATTERN_BOLD_TAGS = Pattern.compile("(?i)<(b|strong)>([\\s\\S]*?)</\\1>");
-    private static final Pattern PATTERN_ITALIC_TAGS = Pattern.compile("(?i)<(i|em)>([\\s\\S]*?)</\\1>");
-    private static final Pattern PATTERN_EDIT_BUTTONS = Pattern
-            .compile("(?i)\\[edit\\s*\\|\\s*edit source\\]|\\[edit\\]|\\b(\\?\\s*)?\\(edit\\)");
-    private static final Pattern PATTERN_MOID_NOISE = Pattern.compile("(?i)\\b(view|edit|MOID+)\\b");
-    private static final Pattern PATTERN_MULTIPLE_NEWLINES = Pattern.compile("\n{3,}");
     private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern PATTERN_NON_ALPHA = Pattern.compile("[^a-z]+");
-    private static final Pattern PATTERN_RAW_STAT = Pattern.compile("[+\\-]?\\d+%?");
-    private static final Pattern PATTERN_LINES = Pattern.compile("\r?\n");
-
-    // =========================================================================
-    // Legacy Wikitext Cleaning Patterns
-    // =========================================================================
-
-    private static final Pattern PATTERN_COMMENTS = Pattern.compile("(?s)<!--.*?-->");
-    private static final Pattern PATTERN_MAGIC = Pattern.compile("(?i)__(TOC|NOTOC|NOEDITSECTION)__");
-    private static final Pattern PATTERN_FILES = Pattern.compile("(?i)\\[\\[(File|Image|Category):.*?\\]\\]");
-    private static final Pattern PATTERN_PIPE_LINKS = Pattern.compile("\\[\\[[^]]*?\\|([^]]+?)\\]\\]");
-    private static final Pattern PATTERN_SIMPLE_LINKS = Pattern.compile("\\[\\[([^]]+?)\\]\\]");
-    private static final Pattern PATTERN_BOLD = Pattern.compile("'''(.*?)'''");
-    private static final Pattern PATTERN_ITALIC = Pattern.compile("''(.*?)''");
-    private static final Pattern PATTERN_EMPTY_LINES = Pattern.compile("(?m)^[ \t]*\r?\n");
-    private static final Pattern PATTERN_TABLE_START = Pattern.compile("(?s)\\{\\|[^\n]*\n");
-    private static final Pattern PATTERN_TABLE_END = Pattern.compile("\\|\\}");
-    private static final Pattern PATTERN_TABLE_CLASS = Pattern.compile("(?m)^\\|+[^\n]*class=[^\n]*\n?");
-    private static final Pattern PATTERN_TABLE_STYLE = Pattern.compile("(?m)^\\|+[^\n]*style=[^\n]*\n?");
-    private static final Pattern PATTERN_TABLE_ROW = Pattern.compile("\\|\\-");
-    private static final Pattern PATTERN_TABLE_DELIM = Pattern.compile("!|\\|\\|");
-    private static final Pattern PATTERN_TABLE_CELL = Pattern.compile("(?m)^\\|");
-    private static final Pattern PATTERN_TABLE_HEADER = Pattern.compile("(?m)^!");
-    private static final Pattern PATTERN_USELESS_SECTIONS = Pattern.compile(
-            "(?ims)^==\\s*(Changes|Update history|History|Gallery|References|External links|Navigation)\\s*==.*?(?=(^==|\\z))");
-    private static final Pattern PATTERN_STUB_TAGS = Pattern.compile("(?i)\\{\\{(stub|clear|sic|!)\\}\\}");
 
     // =========================================================================
     // Search Query Cleaning Constants
@@ -247,92 +176,407 @@ public final class WikiSearchUtil {
             "where", "when", "can", "you", "are", "not", "osrs", "wiki",
             "get", "has", "its", "your", "their", "they", "have", "been");
 
-    /**
-     * Immutable wrapper pairing a wiki result JSON string with the epoch-second
-     * timestamp at which it was cached, used to enforce the
-     * {@link #CACHE_TTL_SECONDS}
-     * expiry policy.
-     */
-    private static final class CacheEntry {
-        final String result;
-        final long cachedAt;
+    // =========================================================================
+    // Caches
+    // =========================================================================
 
-        CacheEntry(String result) {
-            this.result = result;
-            this.cachedAt = System.currentTimeMillis() / 1000L;
+    private static final class Timed<V> {
+        final V value;
+        final long at = System.currentTimeMillis();
+
+        Timed(V value) {
+            this.value = value;
         }
 
         boolean isExpired() {
-            return (System.currentTimeMillis() / 1000L) - cachedAt > CACHE_TTL_SECONDS;
+            return System.currentTimeMillis() - at > CACHE_TTL_MILLIS;
         }
     }
 
-    /**
-     * LRU cache storing recent wiki query results to prevent redundant HTTP network
-     * calls. Values are wrapped in {@link CacheEntry} to support TTL expiry.
-     */
-    private static final Map<String, CacheEntry> SEARCH_CACHE = Collections.synchronizedMap(
-            new LinkedHashMap<>(CACHE_MAX_ENTRIES, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
-                    return size() > CACHE_MAX_ENTRIES;
-                }
-            });
+    private static <V> Map<String, Timed<V>> lruCache(int maxEntries) {
+        return Collections.synchronizedMap(new LinkedHashMap<String, Timed<V>>(maxEntries, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Timed<V>> eldest) {
+                return size() > maxEntries;
+            }
+        });
+    }
+
+    /** Parsed pages by lower-case title, so section requests for a page need no new request. */
+    private static final Map<String, Timed<WikiPage>> PAGE_CACHE = lruCache(PAGE_CACHE_MAX_ENTRIES);
+
+    /** How each query resolved: a page plus match details, or a no-match result. */
+    private static final Map<String, Timed<Resolution>> RESOLVE_CACHE = lruCache(RESOLVE_CACHE_MAX_ENTRIES);
+
+    private static final class Resolution {
+        final WikiPage page;
+        final String query;
+        final boolean exactTitle;
+        final List<String> otherMatches;
+        final JsonObject failure;
+
+        private Resolution(WikiPage page, String query, boolean exactTitle, List<String> otherMatches,
+                JsonObject failure) {
+            this.page = page;
+            this.query = query;
+            this.exactTitle = exactTitle;
+            this.otherMatches = otherMatches;
+            this.failure = failure;
+        }
+
+        static Resolution found(WikiPage page, String query, boolean exactTitle, List<String> others) {
+            return new Resolution(page, query, exactTitle, others, null);
+        }
+
+        static Resolution failed(JsonObject failure) {
+            return new Resolution(null, null, false, Collections.emptyList(), failure);
+        }
+    }
 
     private WikiSearchUtil() {
         // Utility class
     }
 
     /**
-     * Clears all cached wiki search entries from memory.
+     * Clears all cached wiki pages and query resolutions.
      */
     public static void clearCache() {
-        SEARCH_CACHE.clear();
+        PAGE_CACHE.clear();
+        RESOLVE_CACHE.clear();
+    }
+
+    // =========================================================================
+    // Tool entry point
+    // =========================================================================
+
+    /**
+     * Looks up a wiki page and returns its summary, or the whole page when it is short.
+     *
+     * @see #executeWikiSearch(OkHttpClient, Gson, String, String)
+     */
+    public static String executeWikiSearch(OkHttpClient wikiClient, Gson gson, String query) {
+        return executeWikiSearch(wikiClient, gson, query, null);
     }
 
     /**
-     * Executes an OSRS Wiki search for the specified query, checking cache first
-     * before issuing network requests.
+     * Looks up a wiki page for the {@code search_osrs_wiki} tool.
      *
-     * @param wikiClient {@link OkHttpClient} configured for wiki HTTP calls
-     * @param gson       {@link Gson} instance for JSON parsing
-     * @param query      entity, location, item, monster, or topic search query
-     * @return JSON string containing article title and markdown extract, or error
-     *         JSON if not found
+     * @param wikiClient HTTP client for wiki requests
+     * @param gson       JSON serialiser
+     * @param query      page name or search terms
+     * @param section    optional section to return (e.g. "Drops"); {@code null} for the summary
+     * @return JSON with {@code status} {@code success}, {@code section_not_found}, {@code no_match},
+     *         {@code not_found} or {@code error}
      */
-    public static String executeWikiSearch(OkHttpClient wikiClient, Gson gson, String query) {
-        String cleanedQuery = extractSearchQuery(query);
-        String cacheKey = cleanedQuery.trim().toLowerCase(Locale.ROOT);
-
-        CacheEntry cached = SEARCH_CACHE.get(cacheKey);
-        if (cached != null) {
-            if (!cached.isExpired()) {
-                log.debug("Wiki search cache hit for: {}", cacheKey);
-                return cached.result;
+    public static String executeWikiSearch(OkHttpClient wikiClient, Gson gson, String query, String section) {
+        String q = query == null ? "" : PATTERN_WHITESPACE.matcher(query).replaceAll(" ").trim();
+        if (q.endsWith("?")) {
+            q = q.substring(0, q.length() - 1).trim();
+        }
+        if (q.isEmpty()) {
+            return gson.toJson(status("error", "No search query was given. Pass the name of a page to look up."));
+        }
+        try {
+            Resolution resolution = resolve(wikiClient, gson, q);
+            if (resolution.page == null) {
+                return gson.toJson(resolution.failure);
             }
-            log.debug("Wiki search cache expired for: {}", cacheKey);
+            return gson.toJson(buildResult(resolution, section));
+        } catch (IOException | RuntimeException e) {
+            log.warn("OSRS Wiki lookup failed for '{}': {}", q, e.toString());
+            return gson.toJson(status("error", "The OSRS Wiki could not be reached (" + e.getMessage()
+                    + "). This is a connection problem, not evidence that the topic doesn't exist. Tell the player"
+                    + " you couldn't check the wiki instead of guessing, or try the lookup again."));
         }
-
-        // 1. Direct title parse fetch via MediaWiki action=parse
-        String result = fetchDirectTitleExtract(wikiClient, gson, cleanedQuery);
-        if (result == null) {
-            // 2. Generator search parse fallback
-            result = fetchGeneratorSearchExtract(wikiClient, gson, cleanedQuery);
-        }
-
-        if (result != null) {
-            SEARCH_CACHE.put(cacheKey, new CacheEntry(result));
-            return result;
-        }
-
-        JsonObject err = new JsonObject();
-        err.addProperty("status", "not_found");
-        err.addProperty("message", "No OSRS wiki article found for query '" + query
-                + "'. This entity, reward, or feature does NOT exist in OSRS (it may be a hallucination, RS3 content, or invalid terminology). Do NOT fabricate mechanics or quest rewards.");
-        String errJson = gson.toJson(err);
-        SEARCH_CACHE.put(cacheKey, new CacheEntry(errJson));
-        return errJson;
     }
+
+    private static JsonObject status(String status, String message) {
+        JsonObject o = new JsonObject();
+        o.addProperty("status", status);
+        o.addProperty("message", message);
+        return o;
+    }
+
+    private static Resolution resolve(OkHttpClient client, Gson gson, String query) throws IOException {
+        String key = query.toLowerCase(Locale.ROOT);
+        Timed<Resolution> cached = RESOLVE_CACHE.get(key);
+        if (cached != null && !cached.isExpired()) {
+            return cached.value;
+        }
+
+        String cleaned = extractSearchQuery(query).trim();
+        List<String> titlesToTry = new ArrayList<>();
+        titlesToTry.add(query);
+        if (!cleaned.isEmpty() && !cleaned.equalsIgnoreCase(query)) {
+            titlesToTry.add(cleaned);
+        }
+        for (String title : titlesToTry) {
+            WikiPage page = fetchPage(client, gson, title);
+            if (page != null) {
+                Resolution r = Resolution.found(page, query, true, Collections.emptyList());
+                RESOLVE_CACHE.put(key, new Timed<>(r));
+                return r;
+            }
+        }
+
+        String searchTerms = cleaned.isEmpty() ? query : cleaned;
+        List<String> hits = searchTitles(client, gson, searchTerms);
+        boolean wantsLeague = query.toLowerCase(Locale.ROOT).contains("league");
+        List<String> candidates = new ArrayList<>();
+        for (String hit : hits) {
+            if (wantsLeague || !hit.toLowerCase(Locale.ROOT).contains(" league")) {
+                candidates.add(hit);
+            }
+        }
+
+        Resolution result;
+        if (candidates.isEmpty()) {
+            result = Resolution.failed(status("not_found", "No OSRS Wiki page matched '" + query
+                    + "'. Try the exact in-game name or different wording. Don't state facts about it that you"
+                    + " can't verify. If it seems to be RuneScape 3 content, say so."));
+        } else {
+            String best = null;
+            for (String c : candidates) {
+                if (isTitleRelevantToQuery(c, query) || isTitleRelevantToQuery(c, searchTerms)) {
+                    best = c;
+                    break;
+                }
+            }
+            WikiPage page = best == null ? null : fetchPage(client, gson, best);
+            if (page == null) {
+                JsonObject failure = status("no_match", "No OSRS Wiki page is titled '" + query
+                        + "', and none of the search results look like a match. If one of 'searchResults' is what"
+                        + " you meant, call search_osrs_wiki again with that exact title. Otherwise don't state facts"
+                        + " about it that you can't verify.");
+                JsonArray results = new JsonArray();
+                for (String c : candidates) {
+                    results.add(c);
+                }
+                failure.add("searchResults", results);
+                result = Resolution.failed(failure);
+            } else {
+                List<String> others = new ArrayList<>(candidates);
+                others.remove(best);
+                result = Resolution.found(page, query, false, others);
+            }
+        }
+        RESOLVE_CACHE.put(key, new Timed<>(result));
+        return result;
+    }
+
+    private static JsonObject buildResult(Resolution resolution, String section) {
+        WikiPage page = resolution.page;
+        JsonObject o = new JsonObject();
+        o.addProperty("status", "success");
+        o.addProperty("title", page.title);
+        o.addProperty("url", pageUrl(page.title));
+        o.addProperty("license", WIKI_LICENSE);
+        if (resolution.exactTitle && !sameTitle(resolution.query, page.title)
+                && !sameTitle(extractSearchQuery(resolution.query), page.title)) {
+            o.addProperty("redirectNote", "The wiki redirects '" + resolution.query + "' to '" + page.title
+                    + "'. If that is not the same thing the player asked about (for example, a RuneScape 3 name),"
+                    + " say so.");
+        }
+        if (!resolution.exactTitle) {
+            o.addProperty("matchNote", "No page is titled exactly '" + resolution.query
+                    + "'. This is the closest search result; check it is what you were looking for before using it.");
+            if (!resolution.otherMatches.isEmpty()) {
+                JsonArray others = new JsonArray();
+                for (String t : resolution.otherMatches) {
+                    others.add(t);
+                }
+                o.add("otherSearchResults", others);
+            }
+        }
+
+        if (section == null || section.trim().isEmpty()) {
+            String all = page.renderAll();
+            if (all.length() <= WIKI_EXTRACT_CHARS) {
+                o.addProperty("section", "(whole page)");
+                o.addProperty("extract", all);
+                return o;
+            }
+            o.addProperty("section", "(summary and infobox)");
+            o.addProperty("extract", cap(summary(page)));
+            o.add("availableSections", outline(page.outline()));
+            o.addProperty("hint", "This page is long, so only its summary is shown. To read more, call"
+                    + " search_osrs_wiki again with the same query and 'section' set to one of availableSections.");
+            return o;
+        }
+
+        int index = page.findSection(section);
+        if (index < 0) {
+            o.addProperty("status", "section_not_found");
+            o.addProperty("message", "This page has no section matching '" + section
+                    + "'. Pick one of availableSections, or omit 'section' to get the page summary.");
+            o.add("availableSections", outline(page.outline()));
+            return o;
+        }
+        String text = page.renderSection(index);
+        o.addProperty("section", page.sections.get(index).name);
+        if (text.length() <= WIKI_EXTRACT_CHARS) {
+            o.addProperty("extract", text);
+            return o;
+        }
+        o.addProperty("extract", cap(text));
+        o.addProperty("truncated", true);
+        List<String> subsections = page.subsectionNames(index);
+        if (!subsections.isEmpty()) {
+            o.add("subsections", outline(subsections));
+            o.addProperty("hint", "This section was cut off. Request one of 'subsections' by name to read the rest.");
+        } else {
+            o.addProperty("hint", "This section was cut off; the rest is on the wiki page at 'url'.");
+        }
+        return o;
+    }
+
+    /**
+     * The page lead plus any core sections that hold the facts most questions need: a quest's
+     * "Details" (requirements) and an item's "Combat stats" (equipment bonuses).
+     */
+    private static String summary(WikiPage page) {
+        StringBuilder sb = new StringBuilder(page.renderLead());
+        for (String core : CORE_SECTIONS) {
+            int index = page.findTopLevel(core);
+            if (index > 0) {
+                String text = page.renderSection(index);
+                if (sb.length() + text.length() + 2 <= WIKI_EXTRACT_CHARS) {
+                    sb.append("\n\n").append(text);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private static boolean sameTitle(String a, String b) {
+        return a != null && b != null
+                && a.trim().replace('_', ' ').equalsIgnoreCase(b.trim().replace('_', ' '));
+    }
+
+    private static JsonArray outline(List<String> names) {
+        JsonArray arr = new JsonArray();
+        for (int i = 0; i < names.size() && i < MAX_OUTLINE_ENTRIES; i++) {
+            arr.add(names.get(i));
+        }
+        if (names.size() > MAX_OUTLINE_ENTRIES) {
+            arr.add("(" + (names.size() - MAX_OUTLINE_ENTRIES) + " more)");
+        }
+        return arr;
+    }
+
+    /** Cuts text to the extract budget at a line break, marking that it was cut. */
+    static String cap(String text) {
+        if (text.length() <= WIKI_EXTRACT_CHARS) {
+            return text;
+        }
+        int cut = text.lastIndexOf('\n', WIKI_EXTRACT_CHARS);
+        if (cut < WIKI_EXTRACT_CHARS / 2) {
+            cut = WIKI_EXTRACT_CHARS;
+        }
+        return text.substring(0, cut).trim() + "\n...[cut off]";
+    }
+
+    // =========================================================================
+    // HTTP
+    // =========================================================================
+
+    /**
+     * Fetches and parses a page by title, following redirects.
+     *
+     * @return the page, or {@code null} if no page has that title
+     * @throws IOException if the wiki could not be reached or returned an unexpected response
+     */
+    static WikiPage fetchPage(OkHttpClient client, Gson gson, String title) throws IOException {
+        String key = title.trim().toLowerCase(Locale.ROOT);
+        Timed<WikiPage> cached = PAGE_CACHE.get(key);
+        if (cached != null && !cached.isExpired()) {
+            return cached.value;
+        }
+
+        HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
+                .addQueryParameter("action", "parse")
+                .addQueryParameter("page", title)
+                .addQueryParameter("prop", "text")
+                .addQueryParameter("redirects", "1")
+                .addQueryParameter("disableeditsection", "1")
+                .addQueryParameter("disabletoc", "1")
+                .addQueryParameter("disablelimitreport", "1")
+                .addQueryParameter("format", "json")
+                .addQueryParameter("formatversion", "2")
+                .build();
+        JsonObject json = getJson(client, gson, url);
+        if (json.has("error")) {
+            String code = stringOrEmpty(json.getAsJsonObject("error"), "code");
+            if ("missingtitle".equals(code) || "invalidtitle".equals(code)) {
+                return null;
+            }
+            throw new IOException("wiki API error '" + code + "'");
+        }
+        JsonObject parse = json.getAsJsonObject("parse");
+        if (parse == null || !parse.has("text")) {
+            throw new IOException("unexpected wiki response");
+        }
+        String resolvedTitle = parse.has("title") ? parse.get("title").getAsString() : title;
+        WikiPage page = WikiHtmlParser.parse(resolvedTitle, parse.get("text").getAsString());
+        Timed<WikiPage> entry = new Timed<>(page);
+        PAGE_CACHE.put(key, entry);
+        PAGE_CACHE.put(resolvedTitle.toLowerCase(Locale.ROOT), entry);
+        return page;
+    }
+
+    private static List<String> searchTitles(OkHttpClient client, Gson gson, String query) throws IOException {
+        HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
+                .addQueryParameter("action", "query")
+                .addQueryParameter("list", "search")
+                .addQueryParameter("srsearch", query)
+                .addQueryParameter("srnamespace", "0")
+                .addQueryParameter("srlimit", String.valueOf(WIKI_SEARCH_SRLIMIT))
+                .addQueryParameter("format", "json")
+                .addQueryParameter("formatversion", "2")
+                .build();
+        JsonObject json = getJson(client, gson, url);
+        List<String> titles = new ArrayList<>();
+        JsonObject q = json.getAsJsonObject("query");
+        JsonArray results = q == null ? null : q.getAsJsonArray("search");
+        if (results != null) {
+            for (JsonElement e : results) {
+                String t = stringOrEmpty(e.getAsJsonObject(), "title");
+                if (!t.isEmpty()) {
+                    titles.add(t);
+                }
+            }
+        }
+        return titles;
+    }
+
+    private static JsonObject getJson(OkHttpClient client, Gson gson, HttpUrl url) throws IOException {
+        Request request = new Request.Builder()
+                .url(url)
+                .header("User-Agent", OSRS_AI_USER_AGENT)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("HTTP " + response.code());
+            }
+            ResponseBody body = response.body();
+            if (body == null) {
+                throw new IOException("empty response");
+            }
+            JsonObject json = gson.fromJson(body.string(), JsonObject.class);
+            if (json == null) {
+                throw new IOException("empty response");
+            }
+            return json;
+        }
+    }
+
+    private static String stringOrEmpty(JsonObject o, String key) {
+        return o != null && o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : "";
+    }
+
+    // =========================================================================
+    // Query helpers
+    // =========================================================================
 
     /**
      * Strips common conversational question prefixes and query suffixes to produce
@@ -403,547 +647,54 @@ public final class WikiSearchUtil {
     }
 
     /**
-     * Fetches and parses a wiki page directly by page title using MediaWiki
-     * action=parse.
+     * Checks whether a search result title plausibly names what the query asked for: a shared
+     * significant word (ignoring plural "s"), or one appearing inside the other once spaces are
+     * removed (so "super antipoison" matches "Superantipoison").
      *
-     * @param wikiClient {@link OkHttpClient} instance
-     * @param gson       {@link Gson} instance
-     * @param query      article title string
-     * @return JSON string with article title and markdown extract, or {@code null}
-     *         if page not found
-     */
-    public static String fetchDirectTitleExtract(OkHttpClient wikiClient, Gson gson, String query) {
-        try {
-            HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
-                    .addQueryParameter("action", "parse")
-                    .addQueryParameter("page", query)
-                    .addQueryParameter("prop", "text")
-                    .addQueryParameter("redirects", "1")
-                    .addQueryParameter("format", "json")
-                    .build();
-
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", OSRS_AI_USER_AGENT)
-                    .build();
-
-            try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null) {
-                    return null;
-                }
-                JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                if (json != null && json.has("parse")) {
-                    JsonObject parseObj = json.getAsJsonObject("parse");
-                    String title = parseObj.has("title") ? parseObj.get("title").getAsString() : query;
-                    if (parseObj.has("text")) {
-                        JsonObject textObj = parseObj.getAsJsonObject("text");
-                        if (textObj.has("*")) {
-                            String rawHtml = textObj.get("*").getAsString();
-                            String cleanedMarkdown = parseWikiHtmlToMarkdown(title, rawHtml);
-                            if (cleanedMarkdown != null && !cleanedMarkdown.trim().isEmpty()) {
-                                JsonObject res = new JsonObject();
-                                res.addProperty("title", title);
-                                res.addProperty("url", pageUrl(title));
-                                res.addProperty("license", WIKI_LICENSE);
-                                res.addProperty("extract", cleanedMarkdown);
-                                return gson.toJson(res);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Direct title parse fetch failed for: {}", query, e);
-        }
-        return null;
-    }
-
-    /**
-     * Fallback search strategy that searches the wiki via search list before
-     * parsing the top result.
-     *
-     * @param wikiClient {@link OkHttpClient} instance
-     * @param gson       {@link Gson} instance
-     * @param query      search query
-     * @return JSON string with article title and markdown extract, or {@code null}
-     */
-    public static String fetchGeneratorSearchExtract(OkHttpClient wikiClient, Gson gson, String query) {
-        String topTitle = searchWikiTopResult(wikiClient, gson, query);
-        if (topTitle != null) {
-            return fetchDirectTitleExtract(wikiClient, gson, topTitle);
-        }
-        return null;
-    }
-
-    /**
-     * Resolves a query string directly to a canonical wiki article title (handling
-     * redirects).
-     *
-     * @param wikiClient {@link OkHttpClient} instance
-     * @param gson       {@link Gson} instance
-     * @param query      query or page title
-     * @return resolved article title, or {@code null}
-     */
-    public static String resolveTitleDirectly(OkHttpClient wikiClient, Gson gson, String query) {
-        try {
-            HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
-                    .addQueryParameter("action", "query")
-                    .addQueryParameter("titles", query)
-                    .addQueryParameter("redirects", "1")
-                    .addQueryParameter("format", "json")
-                    .build();
-
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", OSRS_AI_USER_AGENT)
-                    .build();
-
-            try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null) {
-                    return null;
-                }
-                JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                if (json == null) {
-                    return null;
-                }
-                JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null) {
-                    return null;
-                }
-                JsonObject pages = queryObj.getAsJsonObject("pages");
-                if (pages == null) {
-                    return null;
-                }
-                for (Map.Entry<String, JsonElement> entry : pages.entrySet()) {
-                    if ("-1".equals(entry.getKey())) {
-                        continue;
-                    }
-                    JsonObject page = entry.getValue().getAsJsonObject();
-                    if (page.has("title")) {
-                        return page.get("title").getAsString();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Direct title resolution failed for: {}", query, e);
-        }
-        return null;
-    }
-
-    /**
-     * Executes a MediaWiki search API query to retrieve the top matching article
-     * title.
-     *
-     * @param wikiClient {@link OkHttpClient} instance
-     * @param gson       {@link Gson} instance
-     * @param query      search query
-     * @return top article title, or {@code null}
-     */
-    public static String searchWikiTopResult(OkHttpClient wikiClient, Gson gson, String query) {
-        String directTitle = resolveTitleDirectly(wikiClient, gson, query);
-        if (directTitle != null && isTitleRelevantToQuery(directTitle, query)) {
-            return directTitle;
-        } else if (directTitle != null) {
-            log.info("Direct title resolve '{}' deemed irrelevant to query '{}'; falling back to full-text search",
-                    directTitle, query);
-        }
-
-        try {
-            HttpUrl url = Objects.requireNonNull(HttpUrl.parse(WIKI_API)).newBuilder()
-                    .addQueryParameter("action", "query")
-                    .addQueryParameter("list", "search")
-                    .addQueryParameter("srsearch", query)
-                    .addQueryParameter("srnamespace", "0")
-                    .addQueryParameter("srlimit", String.valueOf(WIKI_SEARCH_SRLIMIT))
-                    .addQueryParameter("format", "json")
-                    .build();
-
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", OSRS_AI_USER_AGENT)
-                    .build();
-
-            try (Response response = wikiClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null) {
-                    return null;
-                }
-                JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
-                if (json == null) {
-                    return null;
-                }
-                JsonObject queryObj = json.getAsJsonObject("query");
-                if (queryObj == null) {
-                    return null;
-                }
-                JsonArray results = queryObj.getAsJsonArray("search");
-                if (results == null || results.size() == 0) {
-                    return null;
-                }
-
-                boolean wantsLeague = query != null && query.toLowerCase(Locale.ROOT).contains("league");
-                for (int i = 0; i < results.size(); i++) {
-                    JsonObject item = results.get(i).getAsJsonObject();
-                    if (item.has("title")) {
-                        String candidateTitle = item.get("title").getAsString();
-                        if (!wantsLeague && candidateTitle.toLowerCase(Locale.ROOT).contains(" league")) {
-                            continue;
-                        }
-                        return candidateTitle;
-                    }
-                }
-                return results.get(0).getAsJsonObject().get("title").getAsString();
-            }
-        } catch (Exception e) {
-            log.warn("Wiki search failed for: {}", query, e);
-            return null;
-        }
-    }
-
-    /**
-     * Checks whether a resolved wiki article title is relevant to the original
-     * search
-     * query by testing for at least one shared keyword of 3+ characters, ignoring
-     * common English and OSRS stop words.
-     *
-     * @param title resolved article title from the MediaWiki API
-     * @param query original cleaned search query
+     * @param title search result title
+     * @param query search query
      * @return {@code true} if the title appears related to the query
      */
     static boolean isTitleRelevantToQuery(String title, String query) {
         if (title == null || query == null || title.isEmpty() || query.isEmpty()) {
             return false;
         }
-
         String titleLower = title.toLowerCase(Locale.ROOT);
         String queryLower = query.toLowerCase(Locale.ROOT);
 
-        String[] queryTokens = PATTERN_NON_ALPHA.split(queryLower);
-        String[] titleTokens = PATTERN_NON_ALPHA.split(titleLower);
-
         Set<String> titleWords = new HashSet<>();
-        for (String t : titleTokens) {
+        for (String t : PATTERN_NON_ALPHA.split(titleLower)) {
             if (t.length() >= 3 && !STOP_WORDS.contains(t)) {
-                titleWords.add(t);
+                titleWords.add(singular(t));
             }
         }
+        String titleCompact = PATTERN_NON_ALPHA.matcher(titleLower).replaceAll("");
+        String queryCompact = PATTERN_NON_ALPHA.matcher(queryLower).replaceAll("");
 
-        for (String q : queryTokens) {
-            if (q.length() >= 3 && !STOP_WORDS.contains(q) && titleWords.contains(q)) {
+        for (String q : PATTERN_NON_ALPHA.split(queryLower)) {
+            if (q.length() < 3 || STOP_WORDS.contains(q)) {
+                continue;
+            }
+            if (titleWords.contains(singular(q)) || q.length() >= 5 && titleCompact.contains(singular(q))) {
                 return true;
             }
         }
-        return false;
+        return titleCompact.length() >= 5 && queryCompact.contains(titleCompact);
+    }
+
+    private static String singular(String word) {
+        return word.length() > 3 && word.endsWith("s") ? word.substring(0, word.length() - 1) : word;
     }
 
     /**
-     * Fetches the markdown extract of a specific wiki page by title.
+     * Converts wiki page HTML to Markdown, keeping every section. Used by tests and tools that
+     * want the whole page.
      *
-     * @param wikiClient {@link OkHttpClient} instance
-     * @param gson       {@link Gson} instance
-     * @param title      article title
-     * @return markdown extract string, or {@code null}
-     */
-    public static String fetchWikiExtract(OkHttpClient wikiClient, Gson gson, String title) {
-        String jsonRes = fetchDirectTitleExtract(wikiClient, gson, title);
-        if (jsonRes != null) {
-            try {
-                JsonObject obj = gson.fromJson(jsonRes, JsonObject.class);
-                if (obj != null && obj.has("extract")) {
-                    return obj.get("extract").getAsString();
-                }
-            } catch (Exception e) {
-                log.warn("Failed to extract content from json response for title: {}", title, e);
-            }
-        }
-        return null;
-    }
-
-    // =========================================================================
-    // HTML to Markdown Parser & Table Utilities
-    // =========================================================================
-
-    /**
-     * Converts server-rendered MediaWiki HTML into concise, structured Markdown
-     * without external library dependencies.
-     *
-     * @param title article title
-     * @param html  raw HTML from MediaWiki action=parse
-     * @return formatted Markdown string
+     * @param title page title
+     * @param html  HTML from the wiki's {@code action=parse} API
+     * @return the page as Markdown
      */
     public static String parseWikiHtmlToMarkdown(String title, String html) {
-        if (html == null || html.trim().isEmpty()) {
-            return "";
-        }
-
-        String cleaned = html;
-        for (int i = 0; i < 3; i++) {
-            cleaned = PATTERN_HTML_NOISE.matcher(cleaned).replaceAll(" ");
-            cleaned = PATTERN_HTML_CLASS_NOISE.matcher(cleaned).replaceAll(" ");
-            cleaned = PATTERN_HTML_DISPLAY_NONE.matcher(cleaned).replaceAll(" ");
-        }
-        cleaned = PATTERN_HTML_USELESS_SECTION.matcher(cleaned).replaceAll(" ");
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("# ").append(title).append("\n\n");
-
-        // 1. Extract Infobox & Quest Details/Stats
-        StringBuilder infoboxSb = new StringBuilder();
-        Matcher infoboxMatcher = PATTERN_HTML_INFOBOX.matcher(cleaned);
-        while (infoboxMatcher.find()) {
-            String tableHtml = infoboxMatcher.group(2);
-            Matcher trMatcher = PATTERN_HTML_TR.matcher(tableHtml);
-            while (trMatcher.find()) {
-                String rowHtml = trMatcher.group(1);
-                List<String> ths = extractCellTexts(rowHtml, PATTERN_HTML_TH);
-                List<String> tds = extractCellTexts(rowHtml, PATTERN_HTML_TD);
-
-                if (!ths.isEmpty() && !tds.isEmpty()) {
-                    String key = cleanCellText(ths.get(0));
-                    String val = cleanCellText(tds.get(0));
-                    if (isValidInfoboxPair(key, val)) {
-                        infoboxSb.append("- **").append(key).append("**: ").append(val).append("\n");
-                    }
-                } else if (tds.size() >= 2) {
-                    String key = cleanCellText(tds.get(0));
-                    String val = cleanCellText(tds.get(1));
-                    if (isValidInfoboxPair(key, val)) {
-                        infoboxSb.append("- **").append(key).append("**: ").append(val).append("\n");
-                    }
-                } else if (tds.size() == 1) {
-                    String val = cleanCellText(tds.get(0));
-                    if (!val.isEmpty() && !val.equalsIgnoreCase("Details")
-                            && !val.contains("You will have to buy another")) {
-                        infoboxSb.append("- ").append(val).append("\n");
-                    }
-                }
-            }
-        }
-        cleaned = PATTERN_HTML_INFOBOX.matcher(cleaned).replaceAll(" ");
-
-        String infoboxMarkdown = infoboxSb.toString().trim();
-        if (!infoboxMarkdown.isEmpty()) {
-            sb.append("## Overview & Stats\n").append(infoboxMarkdown).append("\n\n");
-        }
-
-        // 2. Format Wikitables & Drop Tables into Markdown Tables
-        StringBuilder tableReplaced = new StringBuilder();
-        Matcher tableMatcher = PATTERN_HTML_WIKITABLE.matcher(cleaned);
-        while (tableMatcher.find()) {
-            String tableHtml = tableMatcher.group(2);
-            String mdTable = formatHtmlTableToMarkdown(tableHtml);
-            tableMatcher.appendReplacement(tableReplaced, Matcher.quoteReplacement("\n\n" + mdTable + "\n\n"));
-        }
-        tableMatcher.appendTail(tableReplaced);
-        cleaned = tableReplaced.toString();
-
-        // 3. Convert Headings, Paragraphs, Lists
-        cleaned = PATTERN_HTML_H2.matcher(cleaned).replaceAll("\n\n## $1\n\n");
-        cleaned = PATTERN_HTML_H3.matcher(cleaned).replaceAll("\n\n### $1\n\n");
-        cleaned = PATTERN_HTML_H4.matcher(cleaned).replaceAll("\n\n#### $1\n\n");
-        cleaned = PATTERN_HTML_P.matcher(cleaned).replaceAll("\n\n$1\n\n");
-        cleaned = PATTERN_HTML_LI.matcher(cleaned).replaceAll("\n- $1");
-
-        // 4. Clean bold, italic, tags, and entities
-        cleaned = PATTERN_BOLD_TAGS.matcher(cleaned).replaceAll("**$2**");
-        cleaned = PATTERN_ITALIC_TAGS.matcher(cleaned).replaceAll("*$2*");
-        cleaned = PATTERN_HTML_TAGS.matcher(cleaned).replaceAll(" ");
-        cleaned = decodeHtmlEntities(cleaned);
-        cleaned = PATTERN_EDIT_BUTTONS.matcher(cleaned).replaceAll("");
-        cleaned = PATTERN_MOID_NOISE.matcher(cleaned).replaceAll("");
-
-        String[] lines = PATTERN_LINES.split(cleaned);
-        StringBuilder bodySb = new StringBuilder();
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (!trimmed.isEmpty()) {
-                bodySb.append(trimmed).append("\n\n");
-            }
-        }
-        sb.append(bodySb.toString().trim());
-
-        String result = sb.toString().trim();
-        result = PATTERN_MULTIPLE_NEWLINES.matcher(result).replaceAll("\n\n");
-
-        if (result.length() > WIKI_EXTRACT_CHARS) {
-            result = result.substring(0, WIKI_EXTRACT_CHARS) + "\n...[truncated]";
-        }
-        return result;
-    }
-
-    private static String formatHtmlTableToMarkdown(String tableHtml) {
-        Matcher trMatcher = PATTERN_HTML_TR.matcher(tableHtml);
-        List<List<String>> allRows = new ArrayList<>();
-        List<String> headers = new ArrayList<>();
-
-        while (trMatcher.find()) {
-            String rowHtml = trMatcher.group(1);
-            List<String> ths = extractCellTexts(rowHtml, PATTERN_HTML_TH);
-            List<String> tds = extractCellTexts(rowHtml, PATTERN_HTML_TD);
-
-            if (headers.isEmpty() && !ths.isEmpty()) {
-                for (String th : ths) {
-                    String hText = cleanCellText(th).replace("|", "\\|");
-                    headers.add(hText.isEmpty() ? "-" : hText);
-                }
-            } else {
-                List<String> rowCells = new ArrayList<>();
-                for (String th : ths) {
-                    rowCells.add(cleanCellText(th).replace("|", "\\|"));
-                }
-                for (String td : tds) {
-                    rowCells.add(cleanCellText(td).replace("|", "\\|"));
-                }
-                if (!rowCells.isEmpty()) {
-                    allRows.add(rowCells);
-                }
-            }
-        }
-
-        if (headers.isEmpty() && !allRows.isEmpty()) {
-            int maxCols = 0;
-            for (List<String> dr : allRows) {
-                maxCols = Math.max(maxCols, dr.size());
-            }
-            for (int col = 1; col <= maxCols; col++) {
-                headers.add("Col " + col);
-            }
-        }
-
-        if (headers.isEmpty()) {
-            return "";
-        }
-
-        StringBuilder tableSb = new StringBuilder();
-        tableSb.append("| ").append(String.join(" | ", headers)).append(" |\n");
-        tableSb.append("| ");
-        for (int i = 0; i < headers.size(); i++) {
-            tableSb.append("---").append(i < headers.size() - 1 ? " | " : "");
-        }
-        tableSb.append(" |\n");
-
-        int rowCount = 0;
-        for (List<String> rowData : allRows) {
-            while (rowData.size() < headers.size()) {
-                rowData.add("");
-            }
-            tableSb.append("| ").append(String.join(" | ", rowData.subList(0, headers.size()))).append(" |\n");
-            rowCount++;
-            if (rowCount >= MAX_WIKITABLE_DATA_ROWS) {
-                break;
-            }
-        }
-
-        if (allRows.size() > MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD) {
-            tableSb.append("*...[").append(allRows.size() - MAX_WIKITABLE_TOTAL_ROWS_THRESHOLD)
-                    .append(" additional rows truncated]*\n");
-        }
-        return tableSb.toString().trim();
-    }
-
-    private static List<String> extractCellTexts(String html, Pattern cellPattern) {
-        List<String> list = new ArrayList<>();
-        Matcher m = cellPattern.matcher(html);
-        while (m.find()) {
-            list.add(m.group(1));
-        }
-        return list;
-    }
-
-    private static String cleanCellText(String cellHtml) {
-        if (cellHtml == null) {
-            return "";
-        }
-        String text = PATTERN_HTML_TAGS.matcher(cellHtml).replaceAll(" ").trim();
-        text = decodeHtmlEntities(text);
-        text = PATTERN_EDIT_BUTTONS.matcher(text).replaceAll("").trim();
-        text = PATTERN_MOID_NOISE.matcher(text).replaceAll("").trim();
-        return PATTERN_WHITESPACE.matcher(text).replaceAll(" ").trim();
-    }
-
-    private static boolean isValidInfoboxPair(String key, String val) {
-        return !key.isEmpty() && !val.isEmpty()
-                && !key.equalsIgnoreCase("Image")
-                && !key.equalsIgnoreCase("Caption")
-                && !isRawStatKey(key)
-                && !val.equalsIgnoreCase("Not alchemisable")
-                && !val.equalsIgnoreCase("Not sold")
-                && !val.equalsIgnoreCase("No data to display");
-    }
-
-    static boolean isRawStatKey(String key) {
-        if (key == null || key.isEmpty()) {
-            return false;
-        }
-        return PATTERN_RAW_STAT.matcher(key).matches();
-    }
-
-    public static String decodeHtmlEntities(String text) {
-        if (text == null || text.isEmpty()) {
-            return "";
-        }
-        return text.replace("&nbsp;", " ")
-                .replace("&#160;", " ")
-                .replace("&amp;", "&")
-                .replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&quot;", "\"")
-                .replace("&#039;", "'")
-                .replace("&apos;", "'")
-                .replace("&#8203;", "")
-                .replace("&ndash;", "–")
-                .replace("&mdash;", "—");
-    }
-
-    // =========================================================================
-    // Legacy Wikitext Cleaners
-    // =========================================================================
-
-    /**
-     * Fallback wikitext cleaner for backwards compatibility with raw text.
-     *
-     * @param wikitext raw MediaWiki wikitext string
-     * @return cleaned text
-     */
-    public static String cleanWikitext(String wikitext) {
-        if (wikitext == null) {
-            return "";
-        }
-
-        String clean = PATTERN_COMMENTS.matcher(wikitext).replaceAll("");
-        clean = PATTERN_USELESS_SECTIONS.matcher(clean).replaceAll("");
-
-        clean = PATTERN_MAGIC.matcher(
-                clean.replace("&nbsp;", " ")
-                        .replace("&amp;", "&")
-                        .replace("&lt;", "<")
-                        .replace("&gt;", ">")
-                        .replace("&quot;", "\""))
-                .replaceAll("");
-
-        clean = convertWikitables(clean);
-        clean = PATTERN_FILES.matcher(clean).replaceAll("");
-        clean = PATTERN_PIPE_LINKS.matcher(clean).replaceAll("$1");
-        clean = PATTERN_SIMPLE_LINKS.matcher(clean).replaceAll("$1");
-        clean = PATTERN_BOLD.matcher(clean).replaceAll("**$1**");
-        clean = PATTERN_ITALIC.matcher(clean).replaceAll("*$1*");
-        clean = PATTERN_STUB_TAGS.matcher(clean).replaceAll("");
-        clean = clean.replace("{{", "[ ").replace("}}", " ]");
-        clean = PATTERN_EMPTY_LINES.matcher(clean).replaceAll("");
-
-        return clean.trim();
-    }
-
-    private static String convertWikitables(String input) {
-        if (input == null) {
-            return "";
-        }
-        String res = PATTERN_TABLE_START.matcher(input).replaceAll("\n");
-        res = PATTERN_TABLE_END.matcher(res).replaceAll("\n");
-        res = PATTERN_TABLE_CLASS.matcher(res).replaceAll("");
-        res = PATTERN_TABLE_STYLE.matcher(res).replaceAll("");
-        res = PATTERN_TABLE_ROW.matcher(res).replaceAll("\n");
-        res = PATTERN_TABLE_DELIM.matcher(res).replaceAll(" | ");
-        res = PATTERN_TABLE_CELL.matcher(res).replaceAll(" ");
-        return PATTERN_TABLE_HEADER.matcher(res).replaceAll(" ");
+        return WikiHtmlParser.parse(title, html).renderAll();
     }
 }

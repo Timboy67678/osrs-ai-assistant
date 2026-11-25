@@ -110,7 +110,7 @@ The AI assistant has access to a comprehensive suite of **22 custom tools** enab
 - `get_player_ge_offers` — Retrieves Grand Exchange offer slots (active, completed, or collecting buy/sell orders, prices, filled vs total quantities, and GP spent/received).
 - `get_market_prices` — Retrieves live Grand Exchange market prices, High Alchemy values, Nature Rune costs, and calculated High Alchemy profit margins for specified items.
 - `get_item_stats` — Retrieves equipment stats, combat bonuses, weight, slot type, and market prices for specified item names or IDs.
-- `search_osrs_wiki` — Performs a live search on the Old School RuneScape Wiki for authoritative game mechanics, boss guides, drop tables, quest requirements, training methods, and recent game updates. Answers that use wiki content link back to the source pages (OSRS Wiki content is licensed [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/)).
+- `search_osrs_wiki` — Looks up pages on the Old School RuneScape Wiki for authoritative game mechanics, monster and item stats, drop tables, quest requirements and rewards, and training methods. Long pages return a summary plus a list of sections, so the AI can read just the part it needs (e.g. a boss's drops). Answers that use wiki content link back to the source pages (OSRS Wiki content is licensed [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/)).
 
 ---
 

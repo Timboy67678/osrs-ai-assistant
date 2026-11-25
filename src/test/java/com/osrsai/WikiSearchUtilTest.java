@@ -33,28 +33,6 @@ public class WikiSearchUtilTest {
     }
 
     @Test
-    public void testCleanWikitextStripsFormatting() {
-        String input = "'''Dragon dagger''' is a [[weapon]]. {{Infobox Item|id=1234}} <!-- comment -->";
-        String cleaned = WikiSearchUtil.cleanWikitext(input);
-        Assert.assertTrue(cleaned.contains("**Dragon dagger**"));
-        Assert.assertTrue(cleaned.contains("weapon"));
-        Assert.assertTrue(cleaned.contains("Infobox Item"));
-        Assert.assertTrue(cleaned.contains("id=1234"));
-        Assert.assertFalse(cleaned.contains("comment"));
-    }
-
-    @Test
-    public void testCleanWikitextStripsUselessSections() {
-        String input = "A rune pouch stores runes.\n==Obtaining==\nBuy from Slayer master.\n==Changes==\nDate: 15 July 2026\n[ div col|colwidth=20em ]\nAdded Maggot King.\n[ div col end ]";
-        String cleaned = WikiSearchUtil.cleanWikitext(input);
-        Assert.assertTrue(cleaned.contains("A rune pouch stores runes"));
-        Assert.assertTrue(cleaned.contains("Buy from Slayer master"));
-        Assert.assertFalse(cleaned.contains("==Changes=="));
-        Assert.assertFalse(cleaned.contains("Added Maggot King"));
-        Assert.assertFalse(cleaned.contains("div col"));
-    }
-
-    @Test
     public void testParseWikiHtmlToMarkdownInfobox() {
         String html = "<div class=\"mw-parser-output\">"
                 + "<table class=\"infobox\"><tr><th>Attack speed</th><td>2.4s (4 ticks)</td></tr><tr><th>High alch</th><td>72,000 coins</td></tr></table>"
