@@ -145,13 +145,12 @@ If you’re contributing or running locally for development:
 
 ## 🤖 AI Disclosure & Development Notes
 
-This project was built entirely by **Google Antigravity AI**, an agentic coding assistant developed by the Google DeepMind team. 
+This project was built with AI coding agents, pair programming with @Timboy67678.
 
-- **Primary Developer:** Google Antigravity AI (via autonomous execution loops)
-- **Collaboration Model:** Pair programming with @Timboy67678
-- **Core Technology:** DeepMind Gemini Models and advanced software agent toolkits
+- **Original development:** **Google Antigravity**, Google DeepMind's agentic coding assistant, powered by Gemini models.
+- **Ongoing development:** **Claude Code**, Anthropic's agentic coding tool, powered by Claude models. Commits made with Claude carry a `Co-Authored-By: Claude` trailer.
 
-Every component in this repository—including the RuneLite plugin configuration interface, the Swing UI panels, thread management, dynamic OSRS Wiki context resolvers, function-calling tool registries, and the Gradle build configuration—was structured, written, and refactored by the AI assistant. 
+Every component in this repository—including the RuneLite plugin configuration interface, the Swing UI panels, thread management, dynamic OSRS Wiki context resolvers, function-calling tool registries, and the Gradle build configuration—was structured, written, and refactored by these AI assistants.
 
 ---
 
