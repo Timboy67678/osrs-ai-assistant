@@ -56,7 +56,7 @@ Paid providers (Claude, OpenAI, Grok, or Gemini's paid tier) are fully optional.
   - Detects current location, Wilderness level (HUD widget & coordinate fallback), multi-combat zones, instanced areas, and world types (PvP, High Risk, Members).
   - Inspects active inventory, equipped items, and bank contents (with automatic offline snapshot caching when closed) with live GE and High Alchemy prices.
   - Scans surrounding game environment for nearby NPCs/monsters, other players (with Wilderness threat detection), valuable ground items, and interactable game objects (altars, bank booths, fairy rings, portals).
-  - Monitors birdhouse run timers, Hespori growth, Tears of Guthix cooldowns, and Kingdom of Miscellania status.
+  - Monitors birdhouse run timers, Hespori growth, and Kingdom of Miscellania status.
   - Tracks your boat's hull HP, repair kits, wind charges and cargo hold contents when sailing.
 - **🗺️ Interactive Pathfinding & Navigation:**
   - Integrates with the **Shortest Path** plugin via cross-plugin communication to automatically set route overlays to coordinates or named POIs (e.g. Farming Guild, Barrows, Chasm of Fire).
@@ -88,7 +88,7 @@ The AI assistant has access to a comprehensive suite of **22 custom tools** enab
 - `get_player_equipment` — Retrieves equipped gear, quantities, GE prices, and High Alchemy values across all equipment slots.
 - `get_player_bank` — Retrieves bank items, quantities, GE prices, and High Alchemy values when open (or from cached snapshot when closed). Supports search filtering and value thresholds.
 - `get_player_status` — Retrieves real-time combat status (current HP, Prayer points, active prayers, poison/venom state, run energy, special attack %, and active status timers).
-- `get_player_currencies_and_points` — Retrieves minigame currencies, tokens, and reward points (e.g. NMZ points, Pest Control commendations, Tithe Farm points, Golden Nuggets, Abyssal Pearls, Marks of Grace, Slayer points, Archery tickets).
+- `get_player_currencies_and_points` — Retrieves minigame currencies, tokens, and reward points (e.g. NMZ points, Tithe Farm points, Barbarian Assault Honour points, Giants' Foundry reputation, Golden Nuggets, Abyssal Pearls, Marks of Grace, Slayer points, Archery tickets).
 - `get_player_location_details` — Retrieves location attributes including Wilderness level, multi-combat status, instanced area check, world types, and region ID.
 
 ### ⚔️ Activities, Quests & Progression Tools
@@ -97,7 +97,7 @@ The AI assistant has access to a comprehensive suite of **22 custom tools** enab
 - `get_player_achievement_diaries` — Retrieves Achievement Diary completion progress for all 12 regions across Easy, Medium, Hard, and Elite tiers.
 - `get_player_combat_achievements` — Retrieves Combat Achievement tier progress (Easy through Grandmaster), boss/monster kill counts (KC), and task completion. Supports filtering by tier, boss name, completion status, or task name.
 - `get_player_clues` — Retrieves active clue scroll details (current step text, requirements, solution) and clue scroll items in inventory or bank.
-- `get_player_farming_and_timers` — Retrieves birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, Kingdom of Miscellania status, and active infobox activity timers.
+- `get_player_farming_and_timers` — Retrieves birdhouse states and timers, Hespori growth state, Kingdom of Miscellania status, and active infobox activity timers.
 - `get_player_sailing_status` — Retrieves the player's Sailing level, whether they're on their boat, its hull HP, repair kits and wind charges, their location, and the contents of any boat cargo holds opened this session.
 
 ### 🗺️ Environment, World & Navigation Tools

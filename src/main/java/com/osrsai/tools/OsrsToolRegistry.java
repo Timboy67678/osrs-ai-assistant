@@ -64,7 +64,7 @@ public class OsrsToolRegistry {
                                 true, true, AiService::executeGetPlayerStatus));
 
                 registry.add(new AiService.ToolDefinition("get_player_currencies_and_points",
-                                "Get the player's minigame points, currencies, tickets and tokens (e.g. Slayer points, Pest Control points, NMZ points).",
+                                "Get the player's minigame points, currencies, tickets and tokens (e.g. Slayer, NMZ, Tithe Farm and Barbarian Assault Honour points). Some minigame points are not readable; the result says which.",
                                 true, true, AiService::executeGetPlayerCurrenciesAndPoints));
 
                 registry.add(new AiService.ToolDefinition("get_player_location_details",
@@ -185,7 +185,7 @@ public class OsrsToolRegistry {
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_farming_and_timers",
-                                "Get birdhouse timers, Hespori growth, Tears of Guthix cooldown, Kingdom of Miscellania status and active timers. Crop and herb patch states are not available; point the player to RuneLite's Time Tracking panel for those.",
+                                "Get birdhouse states and timers, Hespori growth, Kingdom of Miscellania status and active timers. Crop and herb patch states and the Tears of Guthix cooldown are not available; point the player to RuneLite's Time Tracking panel for patches.",
                                 true, true, AiService::executeGetPlayerFarmingAndTimers));
 
                 for (AiService.ToolDefinition def : registry) {

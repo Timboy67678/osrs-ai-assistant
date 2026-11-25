@@ -31,8 +31,6 @@ public class PlayerStateTools {
 
     private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
 
-    private static final int VARP_NMZ_REWARD_POINTS = 1056;
-    private static final int VARP_PEST_CONTROL_POINTS = 261;
     private static final int POISON_VENOM_THRESHOLD = 1_000_000; // start of venom
 
     private static final int MAX_REASONABLE_STREAK = 5000;
@@ -82,9 +80,9 @@ public class PlayerStateTools {
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_ABYSSALDEMONS, "Abyssal Demons (Augment my abbies)");
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_ANKOU, "Ankou (Ankou very much)");
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_SUQAH, "Suqahs (Suq-a-nother one)");
-        SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_BLACKDRAGONS, "Fire Giants (Fire & Darkness)");
+        SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_BLACKDRAGONS, "Black Dragons (Fire & Darkness)");
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_METALDRAGONS, "Metal Dragons (Pedal to the metals)");
-        SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_BLACKDEMONS, "Dark Beasts (It's dark in here)");
+        SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_BLACKDEMONS, "Black Demons (It's dark in here)");
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_GREATERDEMONS, "Greater Demons (Greater challenge)");
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_UNLOCK_MITHRILDRAGONS, "Mithril Dragons (I hope you mith me)");
         SLAYER_EXTENSION_VARBITS.put(VarbitID.SLAYER_LONGER_BLOODVELD, "Bloodvelds (Bleed me dry)");
@@ -289,19 +287,16 @@ public class PlayerStateTools {
         return name != null ? name : "Task ID " + taskId;
     }
 
-    private static final int VARBIT_VALE_RESEARCH_POINTS = 16301;
-    private static final int VARBIT_MTA_TELEKINETIC_PIZZAZZ = 287;
-    private static final int VARBIT_MTA_ALCHEMIST_PIZZAZZ = 288;
-    private static final int VARBIT_MTA_ENCHANTING_PIZZAZZ = 289;
-    private static final int VARBIT_MTA_GRAVEYARD_PIZZAZZ = 290;
-    private static final int VARBIT_BA_ATTACKER_POINTS = 4761;
-    private static final int VARBIT_BA_DEFENDER_POINTS = 4762;
-    private static final int VARBIT_BA_COLLECTOR_POINTS = 4763;
-    private static final int VARBIT_BA_HEALER_POINTS = 4764;
-    private static final int VARBIT_GIANTS_FOUNDRY_REPUTATION = 13919;
-    private static final int VARBIT_VOLCANIC_MINE_POINTS = 5934;
-    private static final int VARBIT_LMS_POINTS = 9304;
-    private static final int VARBIT_BOUNTY_HUNTER_POINTS = 10079;
+    /**
+     * Barbarian Assault stores each role's Honour points in two varbits; the game's own script
+     * combines them as extra * 512 + base.
+     */
+    private static final int BA_EXTRA_MULTIPLIER = 512;
+
+    /** Point totals the game doesn't keep in a client variable this plugin can read. */
+    private static final String UNAVAILABLE_POINTS_NOTE = "Pest Control points, Mage Training Arena"
+            + " Pizazz points, Volcanic Mine points and Last Man Standing points are not available to this"
+            + " plugin. If asked, tell the player where to check them in game instead of giving a number.";
 
     private static final Set<String> TARGET_CURRENCY_NAMES = Set.of(
             "mark of grace",
@@ -671,75 +666,51 @@ public class PlayerStateTools {
         return gson.toJson(result);
     }
 
+    private int baHonourPoints(int baseVarbit, int extraVarbit) {
+        return client.getVarbitValue(extraVarbit) * BA_EXTRA_MULTIPLIER + client.getVarbitValue(baseVarbit);
+    }
+
     public String executeGetPlayerCurrenciesAndPoints(JsonObject args) {
         JsonObject result = new JsonObject();
         JsonObject points = new JsonObject();
 
         try {
-            int nmz = client.getVarpValue(VARP_NMZ_REWARD_POINTS);
-            points.addProperty("nightmareZonePoints", nmz);
+            points.addProperty("nightmareZonePoints", client.getVarpValue(VarPlayerID.NZONE_REWARDPOINTS));
         } catch (Exception ignored) {
         }
 
         try {
-            int pc = client.getVarpValue(VARP_PEST_CONTROL_POINTS);
-            points.addProperty("pestControlCommendations", pc);
+            points.addProperty("titheFarmPoints", client.getVarbitValue(VarbitID.HOSIDIUS_TITHE_REWARDPOINTS));
         } catch (Exception ignored) {
         }
 
         try {
-            int tithe = client.getVarbitValue(VarbitID.HOSIDIUS_TITHE_REWARDPOINTS);
-            points.addProperty("titheFarmPoints", tithe);
-        } catch (Exception ignored) {
-        }
-
-        try {
-            int vale = client.getVarbitValue(VARBIT_VALE_RESEARCH_POINTS);
-            points.addProperty("valeResearchPoints", vale);
-        } catch (Exception ignored) {
-        }
-
-        try {
-            JsonObject mta = new JsonObject();
-            mta.addProperty("telekineticPizzazz", client.getVarbitValue(VARBIT_MTA_TELEKINETIC_PIZZAZZ));
-            mta.addProperty("alchemistPizzazz", client.getVarbitValue(VARBIT_MTA_ALCHEMIST_PIZZAZZ));
-            mta.addProperty("enchantingPizzazz", client.getVarbitValue(VARBIT_MTA_ENCHANTING_PIZZAZZ));
-            mta.addProperty("graveyardPizzazz", client.getVarbitValue(VARBIT_MTA_GRAVEYARD_PIZZAZZ));
-            points.add("mageTrainingArenaPizzazzPoints", mta);
+            points.addProperty("valeTotemsResearchPoints", client.getVarpValue(VarPlayerID.ENT_TOTEMS_RESEARCH_POINTS));
         } catch (Exception ignored) {
         }
 
         try {
             JsonObject ba = new JsonObject();
-            ba.addProperty("attackerPoints", client.getVarbitValue(VARBIT_BA_ATTACKER_POINTS));
-            ba.addProperty("defenderPoints", client.getVarbitValue(VARBIT_BA_DEFENDER_POINTS));
-            ba.addProperty("collectorPoints", client.getVarbitValue(VARBIT_BA_COLLECTOR_POINTS));
-            ba.addProperty("healerPoints", client.getVarbitValue(VARBIT_BA_HEALER_POINTS));
-            points.add("barbarianAssaultHonorPoints", ba);
+            ba.addProperty("attacker", baHonourPoints(VarbitID.BARBASSAULT_POINTS_ATTACKER_BASE,
+                    VarbitID.BARBASSAULT_POINTS_ATTACKER_EXTRA));
+            ba.addProperty("defender", baHonourPoints(VarbitID.BARBASSAULT_POINTS_DEFENDER_BASE,
+                    VarbitID.BARBASSAULT_POINTS_DEFENDER_EXTRA));
+            ba.addProperty("collector", baHonourPoints(VarbitID.BARBASSAULT_POINTS_COLLECTOR_BASE,
+                    VarbitID.BARBASSAULT_POINTS_COLLECTOR_EXTRA));
+            ba.addProperty("healer", baHonourPoints(VarbitID.BARBASSAULT_POINTS_HEALER_BASE,
+                    VarbitID.BARBASSAULT_POINTS_HEALER_EXTRA));
+            points.add("barbarianAssaultHonourPoints", ba);
         } catch (Exception ignored) {
         }
 
         try {
-            int gf = client.getVarbitValue(VARBIT_GIANTS_FOUNDRY_REPUTATION);
-            points.addProperty("giantsFoundryReputation", gf);
+            points.addProperty("giantsFoundryReputation",
+                    client.getVarpValue(VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS));
         } catch (Exception ignored) {
         }
 
         try {
-            int vm = client.getVarbitValue(VARBIT_VOLCANIC_MINE_POINTS);
-            points.addProperty("volcanicMinePoints", vm);
-        } catch (Exception ignored) {
-        }
-
-        try {
-            int lms = client.getVarbitValue(VARBIT_LMS_POINTS);
-            points.addProperty("lmsPoints", lms);
-        } catch (Exception ignored) {
-        }
-
-        try {
-            int bh = client.getVarbitValue(VARBIT_BOUNTY_HUNTER_POINTS);
-            points.addProperty("bountyHunterPoints", bh);
+            points.addProperty("bountyHunterPoints", client.getVarpValue(VarPlayerID.BH_2023_POINTS));
         } catch (Exception ignored) {
         }
 
@@ -835,6 +806,7 @@ public class PlayerStateTools {
         }
         points.add("currencyItems", itemCurrencies);
         result.add("pointsAndCurrencies", points);
+        result.addProperty("notAvailable", UNAVAILABLE_POINTS_NOTE);
 
         return gson.toJson(result);
     }

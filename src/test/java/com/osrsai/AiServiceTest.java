@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import java.util.*;
+import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.InterfaceID;
@@ -29,7 +30,6 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.config.ConfigManager;
 import com.osrsai.provider.AiProfile;
 import com.osrsai.provider.AiProvider;
-import com.osrsai.tools.FarmingAndTimerTools;
 import com.osrsai.tools.OsrsToolRegistry;
 import com.osrsai.tools.QuestAndDiaryTools;
 import com.osrsai.util.ItemContainerUtils;
@@ -76,8 +76,8 @@ public class AiServiceTest {
 
     @Test
     public void testKingdomLiveVarps() {
-        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_FAVOUR)).thenReturn(127);
-        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_COFFER)).thenReturn(1250000);
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_APPROVAL)).thenReturn(127);
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_COFFERS)).thenReturn(1250000);
 
         String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
         JsonObject root = new Gson().fromJson(json, JsonObject.class);
@@ -91,8 +91,8 @@ public class AiServiceTest {
 
     @Test
     public void testKingdomCachedAndEstimated() {
-        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_FAVOUR)).thenReturn(0);
-        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_COFFER)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_APPROVAL)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_COFFERS)).thenReturn(0);
 
         Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "approval")).thenReturn("127");
         Mockito.when(configManager.getRSProfileConfiguration("kingdomofmiscellania", "coffer")).thenReturn("1250000");
@@ -113,8 +113,8 @@ public class AiServiceTest {
 
     @Test
     public void testKingdomMultiDayDecay() {
-        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_FAVOUR)).thenReturn(0);
-        Mockito.when(client.getVarpValue(FarmingAndTimerTools.VARP_KINGDOM_COFFER)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_APPROVAL)).thenReturn(0);
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_COFFERS)).thenReturn(0);
 
         // 3 days ago, 127 approval, 1.25M coffer
         java.time.Instant threeDaysAgo = java.time.Instant.now().minus(java.time.Duration.ofDays(3));
@@ -1220,20 +1220,60 @@ public class AiServiceTest {
 
     @Test
     public void testExecuteGetPlayerFarmingAndTimers() {
-        Mockito.when(client.getVarbitValue(6521)).thenReturn(1); // Meadow North
-        Mockito.when(client.getVarbitValue(7908)).thenReturn(7); // Hespori fully grown
-        Mockito.when(client.getVarpValue(452)).thenReturn(0); // TOG ready
-        Mockito.when(client.getVarpValue(73)).thenReturn(127); // 100% Kingdom favour
-        Mockito.when(client.getVarpValue(74)).thenReturn(5000000); // Kingdom coffer
+        Mockito.when(client.getVarbitValue(VarbitID.FARMING_TRANSMIT_J)).thenReturn(7); // Hespori fully grown
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_APPROVAL)).thenReturn(127); // 100% Kingdom favour
+        Mockito.when(client.getVarbitValue(VarbitID.MISC_COFFERS)).thenReturn(5000000);
 
         String json = aiService.executeGetPlayerFarmingAndTimers(new JsonObject());
-        Assert.assertNotNull(json);
         JsonObject root = new Gson().fromJson(json, JsonObject.class);
         Assert.assertEquals("success", root.get("status").getAsString());
-        Assert.assertTrue(root.getAsJsonObject("tearsOfGuthix").get("ready").getAsBoolean());
+        Assert.assertFalse("no Tears of Guthix guess", root.has("tearsOfGuthix"));
         Assert.assertEquals(100, root.getAsJsonObject("kingdomOfMiscellania").get("favourPercent").getAsInt());
         Assert.assertEquals("Fully Grown / Ready to fight",
                 root.getAsJsonObject("hespori").get("status").getAsString());
+    }
+
+    @Test
+    public void testBirdhousesDecodeLikeTimeTracking() {
+        long now = System.currentTimeMillis() / 1000L;
+        net.runelite.api.Player player = Mockito.mock(net.runelite.api.Player.class);
+        Mockito.when(client.getLocalPlayer()).thenReturn(player);
+        // Seeded (multiple of 3) an hour ago: full. Seeded 10 minutes ago: 40 minutes left.
+        Mockito.when(client.getVarpValue(VarPlayerID.BIRDHOUSE_TRANSMIT_A)).thenReturn(3);
+        Mockito.when(client.getVarpValue(VarPlayerID.BIRDHOUSE_TRANSMIT_B)).thenReturn(6);
+        Mockito.when(client.getVarpValue(VarPlayerID.BIRDHOUSE_TRANSMIT_C)).thenReturn(4); // built, not seeded
+        Mockito.when(client.getVarpValue(VarPlayerID.BIRDHOUSE_TRANSMIT_D)).thenReturn(0);
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "birdhouse." + VarPlayerID.BIRDHOUSE_TRANSMIT_A))
+                .thenReturn("3:" + (now - 3600));
+        Mockito.when(configManager.getRSProfileConfiguration("timetracking", "birdhouse." + VarPlayerID.BIRDHOUSE_TRANSMIT_B))
+                .thenReturn("6:" + (now - 600));
+
+        JsonObject bh = new Gson().fromJson(aiService.executeGetPlayerFarmingAndTimers(new JsonObject()),
+                JsonObject.class).getAsJsonObject("birdhouses");
+        Assert.assertEquals("Full, ready to collect", bh.get("meadowNorth").getAsString());
+        Assert.assertEquals("Catching birds (40m left)", bh.get("meadowSouth").getAsString());
+        Assert.assertEquals("Built, not seeded", bh.get("valleyNorth").getAsString());
+        Assert.assertEquals("Empty", bh.get("valleySouth").getAsString());
+        Assert.assertEquals(1, bh.get("readyCount").getAsInt());
+    }
+
+    @Test
+    public void testCurrenciesUseRealVarsAndCombineBarbarianAssaultPoints() {
+        Mockito.when(client.getVarpValue(VarPlayerID.NZONE_REWARDPOINTS)).thenReturn(250000);
+        Mockito.when(client.getVarbitValue(VarbitID.BARBASSAULT_POINTS_HEALER_BASE)).thenReturn(100);
+        Mockito.when(client.getVarbitValue(VarbitID.BARBASSAULT_POINTS_HEALER_EXTRA)).thenReturn(2);
+        Mockito.when(client.getVarpValue(VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS)).thenReturn(4321);
+
+        JsonObject root = new Gson().fromJson(aiService.executeGetPlayerCurrenciesAndPoints(new JsonObject()),
+                JsonObject.class);
+        JsonObject points = root.getAsJsonObject("pointsAndCurrencies");
+        Assert.assertEquals(250000, points.get("nightmareZonePoints").getAsInt());
+        Assert.assertEquals(2 * 512 + 100,
+                points.getAsJsonObject("barbarianAssaultHonourPoints").get("healer").getAsInt());
+        Assert.assertEquals(4321, points.get("giantsFoundryReputation").getAsInt());
+        Assert.assertFalse(points.has("pestControlCommendations") || points.has("lmsPoints")
+                || points.has("volcanicMinePoints") || points.has("mageTrainingArenaPizzazzPoints"));
+        Assert.assertTrue(root.get("notAvailable").getAsString().contains("Pest Control"));
     }
 
     @Test

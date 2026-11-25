@@ -11,6 +11,7 @@ import net.runelite.api.QuestState;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
+import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 
 import java.time.Instant;
@@ -19,23 +20,25 @@ import java.util.*;
 
 /**
  * Tool implementations for time tracking, birdhouse traps, Hespori growth,
- * Tears of Guthix cooldown, Kingdom of Miscellania calculation, daily task
+ * Kingdom of Miscellania calculation, daily task
  * collectibles,
  * and active InfoBox timers.
  */
 @Slf4j
 public class FarmingAndTimerTools {
 
-    private static final int VARBIT_BIRDHOUSE_MEADOW_NORTH = 6521;
-    private static final int VARBIT_BIRDHOUSE_MEADOW_SOUTH = 6522;
-    private static final int VARBIT_BIRDHOUSE_VALLEY_NORTH = 6523;
-    private static final int VARBIT_BIRDHOUSE_VALLEY_SOUTH = 6524;
+    /** Birdhouse space varps, in the order Meadow North, Meadow South, Valley North, Valley South. */
+    private static final int[] BIRDHOUSE_VARPS = {
+            VarPlayerID.BIRDHOUSE_TRANSMIT_A,
+            VarPlayerID.BIRDHOUSE_TRANSMIT_B,
+            VarPlayerID.BIRDHOUSE_TRANSMIT_C,
+            VarPlayerID.BIRDHOUSE_TRANSMIT_D };
+    private static final String[] BIRDHOUSE_KEYS = { "meadowNorth", "meadowSouth", "valleyNorth", "valleySouth" };
+    /** Same duration RuneLite's Time Tracking plugin uses for a seeded birdhouse. */
+    private static final long BIRDHOUSE_DURATION_SEC = 50 * 60;
 
     private static final int HESPORI_STAGE_READY = 7;
 
-    private static final int VARP_TEARS_OF_GUTHIX_COOLDOWN = 452;
-    public static final int VARP_KINGDOM_FAVOUR = 73;
-    public static final int VARP_KINGDOM_COFFER = 74;
 
     private final Client client;
     private final ConfigManager configManager;
@@ -67,60 +70,58 @@ public class FarmingAndTimerTools {
 
         long nowSec = System.currentTimeMillis() / 1000L;
 
-        // 1. Birdhouse run states (Fossil Island - live varbits + Time Tracking cache)
+        // 1. Birdhouses, decoded the same way as RuneLite's Time Tracking plugin: the varp is 0 when
+        // empty, a multiple of 3 when seeded, otherwise built but not seeded. Time Tracking stores
+        // "varp:timestamp" with the time the space last changed; a seeded house is full 50 minutes later.
         JsonObject birdhouses = new JsonObject();
-        int bh1 = client != null ? client.getVarbitValue(VARBIT_BIRDHOUSE_MEADOW_NORTH) : 0;
-        int bh2 = client != null ? client.getVarbitValue(VARBIT_BIRDHOUSE_MEADOW_SOUTH) : 0;
-        int bh3 = client != null ? client.getVarbitValue(VARBIT_BIRDHOUSE_VALLEY_NORTH) : 0;
-        int bh4 = client != null ? client.getVarbitValue(VARBIT_BIRDHOUSE_VALLEY_SOUTH) : 0;
+        int ready = 0;
+        int catching = 0;
+        int seededUnknownTime = 0;
+        for (int i = 0; i < BIRDHOUSE_VARPS.length; i++) {
+            String stored = Utilities.getConfigValue(configManager, "timetracking", "birdhouse." + BIRDHOUSE_VARPS[i]);
+            int storedVarp = -1;
+            long storedTime = 0;
+            if (stored != null) {
+                String[] parts = stored.split(":");
+                try {
+                    storedVarp = Integer.parseInt(parts[0].trim());
+                    storedTime = parts.length > 1 ? Long.parseLong(parts[1].trim()) : 0;
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            int varp = storedVarp;
+            if (client != null && client.getLocalPlayer() != null) {
+                int live = client.getVarpValue(BIRDHOUSE_VARPS[i]);
+                if (live != storedVarp) {
+                    // Changed since Time Tracking last saved it, so the stored time doesn't apply.
+                    storedTime = 0;
+                }
+                varp = live;
+            }
 
-        String bhVal1 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1626");
-        String bhVal2 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1627");
-        String bhVal3 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1628");
-        String bhVal4 = Utilities.getConfigValue(configManager, "timetracking", "birdhouse.1629");
-
-        long bhTime1 = parseTimestampOrDuration(bhVal1);
-        long bhTime2 = parseTimestampOrDuration(bhVal2);
-        long bhTime3 = parseTimestampOrDuration(bhVal3);
-        long bhTime4 = parseTimestampOrDuration(bhVal4);
-
-        boolean bh1Ready = (bh1 >= 3) || (bhVal1 != null
-                && (bhVal1.contains("done") || bhVal1.contains("ready") || (bhTime1 > 0 && bhTime1 <= nowSec)));
-        boolean bh2Ready = (bh2 >= 3) || (bhVal2 != null
-                && (bhVal2.contains("done") || bhVal2.contains("ready") || (bhTime2 > 0 && bhTime2 <= nowSec)));
-        boolean bh3Ready = (bh3 >= 3) || (bhVal3 != null
-                && (bhVal3.contains("done") || bhVal3.contains("ready") || (bhTime3 > 0 && bhTime3 <= nowSec)));
-        boolean bh4Ready = (bh4 >= 3) || (bhVal4 != null
-                && (bhVal4.contains("done") || bhVal4.contains("ready") || (bhTime4 > 0 && bhTime4 <= nowSec)));
-
-        int readyBhCount = (bh1Ready ? 1 : 0) + (bh2Ready ? 1 : 0) + (bh3Ready ? 1 : 0) + (bh4Ready ? 1 : 0);
-        int activeBhCount = ((bh1 > 0 || bhTime1 > 0) ? 1 : 0) + ((bh2 > 0 || bhTime2 > 0) ? 1 : 0)
-                + ((bh3 > 0 || bhTime3 > 0) ? 1 : 0) + ((bh4 > 0 || bhTime4 > 0) ? 1 : 0);
-
-        birdhouses.addProperty("meadowNorth", bh1Ready ? "Done / Ready to harvest"
-                : (bhTime1 > nowSec ? "Growing (" + Math.max(1, (bhTime1 - nowSec) / 60) + "m remaining)"
-                        : "Empty / not built"));
-        birdhouses.addProperty("meadowSouth", bh2Ready ? "Done / Ready to harvest"
-                : (bhTime2 > nowSec ? "Growing (" + Math.max(1, (bhTime2 - nowSec) / 60) + "m remaining)"
-                        : "Empty / not built"));
-        birdhouses.addProperty("valleyNorth", bh3Ready ? "Done / Ready to harvest"
-                : (bhTime3 > nowSec ? "Growing (" + Math.max(1, (bhTime3 - nowSec) / 60) + "m remaining)"
-                        : "Empty / not built"));
-        birdhouses.addProperty("valleySouth", bh4Ready ? "Done / Ready to harvest"
-                : (bhTime4 > nowSec ? "Growing (" + Math.max(1, (bhTime4 - nowSec) / 60) + "m remaining)"
-                        : "Empty / not built"));
-        birdhouses.addProperty("readyCount", readyBhCount);
-        birdhouses.addProperty("ready", readyBhCount > 0);
-        if (readyBhCount == 4) {
-            birdhouses.addProperty("summary",
-                    "All 4 birdhouse traps are full and ready to harvest (Mushroom Meadow North/South, Verdant Valley Northeast/Southwest)");
-        } else if (readyBhCount > 0) {
-            birdhouses.addProperty("summary", readyBhCount + " of 4 birdhouse traps are ready to harvest");
-        } else if (activeBhCount > 0) {
-            birdhouses.addProperty("summary", activeBhCount + " birdhouses are currently catching birds");
-        } else {
-            birdhouses.addProperty("summary", "Empty / not built");
+            String state;
+            if (varp < 0) {
+                state = "Unknown (not seen yet; log in or visit Fossil Island)";
+            } else if (varp == 0) {
+                state = "Empty";
+            } else if (varp % 3 != 0) {
+                state = "Built, not seeded";
+            } else if (storedTime <= 0) {
+                state = "Seeded (time placed unknown)";
+                seededUnknownTime++;
+            } else if (nowSec >= storedTime + BIRDHOUSE_DURATION_SEC) {
+                state = "Full, ready to collect";
+                ready++;
+            } else {
+                long minutes = Math.max(1, (storedTime + BIRDHOUSE_DURATION_SEC - nowSec + 59) / 60);
+                state = "Catching birds (" + minutes + "m left)";
+                catching++;
+            }
+            birdhouses.addProperty(BIRDHOUSE_KEYS[i], state);
         }
+        birdhouses.addProperty("readyCount", ready);
+        birdhouses.addProperty("summary", ready + " ready, " + catching + " catching birds"
+                + (seededUnknownTime > 0 ? ", " + seededUnknownTime + " seeded with unknown time" : ""));
         result.add("birdhouses", birdhouses);
 
         // 2. Hespori Boss Growth
@@ -131,17 +132,10 @@ public class FarmingAndTimerTools {
                 : (hesporiVar > 0 ? "Growing" : "Empty / Cleared"));
         result.add("hespori", hespori);
 
-        // 3. Tears of Guthix Cooldown
-        JsonObject tog = new JsonObject();
-        int togCooldown = client != null ? client.getVarpValue(VARP_TEARS_OF_GUTHIX_COOLDOWN) : 0;
-        tog.addProperty("cooldownVarp", togCooldown);
-        tog.addProperty("ready", togCooldown <= 0);
-        result.add("tearsOfGuthix", tog);
-
         // 4. Kingdom of Miscellania
         JsonObject kingdom = new JsonObject();
-        int rawFavour = client != null ? client.getVarpValue(VARP_KINGDOM_FAVOUR) : 0;
-        int rawCoffer = client != null ? client.getVarpValue(VARP_KINGDOM_COFFER) : 0;
+        int rawFavour = client != null ? client.getVarbitValue(VarbitID.MISC_APPROVAL) : 0;
+        int rawCoffer = client != null ? client.getVarbitValue(VarbitID.MISC_COFFERS) : 0;
 
         Integer cachedFavour = null;
         Integer cachedCoffer = null;
@@ -253,7 +247,7 @@ public class FarmingAndTimerTools {
         if (rawFavour > 0 || rawCoffer > 0) {
             finalFavour = rawFavour;
             finalCoffer = rawCoffer;
-            source = "live (in Miscellania)";
+            source = "live";
         } else if (cachedFavour != null || cachedCoffer != null) {
             int estimatedApproval = cachedFavour != null ? cachedFavour : 0;
             int estimatedCoffer = cachedCoffer != null ? cachedCoffer : 0;
@@ -375,22 +369,4 @@ public class FarmingAndTimerTools {
         return gson.toJson(result);
     }
 
-    private long parseTimestampOrDuration(String val) {
-        if (val == null || val.trim().isEmpty()) {
-            return 0;
-        }
-        String[] parts = val.split("[:;,|]");
-        for (String part : parts) {
-            try {
-                long num = Long.parseLong(part.trim());
-                if (num > 1000000000000L) {
-                    return num / 1000L;
-                } else if (num > 1000000000L) {
-                    return num;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return 0;
-    }
 }
