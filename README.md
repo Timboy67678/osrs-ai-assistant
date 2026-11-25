@@ -20,6 +20,35 @@
 
 ---
 
+## 💸 Free to Use
+
+You don't need a paid AI subscription. Two free options work out of the box:
+
+### 🏠 Ollama (free, runs on your own PC)
+Run an open model locally with [Ollama](https://ollama.com). Nothing leaves your computer, and no API key or account is needed.
+
+1. Install Ollama and pull a model that supports tool calling, e.g. `ollama pull qwen3` or `ollama pull llama3.1`.
+2. In the plugin's **AI Profile Manager**, create a profile with the **Custom** provider.
+3. Leave the endpoint blank to use Ollama's default (`http://localhost:11434/v1/chat/completions`), and enter the model name (e.g. `qwen3`) as the custom model.
+4. Leave the API key empty and set the profile active.
+
+LM Studio, LocalAI, and vLLM work the same way. Point the endpoint at their OpenAI-compatible URL (for LM Studio, usually `http://localhost:1234/v1/chat/completions`).
+
+> [!TIP]
+> Local models need to support tool/function calling to read your game state and search the wiki. Larger models give noticeably better answers; pick the biggest one your hardware runs comfortably.
+
+### ☁️ Google Gemini (free tier)
+Google AI Studio offers a free, rate-limited tier for Gemini Flash models.
+
+1. Create a free API key at [Google AI Studio](https://aistudio.google.com/apikey).
+2. In the **AI Profile Manager**, create a profile with **Gemini 2.5 Flash** or **Gemini 3.6 Flash** and paste in your key.
+
+Free-tier limits and eligible models are set by Google and can change; check [Google's rate limits page](https://ai.google.dev/gemini-api/docs/rate-limits) for the current details. On the free tier, Google may use your prompts to improve its products, so use Ollama if you want everything kept on your machine.
+
+Paid providers (Claude, OpenAI, Grok, or Gemini's paid tier) are fully optional.
+
+---
+
 ## ✨ Features
 
 - **🎮 Autonomous Game Context Integration:**
@@ -36,11 +65,11 @@
   - Automatically tailors advice based on account restrictions (e.g. prioritizing High Alchemy values over GE prices, noting self-sufficiency, and avoiding invalid trading suggestions for Ironmen).
 - **🧠 Multi-Model AI Support & Profiles:**
   - Built-in **AI Profile Manager** to easily create, configure, and switch between multiple AI profiles and providers.
-  - **Google Gemini:** Gemini 3.6 Flash, Gemini 2.5 Flash, Gemini 2.5 Pro.
+  - **Google Gemini:** Gemini 3.6 Flash, Gemini 2.5 Flash, Gemini 2.5 Pro (Flash models are available on Google's free tier).
   - **Anthropic Claude:** Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5.
   - **OpenAI:** GPT-6 Sol, GPT-6 Luna, GPT-4o and GPT-4o Mini (both retiring January 2027).
   - **xAI Grok:** Grok 4.20 Reasoning, Grok 4.3.
-  - **Custom / Local AI:** Connect to Ollama, LM Studio, LocalAI, vLLM, or any OpenAI-compatible API endpoint with custom model IDs.
+  - **Custom / Local AI (free):** Connect to Ollama, LM Studio, LocalAI, vLLM, or any OpenAI-compatible API endpoint with custom model IDs. No API key required.
 - **🗂️ Multi-Session & Window Flexibility:**
   - Create, switch, and delete multiple chat sessions with persistent local history.
   - Usable as a standard RuneLite sidebar panel or detached as an independent floating window (remembers position, size, and multi-monitor bounds).
