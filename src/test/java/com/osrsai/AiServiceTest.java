@@ -312,11 +312,9 @@ public class AiServiceTest {
         Assert.assertTrue(prompt.contains("GROUNDING RULES"));
         Assert.assertTrue(prompt.contains("GAME CONTEXT"));
         Assert.assertTrue(prompt.contains("RECENT CONVERSATION"));
-        Assert.assertTrue(prompt.contains("OSRS RuneLite assistant"));
-        Assert.assertTrue(prompt.contains("Never invent stats"));
-        Assert.assertTrue(prompt.contains("High Alchemy"));
-        Assert.assertTrue(prompt.contains("active spellbook"));
         Assert.assertTrue(prompt.contains("search_osrs_wiki"));
+        Assert.assertTrue(prompt.contains("Location Name: Grand Exchange"));
+        Assert.assertTrue(prompt.contains("You: Where am I?"));
     }
 
     @Test

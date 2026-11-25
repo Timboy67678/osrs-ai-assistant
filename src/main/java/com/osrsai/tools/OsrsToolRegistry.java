@@ -25,75 +25,75 @@ public class OsrsToolRegistry {
                 Map<String, AiService.ToolDefinition> map = new HashMap<>();
 
                 registry.add(new AiService.ToolDefinition("get_player_skills",
-                                "Retrieve the player's base levels, boosted levels, experience (XP), and thresholds. MUST be called before quoting or relying on any of the player's specific skill levels or XP progress.",
+                                "Get the player's base and boosted levels and XP for each skill, and XP remaining to a target level.",
                                 true, true, AiService::executeGetPlayerSkills)
                                 .addParam("skill", "string",
-                                                "Optional skill name to filter strictly by (case-insensitive, e.g. 'Attack', 'Strength', 'Slayer'). If omitted, retrieves all skills.",
+                                                "Optional skill to return (e.g. 'Slayer'). Omit for all skills.",
                                                 false)
                                 .addParam("targetLevel", "integer",
-                                                "Optional target level to calculate exact remaining XP for (e.g. 65, 75, 85, 92).",
+                                                "Optional target level to calculate remaining XP for.",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_inventory",
-                                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently in the player's inventory. Note: Inventory contents are temporary snapshot state and can be restocked at a bank before starting new activities.",
+                                "Get the items in the player's inventory with quantities, GE prices and High Alchemy values.",
                                 true, true, AiService::executeGetPlayerInventory));
 
                 registry.add(new AiService.ToolDefinition("get_player_equipment",
-                                "Retrieve the items, quantities, Grand Exchange prices, and High Alchemy values currently equipped by the player.",
+                                "Get the player's equipped items with GE prices and High Alchemy values.",
                                 true, true, AiService::executeGetPlayerEquipment));
 
                 registry.add(new AiService.ToolDefinition("get_player_slayer_task",
-                                "Retrieve the player's current standard Slayer task AND separate Mortimer Slayer task, remaining quantities, assigned locations, assigned Slayer masters (e.g. Duradel, Nieve, Konar, Mortimer), current Slayer points, and current streaks (standard streak & Mortimer streak). Optionally include purchased slayer unlocks (e.g. 'Basilocked (Basilisks)', 'Broader Fletching', 'Like a Boss', 'Bigger and Badder') and the current block list. Pass includeUnlocks=true when asking how to do a slayer task, evaluating monster variants, reviewing unlocks/blocks, or recommending tasks to block/unlock.",
+                                "Get the player's current Slayer task: monster, amount left, assigned location, Slayer master, Slayer points and task streaks.",
                                 true, true, AiService::executeGetPlayerSlayerTask)
                                 .addParam("includeUnlocks", "boolean",
-                                                "If true, also returns the list of purchased slayer unlocks and the current task block list. Omit or set false to save context tokens when only the active task is needed.",
+                                                "Set true to also return purchased Slayer unlocks and the block list (needed for questions about task variants, unlocks or blocking).",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_quests",
-                                "Retrieve the player's quest points, completed quest count, and lists of in-progress (including stage/varbit value), not started, or completed quests.",
+                                "Get the player's quest points and which quests are completed, in progress or not started.",
                                 true, true, AiService::executeGetPlayerQuests)
                                 .addParam("status", "string",
                                                 "Optional quest status filter: 'IN_PROGRESS' (default), 'NOT_STARTED', 'COMPLETED', or 'ALL'.",
                                                 false)
                                 .addParam("quest", "string",
-                                                "Optional quest name search term (case-insensitive substring, e.g. 'Desert Treasure') to filter the lists of quests.",
+                                                "Optional quest name to filter by (e.g. 'Desert Treasure').",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_status",
-                                "Retrieve the player's real-time combat and vital status (current HP, prayer points, active prayers, poison/venom state, run energy, special attack %, active RuneLite infobox timers & status effects). Use for immediate action/survival questions, NOT as primary criteria for general boss readiness.",
+                                "Get the player's current HP, prayer points, active prayers, poison/venom, run energy, special attack and active timers. For questions about right now, not general readiness.",
                                 true, true, AiService::executeGetPlayerStatus));
 
                 registry.add(new AiService.ToolDefinition("get_player_currencies_and_points",
-                                "Retrieve the player's minigame reward points, currencies, tickets, and tokens (e.g. NMZ points, Pest Control commends, Tithe Farm points, Golden Nuggets, Abyssal Pearls, Marks of Grace, Slayer points, Archery tickets).",
+                                "Get the player's minigame points, currencies, tickets and tokens (e.g. Slayer points, Pest Control points, NMZ points).",
                                 true, true, AiService::executeGetPlayerCurrenciesAndPoints));
 
                 registry.add(new AiService.ToolDefinition("get_player_location_details",
-                                "Retrieve detailed information about the player's location, including Wilderness level, multi-combat status, instanced area status, world types (PvP, Members, High Risk), and region ID.",
+                                "Get the player's location details: Wilderness level, multi-combat, instance, world type and region ID.",
                                 true, true, AiService::executeGetPlayerLocationDetails));
 
                 registry.add(new AiService.ToolDefinition("get_player_achievement_diaries",
-                                "Retrieve the player's Achievement Diary completion progress for all regions and tiers (Easy, Medium, Hard, Elite).",
+                                "Get the player's Achievement Diary completion for every region and tier.",
                                 true, true, AiService::executeGetPlayerAchievementDiaries));
 
                 registry.add(new AiService.ToolDefinition("get_player_bank",
-                                "Retrieve items in the player's bank when open. Omit 'filter' to get top gear and valuable items, or pass category keywords ('gear', 'weapons', 'armour', 'potions', 'food') or item name search queries.",
+                                "Get items in the player's bank (the last-seen contents if the bank is closed). Omit 'filter' for gear and valuable items.",
                                 true, true, AiService::executeGetPlayerBank)
                                 .addParam("filter", "string",
-                                                "Optional search query or category keyword (e.g. 'gear', 'weapons', 'armour', 'potions', 'food', 'dragon', 'rune').",
+                                                "Optional item name or category ('gear', 'weapons', 'armour', 'potions', 'food').",
                                                 false)
                                 .addParam("minValue", "integer", "Optional minimum value to filter items.", false));
 
                 registry.add(new AiService.ToolDefinition("get_item_stats",
-                                "Retrieve detailed equipment statistics, combat bonuses (Strength, Attack, Defence, Prayer), weight, slot, and prices for a list of item IDs or item names. MUST be called whenever recommending gear setups, comparing equipment options, or answering questions about item stats.",
+                                "Get items' equipment bonuses, slot, weight and prices from the game's own data. Use when comparing or recommending gear.",
                                 true, true, AiService::executeGetItemStats)
                                 .addParam("itemIds", "array_integer",
                                                 "Optional list of OSRS item IDs to retrieve stats for.", false)
                                 .addParam("itemNames", "array_string",
-                                                "Optional list of item names to search for in game database or containers and retrieve stats.",
+                                                "Optional list of item names.",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_clues",
-                                "Retrieve details about the player's active clue scroll (current step text, requirements, and solution) if they are in the middle of one, as well as a list of clue scroll items currently in their inventory or bank.",
+                                "Get the player's active clue step (text, solution, location) from RuneLite's Clue Scroll plugin, and clue scrolls in their inventory or bank.",
                                 true, true, AiService::executeGetPlayerClues));
 
                 registry.add(new AiService.ToolDefinition("search_osrs_wiki",
@@ -107,49 +107,49 @@ public class OsrsToolRegistry {
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_combat_achievements",
-                                "Retrieve the player's Combat Achievement tier completion status (Easy, Medium, Hard, Elite, Master, Grandmaster) and boss/activity kill counts (KC).",
+                                "Get the player's Combat Achievement progress by tier and boss kill counts. Filters return individual tasks.",
                                 true, true, AiService::executeGetPlayerCombatAchievements)
                                 .addParam("tier", "string",
-                                                "Optional. Filter individual tasks strictly by tier (case-insensitive: 'Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster').",
+                                                "Optional tier filter ('Easy' to 'Grandmaster').",
                                                 false)
                                 .addParam("boss", "string",
-                                                "Optional. Filter individual tasks by boss/monster name substring (case-insensitive, e.g. 'barrows' or 'zulrah').",
+                                                "Optional boss name filter (e.g. 'zulrah').",
                                                 false)
                                 .addParam("completed", "boolean",
-                                                "Optional. Filter individual tasks by completion status.", false)
+                                                "Optional completion filter.", false)
                                 .addParam("taskName", "string",
-                                                "Optional. Filter individual tasks strictly by task name substring (case-insensitive, e.g. 'noxious foe' or 'barrows novice').",
+                                                "Optional task name filter.",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_transportation",
-                                "Retrieve the player's unlocked travel networks, teleportation unlocks (e.g. Fairy Rings, Spirit Trees, Gnome Gliders, Balloons, Ectophial, Drakkan's Medallion, Royal Seed Pod), current spellbook teleports, Construction POH portal access, and teleportation items in inventory/equipment/bank. Call whenever formulating travel routes, teleport suggestions, or item gathering directions.",
+                                "Get the travel options the player has unlocked: transport networks, spellbook teleports, POH portals and teleport items they own. Use when suggesting routes.",
                                 true, true, AiService::executeGetPlayerTransportation));
 
                 registry.add(new AiService.ToolDefinition("set_shortest_path_target",
-                                "Set a destination coordinate (X, Y, Plane) or named POI in the player's Shortest Path plugin to draw a route overlay on their game screen via cross-plugin communication. IMPORTANT: Always specify surface entrance coordinates (Y < 5000) for dungeons, caves, or underground locations (e.g. Chasm of Fire entrance at X=1435, Y=3671 instead of internal underground offset Y=10077) so the pathfinder draws a valid route on the world map. Supports optional custom start coordinates and pathfinding config overrides (e.g. avoidWilderness). Requires the Shortest Path plugin to be installed and enabled in RuneLite.",
+                                "Draw a route to a destination on the player's screen using the Shortest Path plugin (must be installed). Prefer 'poiName' for known places; for dungeons, target the surface entrance (Y below 5000).",
                                 true, true, AiService::executeSetShortestPathTarget)
                                 .addParam("poiName", "string",
-                                                "Optional well-known landmark, guild, boss entrance, or city name (e.g. 'Farming Guild', 'Grand Exchange', 'Chasm of Fire', 'Barrows', 'Zulrah', 'Myth's Guild'). If provided, coordinates will be automatically resolved.",
+                                                "Optional known place name (e.g. 'Grand Exchange', 'Farming Guild', 'Barrows'); coordinates are looked up automatically.",
                                                 false)
                                 .addParam("x", "integer",
-                                                "The target X coordinate (WorldPoint x, e.g. 3200). Optional if poiName is provided.",
+                                                "Target world X coordinate, if not using poiName.",
                                                 false)
                                 .addParam("y", "integer",
-                                                "The target Y coordinate (WorldPoint y, e.g. 3400). Optional if poiName is provided.",
+                                                "Target world Y coordinate, if not using poiName.",
                                                 false)
                                 .addParam("plane", "integer",
-                                                "The target plane (0 for ground level, 1 for first floor, etc. Default is 0).",
+                                                "Target plane (0 is ground level).",
                                                 false)
                                 .addParam("locationName", "string",
-                                                "A human-readable name of the location being targeted (e.g. 'Varrock West Bank' or 'Grand Exchange') to show the player in the chat response.",
+                                                "Name of the destination to show the player.",
                                                 false)
                                 .addParam("startX", "integer",
-                                                "Optional custom starting X coordinate. Omit to start path calculation from player's current location.",
+                                                "Optional start X; omit to start from the player.",
                                                 false)
                                 .addParam("startY", "integer", "Optional custom starting Y coordinate.", false)
                                 .addParam("startPlane", "integer", "Optional custom starting plane.", false)
                                 .addParam("avoidWilderness", "boolean",
-                                                "Optional. Set to true to force pathfinding to avoid the Wilderness.",
+                                                "Set true to avoid the Wilderness.",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("clear_shortest_path_target",
@@ -157,35 +157,35 @@ public class OsrsToolRegistry {
                                 true, true, AiService::executeClearShortestPathTarget));
 
                 registry.add(new AiService.ToolDefinition("get_player_sailing_status",
-                                "Retrieve details about the player's active vessel and sailing status (ship tier/type, hull HP/condition, sail trim, knot speed, wind direction, anchor status, cargo hold items, crew members, sea location, and Sailing skill stats).",
+                                "Get the player's Sailing level and, when aboard, their ship's name, hull HP, current activity, facilities, cargo and location.",
                                 true, true, AiService::executeGetPlayerSailingStatus)
                                 .addParam("includeCargo", "boolean",
-                                                "Optional. Set to false to exclude ship cargo hold item listing (default is true).",
+                                                "Set false to leave out the cargo list.",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_surrounding_environment",
-                                "Retrieve real-time situational details about the player's immediate surrounding game environment within render distance, including nearby NPCs and monsters (names, combat levels, distance, health, interaction), nearby players (names, combat levels, skulls, Wilderness threat status), valuable unlooted ground items, and notable interactable game objects (altars, bank booths, fairy rings, portals, stairs, ladders, furnaces). Call when asked about nearby monsters, boss spawns, PKers in the Wilderness, unlooted ground drops, or local surroundings.",
+                                "Scan what is near the player: NPCs and monsters, other players (with Wilderness threat info), valuable ground items and notable objects such as banks, altars and portals.",
                                 true, true, AiService::executeGetSurroundingEnvironment)
                                 .addParam("radius", "integer",
-                                                "Optional tile radius to scan around the player (default is 15 tiles, max 30).",
+                                                "Optional scan radius in tiles (default 15, max 30).",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_ge_offers",
-                                "Retrieve the player's Grand Exchange offer slots (active, completed, or collecting buy/sell orders, item names, prices, quantity filled vs total, spent/received GP). Call whenever the player asks about their GE transactions, trade history, or buy/sell offer status.",
+                                "Get the player's Grand Exchange offers: item, buy or sell, price, quantity filled and GP spent or received.",
                                 true, true, AiService::executeGetPlayerGeOffers));
 
                 registry.add(new AiService.ToolDefinition("get_market_prices",
-                                "Retrieve live Grand Exchange prices, High Alchemy values, Nature Rune costs, and calculated High Alchemy profit margins for specified item names or item IDs. Call whenever the player asks about item values, flipping margins, or profitable items to High Alch.",
+                                "Get live GE prices and High Alchemy values for items, including High Alchemy profit after the nature rune cost.",
                                 true, true, AiService::executeGetMarketPrices)
                                 .addParam("itemNames", "array_string",
-                                                "Optional list of item names to look up live market and alch data for.",
+                                                "Optional list of item names.",
                                                 false)
                                 .addParam("itemIds", "array_integer",
-                                                "Optional list of item IDs to look up live market and alch data for.",
+                                                "Optional list of item IDs.",
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_farming_and_timers",
-                                "Retrieve the player's birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, Kingdom of Miscellania status, and active infobox activity timers. Herb/tree/crop patch states are NOT available; for those, tell the player to check RuneLite's Time Tracking panel. Call when asked if birdhouses are ready or about activity cooldowns.",
+                                "Get birdhouse timers, Hespori growth, Tears of Guthix cooldown, Kingdom of Miscellania status and active timers. Crop and herb patch states are not available; point the player to RuneLite's Time Tracking panel for those.",
                                 true, true, AiService::executeGetPlayerFarmingAndTimers));
 
                 for (AiService.ToolDefinition def : registry) {

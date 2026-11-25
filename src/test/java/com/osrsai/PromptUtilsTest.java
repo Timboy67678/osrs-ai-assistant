@@ -11,31 +11,31 @@ public class PromptUtilsTest {
         String prompt = PromptUtils.buildSystemPrompt("Location Name: Grand Exchange", "You: Where am I?");
 
         Assert.assertTrue(prompt.contains("GROUNDING RULES"));
-        Assert.assertTrue(prompt.contains("GAME CONTEXT"));
-        Assert.assertTrue(prompt.contains("RECENT CONVERSATION"));
-        Assert.assertTrue(prompt.contains("OSRS RuneLite assistant"));
-        Assert.assertTrue(prompt.contains("Never invent stats"));
-        Assert.assertTrue(prompt.contains("High Alchemy"));
-        Assert.assertTrue(prompt.contains("active spellbook"));
+        Assert.assertTrue(prompt.contains("GAME CONTEXT:\nLocation Name: Grand Exchange"));
+        Assert.assertTrue(prompt.contains("RECENT CONVERSATION:\nYou: Where am I?"));
         Assert.assertTrue(prompt.contains("search_osrs_wiki"));
-        Assert.assertTrue(prompt.contains("Distinguish general readiness"));
-        Assert.assertTrue(prompt.contains("get_player_skills"));
-        Assert.assertTrue(prompt.contains("RS3 Bloodwood trees"));
-        Assert.assertTrue(prompt.contains("does not exist in OSRS"));
+        Assert.assertTrue(prompt.contains("availableSections"));
+        Assert.assertTrue(prompt.contains("say you couldn't confirm it"));
+        Assert.assertTrue(prompt.contains("status 'error' means the wiki couldn't be reached"));
+        Assert.assertTrue(prompt.contains("'Source:' line"));
+        Assert.assertTrue(prompt.contains("High Alchemy"));
         Assert.assertTrue(prompt.contains("xpToTargetLevel"));
-        Assert.assertTrue(prompt.contains("get_player_transportation"));
-        Assert.assertTrue(prompt.contains("MANDATORY WIKI VERIFICATION"));
-        Assert.assertTrue(prompt.contains("DRAGON COMBAT & DRAGONFIRE PROTECTION"));
-        Assert.assertTrue(prompt.contains("SLAYER TASKS, TASK VARIANTS & MANDATORY PROTECTION EQUIPMENT"));
-        Assert.assertTrue(prompt.contains("BASE VS BOOSTED LEVEL REQUIREMENTS"));
-        Assert.assertTrue(prompt.contains("HARDCORE IRONMAN (HCIM)"));
-        Assert.assertTrue(prompt.contains("PROJECT REBALANCE & COMBAT WEAKNESSES"));
-        Assert.assertTrue(prompt.contains("get_player_sailing_status"));
         Assert.assertTrue(prompt.contains("poiName"));
-        Assert.assertTrue(prompt.contains("STRICT LEVEL GATING & TRAINING METHOD VIABILITY"));
-        Assert.assertTrue(prompt.contains("NEVER recommend a 2-handed weapon"));
-        Assert.assertTrue(prompt.contains("ONLY Turoths and Kurasks REQUIRE Leaf-bladed weapons"));
-        Assert.assertTrue(prompt.contains("prioritize Black Mask / Slayer Helmet"));
+    }
+
+    @Test
+    public void testInstructionsStayFreeOfHardcodedGameFacts() {
+        // Hard-coded facts go stale and override the wiki (the old prompt called Bloodwood trees
+        // RS3-only after they were added to OSRS). Keep game facts in the wiki, not the prompt.
+        Assert.assertFalse(PromptUtils.INSTRUCTIONS.contains("Bloodwood"));
+        Assert.assertFalse(PromptUtils.INSTRUCTIONS.contains("Slayer helmet"));
+        Assert.assertFalse(PromptUtils.INSTRUCTIONS.contains("Anti-dragon shield"));
+    }
+
+    @Test
+    public void testInstructionsStaySmallEnoughForLocalModels() {
+        Assert.assertTrue("instructions are " + PromptUtils.INSTRUCTIONS.length() + " chars",
+                PromptUtils.INSTRUCTIONS.length() < 7000);
     }
 
     @Test
