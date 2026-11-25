@@ -1,5 +1,6 @@
 package com.osrsai;
 
+import com.google.gson.Gson;
 import com.google.inject.Provides;
 import com.osrsai.ui.OsrsAiPanel;
 import net.runelite.api.gameval.InventoryID;
@@ -51,6 +52,9 @@ public class OsrsAiPlugin extends Plugin {
     @Inject
     private AiService aiService;
 
+    @Inject
+    private Gson gson;
+
     /** The primary UI panel attached to the RuneLite sidebar or detached window. */
     private OsrsAiPanel panel;
 
@@ -68,7 +72,7 @@ public class OsrsAiPlugin extends Plugin {
     @Override
     protected void startUp() throws Exception {
         log.info("OSRS AI Assistant started!");
-        panel = new OsrsAiPanel(this, configManager);
+        panel = new OsrsAiPanel(this, configManager, gson);
 
         BufferedImage rawIcon = ImageUtil.loadImageResource(getClass(), "/com/osrsai/icon.png");
         BufferedImage icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);

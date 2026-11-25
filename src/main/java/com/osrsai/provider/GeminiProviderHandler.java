@@ -1,8 +1,9 @@
 package com.osrsai.provider;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.osrsai.AiService;
 import com.osrsai.tools.OsrsToolRegistry;
 import com.osrsai.util.PromptUtils;
@@ -25,7 +26,6 @@ import okhttp3.RequestBody;
 public class GeminiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
     private static final String GEMINI_API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
-    private static final Gson GSON = new Gson();
 
     @Override
     public JsonObject buildRequestBody(String modelId, String context, String recentConversation, String question,
@@ -175,7 +175,7 @@ public class GeminiProviderHandler implements ProviderHandler {
             JsonObject part = new JsonObject();
             JsonObject funcRes = new JsonObject();
             funcRes.addProperty("name", res.call.name);
-            funcRes.add("response", GSON.fromJson(res.resultJson, JsonObject.class));
+            funcRes.add("response", parseJsonObject(res.resultJson));
             part.add("functionResponse", funcRes);
             partsArray.add(part);
         }
@@ -226,5 +226,14 @@ public class GeminiProviderHandler implements ProviderHandler {
                 .header("x-goog-api-key", apiKey)
                 .post(body)
                 .build();
+    }
+
+    /** Parses a JSON object string without creating a Gson instance (Plugin Hub requires the injected one). */
+    private static JsonObject parseJsonObject(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return new JsonObject();
+        }
+        JsonElement el = new JsonParser().parse(json);
+        return el.isJsonObject() ? el.getAsJsonObject() : new JsonObject();
     }
 }

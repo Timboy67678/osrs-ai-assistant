@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
-import java.lang.reflect.Type;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -63,7 +62,7 @@ public class OsrsAiPanel extends PluginPanel {
     private final Deque<ChatTurn> recentMessages = new ArrayDeque<>();
     private JFrame detachedFrame;
 
-    private final Gson gson = new Gson();
+    private final Gson gson;
     private final List<ChatSession> sessions = new ArrayList<>();
     private ChatSession activeSession;
     private boolean updatingComboBox = false;
@@ -87,11 +86,13 @@ public class OsrsAiPanel extends PluginPanel {
      *
      * @param plugin        main {@link OsrsAiPlugin} instance
      * @param configManager RuneLite {@link ConfigManager} for settings persistence
+     * @param gson          RuneLite's injected {@link Gson} instance
      */
-    public OsrsAiPanel(OsrsAiPlugin plugin, ConfigManager configManager) {
+    public OsrsAiPanel(OsrsAiPlugin plugin, ConfigManager configManager, Gson gson) {
         super(false);
         this.plugin = plugin;
         this.configManager = configManager;
+        this.gson = gson;
         setLayout(new BorderLayout());
         setBackground(ColorScheme.DARK_GRAY_COLOR);
         setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -859,9 +860,8 @@ public class OsrsAiPanel extends PluginPanel {
         String json = configManager.getConfiguration(OsrsAiPlugin.CONFIG_GROUP, "chat_sessions_v1");
 
         try {
-            Type listType = new TypeToken<ArrayList<ChatSession>>() {
-            }.getType();
-            List<ChatSession> loaded = gson.fromJson(json, listType);
+            List<ChatSession> loaded = gson.fromJson(json, new TypeToken<ArrayList<ChatSession>>() {
+            }.getType());
 
             sessions.clear();
             if (loaded != null) {
@@ -1418,9 +1418,8 @@ public class OsrsAiPanel extends PluginPanel {
 
         try {
             if (json != null && !json.isEmpty()) {
-                Type listType = new TypeToken<ArrayList<AiProfile>>() {
-                }.getType();
-                List<AiProfile> loaded = gson.fromJson(json, listType);
+                List<AiProfile> loaded = gson.fromJson(json, new TypeToken<ArrayList<AiProfile>>() {
+            }.getType());
                 if (loaded != null) {
                     profiles.addAll(loaded);
                 }

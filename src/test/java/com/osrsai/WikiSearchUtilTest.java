@@ -133,4 +133,11 @@ public class WikiSearchUtilTest {
                 "Cached search should be under 50ms (uncached: " + duration1 + "ms, cached: " + duration2 + "ms)",
                 duration2 < 50);
     }
+
+    @Test
+    public void testPageUrlEncodesTitle() {
+        Assert.assertEquals("https://oldschool.runescape.wiki/w/Abyssal_whip", WikiSearchUtil.pageUrl("Abyssal whip"));
+        Assert.assertEquals("https://oldschool.runescape.wiki/w/Slayer_task/Basilisks",
+                WikiSearchUtil.pageUrl("Slayer task/Basilisks"));
+    }
 }

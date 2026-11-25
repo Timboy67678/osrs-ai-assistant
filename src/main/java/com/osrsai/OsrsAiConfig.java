@@ -77,7 +77,7 @@ public interface OsrsAiConfig extends Config {
          */
         @ConfigItem(keyName = "shareCharacterInfo", name = "Share Character Info", description = "WARNING: When enabled, this option will send your in-game stats, location, active task, inventory, equipment, quests, achievement diaries, and bank contents to the external AI provider whenever you submit a query.", position = 11, section = sharingSection)
         default boolean shareCharacterInfo() {
-                return true;
+                return false;
         }
 
         /**

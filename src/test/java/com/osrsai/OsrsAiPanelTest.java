@@ -10,7 +10,7 @@ import org.junit.Test;
 public class OsrsAiPanelTest {
     @Test
     public void formatsHeadingsListsAndEscaping() throws Exception {
-        OsrsAiPanel panel = new OsrsAiPanel(null, null);
+        OsrsAiPanel panel = new OsrsAiPanel(null, null, new com.google.gson.Gson());
         Method formatter = OsrsAiPanel.class.getDeclaredMethod("formatMarkdownToHtml", String.class);
         formatter.setAccessible(true);
 
@@ -41,7 +41,7 @@ public class OsrsAiPanelTest {
 
     @Test
     public void recentConversationTruncatesLongAiReplies() {
-        OsrsAiPanel panel = new OsrsAiPanel(null, null);
+        OsrsAiPanel panel = new OsrsAiPanel(null, null, new com.google.gson.Gson());
         StringBuilder longReply = new StringBuilder();
         for (int i = 0; i < 100; i++) {
             longReply.append("word ");
@@ -57,7 +57,7 @@ public class OsrsAiPanelTest {
 
     @Test
     public void sessionControlsLockedWhileThinking() throws Exception {
-        OsrsAiPanel panel = new OsrsAiPanel(null, null);
+        OsrsAiPanel panel = new OsrsAiPanel(null, null, new com.google.gson.Gson());
         panel.setThinking(true);
         javax.swing.SwingUtilities.invokeAndWait(() -> { });
         for (String name : new String[] { "chatSessionComboBox", "newChatButton", "deleteChatButton" }) {
@@ -79,7 +79,7 @@ public class OsrsAiPanelTest {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try {
                 javax.swing.JFrame frame = new javax.swing.JFrame();
-                OsrsAiPanel panel = new OsrsAiPanel(null, null);
+                OsrsAiPanel panel = new OsrsAiPanel(null, null, new com.google.gson.Gson());
                 frame.getContentPane().add(panel);
                 frame.setSize(150, 600);
                 frame.setVisible(true);
@@ -134,7 +134,7 @@ public class OsrsAiPanelTest {
         Assume.assumeFalse("Skipping UI test in headless environment", GraphicsEnvironment.isHeadless());
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try {
-                OsrsAiPanel panel = new OsrsAiPanel(null, null);
+                OsrsAiPanel panel = new OsrsAiPanel(null, null, new com.google.gson.Gson());
                 Method detach = OsrsAiPanel.class.getDeclaredMethod("detachToWindow");
                 detach.setAccessible(true);
                 detach.invoke(panel);

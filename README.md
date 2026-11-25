@@ -27,7 +27,7 @@
   - Detects current location, Wilderness level (HUD widget & coordinate fallback), multi-combat zones, instanced areas, and world types (PvP, High Risk, Members).
   - Inspects active inventory, equipped items, and bank contents (with automatic offline snapshot caching when closed) with live GE and High Alchemy prices.
   - Scans surrounding game environment for nearby NPCs/monsters, other players (with Wilderness threat detection), valuable ground items, and interactable game objects (altars, bank booths, fairy rings, portals).
-  - Monitors farming patch growth, harvest readiness, birdhouse run timers, Hespori growth, and Tears of Guthix cooldowns.
+  - Monitors birdhouse run timers, Hespori growth, Tears of Guthix cooldowns, and Kingdom of Miscellania status.
   - Tracks active vessel stats, sail trim, knot speed, cargo, and crew when sailing.
 - **🗺️ Interactive Pathfinding & Navigation:**
   - Integrates with the **Shortest Path** plugin via cross-plugin communication to automatically set route overlays to coordinates or named POIs (e.g. Farming Guild, Barrows, Chasm of Fire).
@@ -68,7 +68,7 @@ The AI assistant has access to a comprehensive suite of **22 custom tools** enab
 - `get_player_achievement_diaries` — Retrieves Achievement Diary completion progress for all 12 regions across Easy, Medium, Hard, and Elite tiers.
 - `get_player_combat_achievements` — Retrieves Combat Achievement tier progress (Easy through Grandmaster), boss/monster kill counts (KC), and task completion. Supports filtering by tier, boss name, completion status, or task name.
 - `get_player_clues` — Retrieves active clue scroll details (current step text, requirements, solution) and clue scroll items in inventory or bank.
-- `get_player_farming_and_timers` — Retrieves active farming patch growth stages, harvest readiness, birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, and active infobox activity timers.
+- `get_player_farming_and_timers` — Retrieves birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, Kingdom of Miscellania status, and active infobox activity timers.
 - `get_player_sailing_status` — Retrieves active vessel details, ship tier/type, hull HP/condition, sail trim, knot speed, wind direction, anchor status, cargo hold items, crew members, and sea location.
 
 ### 🗺️ Environment, World & Navigation Tools
@@ -81,7 +81,7 @@ The AI assistant has access to a comprehensive suite of **22 custom tools** enab
 - `get_player_ge_offers` — Retrieves Grand Exchange offer slots (active, completed, or collecting buy/sell orders, prices, filled vs total quantities, and GP spent/received).
 - `get_market_prices` — Retrieves live Grand Exchange market prices, High Alchemy values, Nature Rune costs, and calculated High Alchemy profit margins for specified items.
 - `get_item_stats` — Retrieves equipment stats, combat bonuses, weight, slot type, and market prices for specified item names or IDs.
-- `search_osrs_wiki` — Performs a live search on the Old School RuneScape Wiki for authoritative game mechanics, boss guides, drop tables, quest requirements, training methods, and recent game updates.
+- `search_osrs_wiki` — Performs a live search on the Old School RuneScape Wiki for authoritative game mechanics, boss guides, drop tables, quest requirements, training methods, and recent game updates. Answers that use wiki content link back to the source pages (OSRS Wiki content is licensed [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/)).
 
 ---
 
@@ -94,7 +94,7 @@ Open **RuneLite Settings (wrench icon)**, search for **OSRS AI Assistant**, or o
 | :--- | :--- |
 | **Max Search Depth** | Maximum recursive tool calls/wiki searches the AI can perform for a single question (1–10, default 5). |
 | **Use Shortest Path Plugin** | Allow the AI to set path destinations using the Shortest Path plugin if installed and enabled. |
-| **Share Character Info** | Toggle sharing player stats, location, gear, quests, and bank data with the external AI provider. |
+| **Share Character Info** | Off by default. When enabled, sends player stats, location, gear, quests, and bank data to the external AI provider with each question. While off, only your question and chat history are sent, and the character tools are disabled. |
 | **Notify on Response** | Play a RuneScape-themed sound effect and send a notification when an AI response is ready. |
 
 ### AI Profile Manager (In-Plugin UI Panel)

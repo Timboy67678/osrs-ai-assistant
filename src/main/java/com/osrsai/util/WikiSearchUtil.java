@@ -43,6 +43,12 @@ public final class WikiSearchUtil {
     /** Endpoint URL for the Old School RuneScape Wiki MediaWiki API. */
     public static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
 
+    /** Base URL for linking to wiki articles. */
+    private static final String WIKI_PAGE_BASE = "https://oldschool.runescape.wiki/w/";
+
+    /** Licence of OSRS Wiki content, which requires attribution when reused. */
+    public static final String WIKI_LICENSE = "CC BY-NC-SA 3.0 (OSRS Wiki)";
+
     /**
      * Maximum character limit for wiki article extracts passed to the AI prompt
      * context.
@@ -384,6 +390,19 @@ public final class WikiSearchUtil {
     }
 
     /**
+     * Builds the public wiki URL for an article title, so answers can link back to their source.
+     *
+     * @param title article title
+     * @return article URL
+     */
+    public static String pageUrl(String title) {
+        return Objects.requireNonNull(HttpUrl.parse(WIKI_PAGE_BASE)).newBuilder()
+                .addPathSegments(title.trim().replace(' ', '_'))
+                .build()
+                .toString();
+    }
+
+    /**
      * Fetches and parses a wiki page directly by page title using MediaWiki
      * action=parse.
      *
@@ -424,6 +443,8 @@ public final class WikiSearchUtil {
                             if (cleanedMarkdown != null && !cleanedMarkdown.trim().isEmpty()) {
                                 JsonObject res = new JsonObject();
                                 res.addProperty("title", title);
+                                res.addProperty("url", pageUrl(title));
+                                res.addProperty("license", WIKI_LICENSE);
                                 res.addProperty("extract", cleanedMarkdown);
                                 return gson.toJson(res);
                             }

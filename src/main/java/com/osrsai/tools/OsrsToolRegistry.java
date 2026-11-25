@@ -182,7 +182,7 @@ public class OsrsToolRegistry {
                                                 false));
 
                 registry.add(new AiService.ToolDefinition("get_player_farming_and_timers",
-                                "Retrieve the player's active farming patch growth stages, harvest readiness, birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, and active infobox activity timers. Call when asked if crops/herbs/birdhouses are ready or about activity cooldowns.",
+                                "Retrieve the player's birdhouse run timers, Hespori growth state, Tears of Guthix cooldown, Kingdom of Miscellania status, and active infobox activity timers. Herb/tree/crop patch states are NOT available; for those, tell the player to check RuneLite's Time Tracking panel. Call when asked if birdhouses are ready or about activity cooldowns.",
                                 true, true, AiService::executeGetPlayerFarmingAndTimers));
 
                 for (AiService.ToolDefinition def : registry) {

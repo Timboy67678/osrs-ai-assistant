@@ -5,15 +5,29 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.osrsai.context.GameContextBuilder;
 import com.osrsai.util.LocationResolver;
+import com.osrsai.util.Utilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.cluescrolls.ClueScrollPlugin;
+import net.runelite.client.plugins.cluescrolls.clues.AnagramClue;
+import net.runelite.client.plugins.cluescrolls.clues.CipherClue;
+import net.runelite.client.plugins.cluescrolls.clues.ClueScroll;
+import net.runelite.client.plugins.cluescrolls.clues.CrypticClue;
+import net.runelite.client.plugins.cluescrolls.clues.EmoteClue;
+import net.runelite.client.plugins.cluescrolls.clues.FairyRingClue;
+import net.runelite.client.plugins.cluescrolls.clues.FaloTheBardClue;
+import net.runelite.client.plugins.cluescrolls.clues.HotColdClue;
+import net.runelite.client.plugins.cluescrolls.clues.LocationClueScroll;
+import net.runelite.client.plugins.cluescrolls.clues.MapClue;
+import net.runelite.client.plugins.cluescrolls.clues.MusicClue;
+import net.runelite.client.plugins.cluescrolls.clues.NpcClueScroll;
+import net.runelite.client.plugins.cluescrolls.clues.SkillChallengeClue;
+import net.runelite.client.plugins.cluescrolls.clues.ThreeStepCrypticClue;
 import net.runelite.api.gameval.InventoryID;
-
-import java.lang.reflect.Field;
 
 /**
  * Tool implementations for active clue scrolls and sailing telemetry / status.
@@ -120,46 +134,87 @@ public class ActivityTrackerTools {
         return activeClueObj;
     }
 
-    private JsonArray formatClueDetails(net.runelite.client.plugins.cluescrolls.clues.ClueScroll clue,
-            net.runelite.client.plugins.cluescrolls.ClueScrollPlugin cluePlugin) {
-        net.runelite.client.ui.overlay.components.PanelComponent panel = new net.runelite.client.ui.overlay.components.PanelComponent();
-        clue.makeOverlayHint(panel, cluePlugin);
+    /**
+     * Describes the active clue using the Clue Scroll plugin's public getters. Each lookup is
+     * guarded separately so one failing getter doesn't drop the rest of the details.
+     */
+    private JsonArray formatClueDetails(ClueScroll clue, ClueScrollPlugin cluePlugin) {
+        JsonArray lines = new JsonArray();
 
-        JsonArray hintLines = new JsonArray();
-        for (Object child : panel.getChildren()) {
-            if (child instanceof net.runelite.client.ui.overlay.components.LineComponent) {
-                net.runelite.client.ui.overlay.components.LineComponent lc = (net.runelite.client.ui.overlay.components.LineComponent) child;
-                String left = readDeclaredFieldString(lc, "left");
-                String right = readDeclaredFieldString(lc, "right");
-
-                if (left != null && !left.trim().isEmpty()) {
-                    if (right != null && !right.trim().isEmpty()) {
-                        hintLines.add(left + ": " + right);
-                    } else {
-                        hintLines.add(left);
-                    }
-                }
-            } else if (child instanceof net.runelite.client.ui.overlay.components.TitleComponent) {
-                net.runelite.client.ui.overlay.components.TitleComponent tc = (net.runelite.client.ui.overlay.components.TitleComponent) child;
-                String text = readDeclaredFieldString(tc, "text");
-
-                if (text != null && !text.trim().isEmpty()) {
-                    hintLines.add(text);
-                }
-            } else {
-                hintLines.add(child.toString());
-            }
+        if (clue instanceof CrypticClue) {
+            CrypticClue c = (CrypticClue) clue;
+            addLine(lines, "Clue", () -> c.getText());
+            addLine(lines, "Solution", () -> c.getSolution(cluePlugin));
+            addLine(lines, "Question", () -> c.getQuestionText());
+            addLine(lines, "Answer", () -> c.getAnswer());
+        } else if (clue instanceof AnagramClue) {
+            AnagramClue c = (AnagramClue) clue;
+            addLine(lines, "Anagram", () -> c.getTextProvider().apply(cluePlugin));
+            addLine(lines, "Solution NPC", () -> c.getNpcProvider().apply(cluePlugin));
+            addLine(lines, "Area", () -> c.getArea());
+            addLine(lines, "Question", () -> c.getQuestion());
+            addLine(lines, "Answer", () -> c.getAnswerProvider().apply(cluePlugin));
+        } else if (clue instanceof CipherClue) {
+            CipherClue c = (CipherClue) clue;
+            addLine(lines, "Cipher", () -> c.getText());
+            addLine(lines, "Area", () -> c.getAreaProvider().apply(cluePlugin));
+            addLine(lines, "Question", () -> c.getQuestion());
+            addLine(lines, "Answer", () -> c.getAnswer());
+        } else if (clue instanceof EmoteClue) {
+            EmoteClue c = (EmoteClue) clue;
+            addLine(lines, "Clue", () -> c.getText());
+            addLine(lines, "Location", () -> c.getLocationName());
+            addLine(lines, "First emote", () -> c.getFirstEmote() != null ? c.getFirstEmote().getName() : null);
+            addLine(lines, "Second emote", () -> c.getSecondEmote() != null ? c.getSecondEmote().getName() : null);
+            addLine(lines, "STASH unit", () -> c.getStashUnit() != null ? c.getStashUnit().name() : null);
+        } else if (clue instanceof HotColdClue) {
+            HotColdClue c = (HotColdClue) clue;
+            addLine(lines, "Clue", () -> c.getText());
+            addLine(lines, "NPC", () -> c.getNpc());
+            addLine(lines, "Solution", () -> c.getSolution());
+        } else if (clue instanceof SkillChallengeClue) {
+            SkillChallengeClue c = (SkillChallengeClue) clue;
+            addLine(lines, "Challenge", () -> c.getChallenge());
+            addLine(lines, "Return to", () -> c.getReturnText());
+            addLine(lines, "Challenge completed", () -> String.valueOf(c.isChallengeCompleted()));
+        } else if (clue instanceof MapClue) {
+            addLine(lines, "Map", () -> ((MapClue) clue).getDescription());
+        } else if (clue instanceof MusicClue) {
+            addLine(lines, "Song to play", () -> ((MusicClue) clue).getSong());
+        } else if (clue instanceof FaloTheBardClue) {
+            addLine(lines, "Clue", () -> ((FaloTheBardClue) clue).getText());
+        } else if (clue instanceof FairyRingClue) {
+            addLine(lines, "Clue", () -> ((FairyRingClue) clue).getText());
+        } else if (clue instanceof ThreeStepCrypticClue) {
+            addLine(lines, "Clue", () -> ((ThreeStepCrypticClue) clue).getText());
         }
-        return hintLines;
+
+        if (clue instanceof NpcClueScroll) {
+            addLine(lines, "NPCs", () -> {
+                String[] npcs = ((NpcClueScroll) clue).getNpcs(cluePlugin);
+                return npcs != null && npcs.length > 0 ? String.join(", ", npcs) : null;
+            });
+        }
+        if (clue instanceof LocationClueScroll) {
+            addLine(lines, "Dig/search location (world point)", () -> {
+                WorldPoint wp = ((LocationClueScroll) clue).getLocation(cluePlugin);
+                return wp != null ? wp.getX() + ", " + wp.getY() + ", " + wp.getPlane() : null;
+            });
+        }
+        addLine(lines, "Requires spade", () -> clue.isRequiresSpade() ? "yes" : null);
+        addLine(lines, "Requires light source", () -> clue.isRequiresLight() ? "yes" : null);
+        addLine(lines, "Enemy that may appear", () -> clue.getEnemy() != null ? clue.getEnemy().getText() : null);
+        return lines;
     }
 
-    private String readDeclaredFieldString(Object obj, String fieldName) {
+    private static void addLine(JsonArray lines, String label, java.util.function.Supplier<String> value) {
         try {
-            Field field = obj.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return (String) field.get(obj);
-        } catch (Exception ignored) {
-            return null;
+            String v = value.get();
+            if (v != null && !v.trim().isEmpty()) {
+                lines.add(label + ": " + Utilities.PATTERN_HTML_TAGS.matcher(v).replaceAll(" ").trim());
+            }
+        } catch (Throwable t) {
+            log.debug("Could not read clue detail '{}': {}", label, t.getMessage());
         }
     }
 

@@ -1,8 +1,9 @@
 package com.osrsai.provider;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.osrsai.AiService;
 import com.osrsai.tools.OsrsToolRegistry;
 import com.osrsai.util.PromptUtils;
@@ -22,7 +23,6 @@ import okhttp3.RequestBody;
  */
 public class OpenAiProviderHandler implements ProviderHandler {
     private static final double LOW_TEMPERATURE = 0.2d;
-    private static final Gson GSON = new Gson();
     private final String apiUrl;
 
     /**
@@ -191,10 +191,10 @@ public class OpenAiProviderHandler implements ProviderHandler {
             String id = tc.has("id") && !tc.get("id").isJsonNull() ? tc.get("id").getAsString() : "call_" + i;
             JsonObject func = tc.getAsJsonObject("function");
             String name = func.get("name").getAsString();
-            String argsStr = func.get("arguments").isJsonObject()
-                    ? GSON.toJson(func.getAsJsonObject("arguments"))
-                    : func.get("arguments").getAsString();
-            JsonObject args = GSON.fromJson(argsStr, JsonObject.class);
+            JsonElement argsEl = func.get("arguments");
+            JsonObject args = argsEl == null || argsEl.isJsonNull() ? new JsonObject()
+                    : argsEl.isJsonObject() ? argsEl.getAsJsonObject()
+                    : parseJsonObject(argsEl.getAsString());
             toolCalls.add(new AiService.ToolCall(id, name, args));
         }
         return toolCalls;
@@ -270,5 +270,14 @@ public class OpenAiProviderHandler implements ProviderHandler {
             builder.header("OpenAI-Organization", clientId);
         }
         return builder.build();
+    }
+
+    /** Parses a JSON object string without creating a Gson instance (Plugin Hub requires the injected one). */
+    private static JsonObject parseJsonObject(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return new JsonObject();
+        }
+        JsonElement el = new JsonParser().parse(json);
+        return el.isJsonObject() ? el.getAsJsonObject() : new JsonObject();
     }
 }
