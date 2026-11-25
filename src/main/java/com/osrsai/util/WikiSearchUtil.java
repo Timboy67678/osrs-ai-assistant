@@ -54,6 +54,12 @@ public final class WikiSearchUtil {
      */
     public static final int WIKI_EXTRACT_CHARS = 6000;
 
+    /**
+     * Most characters returned for a section the model asked for by name. Larger than the
+     * summary budget so a boss's whole drop table usually fits in one result.
+     */
+    public static final int WIKI_SECTION_CHARS = 9000;
+
     /** Search results requested when no page has the exact title. */
     public static final int WIKI_SEARCH_SRLIMIT = 5;
 
@@ -414,18 +420,33 @@ public final class WikiSearchUtil {
         }
         String text = page.renderSection(index);
         o.addProperty("section", page.sections.get(index).name);
-        if (text.length() <= WIKI_EXTRACT_CHARS) {
+        if (text.length() <= WIKI_SECTION_CHARS) {
             o.addProperty("extract", text);
             return o;
         }
-        o.addProperty("extract", cap(text));
+
+        // Too long: include whole subsections in page order while they fit, and name the rest,
+        // so nothing is cut mid-table and the model can see exactly what it hasn't read.
+        StringBuilder sb = new StringBuilder(page.renderSingle(index));
+        List<String> notIncluded = new ArrayList<>();
+        for (int sub : page.subsectionIndexes(index)) {
+            String part = page.renderSingle(sub);
+            if (notIncluded.isEmpty() && sb.length() + part.length() + 2 <= WIKI_SECTION_CHARS) {
+                sb.append("\n\n").append(part);
+            } else {
+                notIncluded.add(page.label(sub));
+            }
+        }
         o.addProperty("truncated", true);
-        List<String> subsections = page.subsectionNames(index);
-        if (!subsections.isEmpty()) {
-            o.add("subsections", outline(subsections));
-            o.addProperty("hint", "This section was cut off. Request one of 'subsections' by name to read the rest.");
-        } else {
+        if (notIncluded.isEmpty()) {
+            o.addProperty("extract", cap(sb.toString(), WIKI_SECTION_CHARS));
             o.addProperty("hint", "This section was cut off; the rest is on the wiki page at 'url'.");
+        } else {
+            o.addProperty("extract", sb.toString());
+            o.add("notIncluded", outline(notIncluded));
+            o.addProperty("hint", "This section was too long to return whole. The subsections in 'notIncluded' were"
+                    + " left out; request any you need by name (e.g. section='" + notIncluded.get(0) + "') before"
+                    + " answering.");
         }
         return o;
     }
@@ -464,14 +485,19 @@ public final class WikiSearchUtil {
         return arr;
     }
 
-    /** Cuts text to the extract budget at a line break, marking that it was cut. */
+    /** Cuts text to the summary budget at a line break, marking that it was cut. */
     static String cap(String text) {
-        if (text.length() <= WIKI_EXTRACT_CHARS) {
+        return cap(text, WIKI_EXTRACT_CHARS);
+    }
+
+    /** Cuts text to {@code limit} characters at a line break, marking that it was cut. */
+    static String cap(String text, int limit) {
+        if (text.length() <= limit) {
             return text;
         }
-        int cut = text.lastIndexOf('\n', WIKI_EXTRACT_CHARS);
-        if (cut < WIKI_EXTRACT_CHARS / 2) {
-            cut = WIKI_EXTRACT_CHARS;
+        int cut = text.lastIndexOf('\n', limit);
+        if (cut < limit / 2) {
+            cut = limit;
         }
         return text.substring(0, cut).trim() + "\n...[cut off]";
     }

@@ -242,13 +242,48 @@ public class WikiHtmlParserTest {
         JsonObject longSection = gson.fromJson(WikiSearchUtil.executeWikiSearch(client, gson, "vorkath", "Drops"),
                 JsonObject.class);
         Assert.assertTrue(longSection.get("truncated").getAsBoolean());
-        Assert.assertTrue(longSection.get("extract").getAsString().length() <= WikiSearchUtil.WIKI_EXTRACT_CHARS + 20);
+        Assert.assertTrue(longSection.get("extract").getAsString().length() <= WikiSearchUtil.WIKI_SECTION_CHARS + 20);
 
         JsonObject missing = gson.fromJson(WikiSearchUtil.executeWikiSearch(client, gson, "vorkath", "Rewards"),
                 JsonObject.class);
         Assert.assertEquals("section_not_found", missing.get("status").getAsString());
 
         Assert.assertEquals("one HTTP request for all four lookups", 1, requests.get());
+    }
+
+    @Test
+    public void longSectionsAreCutBetweenSubsectionsAndNameWhatWasLeftOut() {
+        StringBuilder html = new StringBuilder("<p>Lead.</p><h2>Drops</h2><p>Two rolls.</p>");
+        for (String sub : new String[] { "Weapons", "Runes", "Seeds", "Tertiary" }) {
+            html.append("<h3>").append(sub).append("</h3>");
+            for (int i = 0; i < 100; i++) {
+                html.append("<p>").append(sub).append(" drop ").append(i).append(" at 1/100.</p>");
+            }
+        }
+        OkHttpClient client = fakeWiki(r -> parseResponse("Vorkath", html.toString()));
+        JsonObject result = gson.fromJson(WikiSearchUtil.executeWikiSearch(client, gson, "Vorkath", "Drops"),
+                JsonObject.class);
+
+        String extract = result.get("extract").getAsString();
+        Assert.assertTrue(extract.contains("Two rolls."));
+        Assert.assertTrue(extract.contains("### Weapons"));
+        Assert.assertTrue(extract.length() <= WikiSearchUtil.WIKI_SECTION_CHARS);
+        Assert.assertFalse("no subsection is cut in half", extract.contains("...[cut off]"));
+        String notIncluded = result.getAsJsonArray("notIncluded").toString();
+        Assert.assertTrue(notIncluded, notIncluded.contains("Drops > Tertiary"));
+        Assert.assertTrue(result.get("hint").getAsString().contains("section='"));
+    }
+
+    @Test
+    public void dropTablesLeaveOutPriceColumns() {
+        String html = "<table class=\"wikitable item-drops\"><tr><th></th><th>Item</th><th>Quantity</th><th>Rarity</th>"
+                + "<th>Price</th><th>High Alch</th></tr>"
+                + "<tr><td></td><td>Vorkath's head</td><td>1</td><td>1/50</td><td>4,000</td><td>100</td></tr></table>";
+        String md = WikiHtmlParser.parse("Vorkath", html).renderAll();
+
+        Assert.assertTrue(md, md.contains("| Item | Quantity | Rarity |"));
+        Assert.assertTrue(md, md.contains("| Vorkath's head | 1 | 1/50 |"));
+        Assert.assertFalse(md, md.contains("4,000"));
     }
 
     @Test

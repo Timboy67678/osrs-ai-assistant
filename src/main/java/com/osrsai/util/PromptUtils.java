@@ -45,6 +45,8 @@ public class PromptUtils {
             + "- Search for the exact page name ('Vorkath', 'Abyssal whip', 'Dragon Slayer II'), not a sentence.\n"
             + "- Check the returned 'title' is what you meant, and read 'redirectNote' or 'matchNote' when present: a redirect or closest match may be something different.\n"
             + "- Long pages return a summary plus 'availableSections'. Call again with 'section' to read the part you need: 'Drops' for drop rates, 'Rewards' for quest rewards, 'Strategy' or 'Fight overview' for bosses, 'Locations' for where to find a monster. Don't answer drop-rate or reward questions from the summary alone.\n"
+            + "- If a result is 'truncated' or lists 'notIncluded' subsections, request the ones the question needs before answering. Never tell the player to check the wiki for something you could look up yourself.\n"
+            + "- When listing drops, give each item's rarity exactly as the wiki shows it, and include rare and tertiary drops (pets, uniques), which are usually what the player cares about most.\n"
             + "- status 'error' means the wiki couldn't be reached, not that the thing doesn't exist; say you couldn't check the wiki.\n"
             + "- status 'no_match' lists 'searchResults'; retry with one of them if it fits. Only after a real attempt that ends in 'not_found' say the wiki has no page for it, which may mean it's RS3 content or misnamed.\n"
             + "- When you use wiki content, end your answer with a 'Source:' line listing each page's 'url' (OSRS Wiki content is CC BY-NC-SA 3.0 and must be credited).\n"

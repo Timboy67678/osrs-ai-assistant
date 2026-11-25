@@ -49,6 +49,9 @@ public final class WikiHtmlParser {
             "printfooter", "mw-empty-elt", "gallery", "mw-collapsible-toggle", "rs-external-header-links",
             "infobox-padding", "infobox-bonuses-image", "mw-cite-backlink", "mw-references");
 
+    /** Price columns left out of drop tables. */
+    private static final Set<String> PRICE_COLUMNS = Set.of("price", "high alch", "ge price", "exchange");
+
     /** Infobox rows that only hold wiki tooling links. */
     private static final Set<String> NOISE_ROW_KEYS = Set.of("link", "links");
 
@@ -145,6 +148,23 @@ public final class WikiHtmlParser {
             for (int i = index + 1; i < sections.size() && sections.get(i).level > root.level; i++) {
                 appendSection(sb, sections.get(i));
             }
+            return sb.toString().trim();
+        }
+
+        /** Indexes of the subsections nested under the section at {@code index}. */
+        public List<Integer> subsectionIndexes(int index) {
+            List<Integer> indexes = new ArrayList<>();
+            Section root = sections.get(index);
+            for (int i = index + 1; i < sections.size() && sections.get(i).level > root.level; i++) {
+                indexes.add(i);
+            }
+            return indexes;
+        }
+
+        /** One section's own heading and text, without its subsections. */
+        public String renderSingle(int index) {
+            StringBuilder sb = new StringBuilder();
+            appendSection(sb, sections.get(index));
             return sb.toString().trim();
         }
 
@@ -1232,8 +1252,14 @@ public final class WikiHtmlParser {
         List<String> header = hasHeader ? grid.get(0) : null;
         List<List<String>> data = hasHeader ? grid.subList(1, grid.size()) : grid;
 
+        boolean dropTable = table.hasClass("item-drops");
         List<Integer> keep = new ArrayList<>();
         for (int c = 0; c < width; c++) {
+            if (dropTable && header != null && PRICE_COLUMNS.contains(header.get(c).toLowerCase(Locale.ROOT))) {
+                // Wiki prices are snapshots; get_market_prices has live ones. Dropping them lets
+                // a boss's whole drop table fit in one tool result.
+                continue;
+            }
             boolean empty = true;
             for (List<String> r : data) {
                 if (!r.get(c).isEmpty()) {
