@@ -31,8 +31,8 @@ import net.runelite.client.util.ImageUtil;
  * configuration change events.
  */
 @Slf4j
-@PluginDescriptor(name = "OSRS AI Assistant", description = "An AI chatbot assistant that reads your in-game stats. WARNING: Sends query & selected game details to third-party AI APIs (Gemini/OpenAI/Claude/Grok). Requires an external API key.", tags = {
-        "ai", "chatbot", "gemini", "assistant" })
+@PluginDescriptor(name = "OSRS AI Assistant", description = "An AI chatbot assistant that reads your in-game stats. Free with a local Ollama model or Gemini's free tier. WARNING: Sends your questions, and game details if Share Character Info is enabled, to the AI provider you choose.", tags = {
+        "ai", "chatbot", "gemini", "ollama", "claude", "assistant" })
 public class OsrsAiPlugin extends Plugin {
     /**
      * Config group key used for persisting plugin settings in RuneLite's
