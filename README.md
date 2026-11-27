@@ -53,7 +53,7 @@ Paid providers (Claude, OpenAI, Grok, or Gemini's paid tier) are fully optional.
 
 - **🎮 Autonomous Game Context Integration:**
   - Automatically analyzes player base & boosted skill levels, XP, run energy, prayer points, active prayers, and combat vitals.
-  - Detects current location, Wilderness level (HUD widget & coordinate fallback), multi-combat zones, instanced areas, and world types (PvP, High Risk, Members).
+  - Names where you are using location data generated from the OSRS Wiki (about 1,000 places, including dungeons, with their wider area, e.g. "Rimmington mine, part of Rimmington, Asgarnia"), and detects Wilderness level (HUD widget & coordinate fallback), multi-combat zones, instanced areas, and world types (PvP, High Risk, Members).
   - Inspects active inventory, equipped items, and bank contents (with automatic offline snapshot caching when closed) with live GE and High Alchemy prices.
   - Scans surrounding game environment for nearby NPCs/monsters, other players (with Wilderness threat detection), valuable ground items, and interactable game objects (altars, bank booths, fairy rings, portals).
   - Monitors birdhouse run timers, Hespori growth, and Kingdom of Miscellania status.
@@ -186,3 +186,5 @@ Every component in this repository—including the RuneLite plugin configuration
 ## 📄 License
 
 This project is licensed under the BSD 2-Clause License - see the [LICENSE](LICENSE) file for details.
+
+The location data in `src/main/resources/com/osrsai/wiki-locations.tsv` is derived from the [Old School RuneScape Wiki](https://oldschool.runescape.wiki) and is licensed [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/), not BSD. It is regenerated with `python scripts/generate_wiki_locations.py`.

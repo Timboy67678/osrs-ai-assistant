@@ -1127,7 +1127,7 @@ public class AiServiceTest {
 
         JsonObject root = new Gson().fromJson(json, JsonObject.class);
         Assert.assertEquals("success", root.get("status").getAsString());
-        Assert.assertTrue(root.get("message").getAsString().contains("1248"));
+        Assert.assertTrue(root.get("message").getAsString().contains("1249"));
     }
 
     @Test

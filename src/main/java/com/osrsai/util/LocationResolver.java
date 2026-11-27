@@ -1,155 +1,87 @@
 package com.osrsai.util;
 
-import java.util.*;
-
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import net.runelite.api.InstanceTemplates;
-import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 
 /**
- * Internal resolver class for translating Old School RuneScape coordinates
- * (WorldPoint),
- * region IDs, instance templates, and underground offsets into human-readable
- * area names.
+ * Names the place at a game coordinate, using location data generated from the OSRS Wiki's
+ * Infobox Location pages ({@code wiki-locations.tsv}, built by
+ * {@code scripts/generate_wiki_locations.py}).
+ * <p>
+ * Each wiki location is either an exact outline (polygon, square or rectangle drawn on the wiki
+ * map), a circle around the point the wiki map centres on, or an outline estimated from the
+ * monster spawns the wiki places there. The most specific match wins: land
+ * before water, then the smallest area. Circle matches are reported as "near", since they are
+ * estimates. When nothing matches, the nearest known place and its direction are given instead
+ * of a guess.
  */
 public final class LocationResolver {
-    private static final int[] UNDERGROUND_Y_OFFSETS = { 6400, 12800 };
-    private static final String REGION_ALIAS_RESOURCE = "/com/osrsai/region-aliases.properties";
+    private static final String DATA_RESOURCE = "/com/osrsai/wiki-locations.tsv";
+    /** How far to look for the nearest known place when the point matches no location. */
+    private static final int NEAREST_SEARCH_TILES = 120;
 
-    /** Region aliases map loaded from region-aliases.properties resource. */
-    private static final Map<Integer, RegionAlias> REGION_ALIASES = loadRegionAliases();
+    private static final List<WikiLocation> LOCATIONS = load();
+    private static final Map<String, List<WikiLocation>> BY_NAME = indexByName(LOCATIONS);
 
-    /** Known 2D bounding boxes for well-known OSRS cities, guilds, and dungeons. */
-    private static final List<NamedArea> KNOWN_AREAS = Arrays.asList(
-            new NamedArea("Grand Exchange", new WorldArea(3153, 3472, 34, 28, 0)),
-            new NamedArea("Varrock West Bank", new WorldArea(3176, 3422, 22, 20, 0)),
-            new NamedArea("Varrock East Bank", new WorldArea(3247, 3415, 20, 22, 0)),
-            new NamedArea("Edgeville", new WorldArea(3070, 3480, 42, 34, 0)),
-            new NamedArea("Barbarian Village", new WorldArea(3060, 3400, 42, 36, 0)),
-            new NamedArea("Cook's Guild", new WorldArea(3138, 3436, 20, 20, 0)),
-            new NamedArea("Varrock", new WorldArea(3160, 3360, 120, 120, 0)),
-            new NamedArea("Lumbridge", new WorldArea(3190, 3185, 72, 72, 0)),
-            new NamedArea("Lumbridge Swamp", new WorldArea(3158, 3140, 80, 56, 0)),
-            new NamedArea("Al Kharid Mine", new WorldArea(3288, 3270, 50, 36, 0)),
-            new NamedArea("Draynor Village", new WorldArea(3060, 3210, 54, 44, 0)),
-            new NamedArea("Port Sarim", new WorldArea(3000, 3160, 80, 64, 0)),
-            new NamedArea("Rimmington", new WorldArea(2920, 3180, 56, 44, 0)),
-            new NamedArea("Al Kharid", new WorldArea(3260, 3140, 70, 70, 0)),
-            new NamedArea("Duel Arena", new WorldArea(3300, 3220, 80, 70, 0)),
-            new NamedArea("Sorceress's Garden", new WorldArea(3300, 3110, 80, 54, 0)),
-            new NamedArea("Shantay Pass", new WorldArea(3290, 3110, 36, 32, 0)),
-            new NamedArea("Pollnivneach", new WorldArea(3330, 2920, 86, 78, 0)),
-            new NamedArea("Nardah", new WorldArea(3370, 2860, 66, 64, 0)),
-            new NamedArea("Sophanem", new WorldArea(3260, 2760, 88, 88, 0)),
-            new NamedArea("Desert Bandit Camp", new WorldArea(3165, 2970, 64, 58, 0)),
-            new NamedArea("Falador", new WorldArea(2940, 3280, 120, 110, 0)),
-            new NamedArea("Falador Park", new WorldArea(2986, 3348, 54, 34, 0)),
-            new NamedArea("Crafting Guild", new WorldArea(2920, 3260, 46, 40, 0)),
-            new NamedArea("Mining Guild", new WorldArea(2996, 9720, 44, 40, 0)),
-            new NamedArea("Taverley", new WorldArea(2870, 3400, 74, 96, 0)),
-            new NamedArea("Burthorpe", new WorldArea(2860, 3520, 76, 56, 0)),
-            new NamedArea("Trollheim", new WorldArea(2850, 3640, 90, 90, 0)),
-            new NamedArea("Heroes' Guild", new WorldArea(2870, 3490, 44, 40, 0)),
-            new NamedArea("Taverley Dungeon", new WorldArea(2848, 9728, 96, 130, 0)),
-            new NamedArea("Entrana Dungeon", new WorldArea(2816, 9792, 32, 64, 0)),
-            new NamedArea("Dwarven Mine", new WorldArea(3008, 9670, 170, 110, 0)),
-            new NamedArea("White Wolf Mountain", new WorldArea(2830, 3460, 80, 90, 0)),
-            new NamedArea("Camelot", new WorldArea(2740, 3460, 46, 36, 0)),
-            new NamedArea("Seers' Village", new WorldArea(2680, 3440, 68, 58, 0)),
-            new NamedArea("Ranging Guild", new WorldArea(2646, 3410, 44, 34, 0)),
-            new NamedArea("Fishing Guild", new WorldArea(2576, 3370, 52, 40, 0)),
-            new NamedArea("Tree Gnome Village", new WorldArea(2490, 3130, 104, 90, 0)),
-            new NamedArea("Tree Gnome Stronghold", new WorldArea(2390, 3380, 144, 140, 0)),
-            new NamedArea("Grand Tree", new WorldArea(2458, 3460, 62, 62, 0)),
-            new NamedArea("Catherby", new WorldArea(2780, 3420, 68, 52, 0)),
-            new NamedArea("Legend's Guild", new WorldArea(2710, 3330, 56, 64, 0)),
-            new NamedArea("Witchaven", new WorldArea(2680, 3260, 54, 52, 0)),
-            new NamedArea("East Ardougne", new WorldArea(2580, 3280, 72, 90, 0)),
-            new NamedArea("West Ardougne", new WorldArea(2500, 3280, 88, 90, 0)),
-            new NamedArea("Ardougne Monastery", new WorldArea(2584, 3200, 62, 56, 0)),
-            new NamedArea("Yanille", new WorldArea(2520, 3060, 76, 72, 0)),
-            new NamedArea("Wizards' Guild", new WorldArea(2578, 3070, 26, 30, 0)),
-            new NamedArea("Castle Wars", new WorldArea(2420, 3070, 90, 80, 0)),
-            new NamedArea("Ourania", new WorldArea(2440, 3210, 64, 64, 0)),
-            new NamedArea("Brimhaven", new WorldArea(2740, 3140, 92, 92, 0)),
-            new NamedArea("Musa Point", new WorldArea(2890, 3140, 90, 90, 0)),
-            new NamedArea("Karamja Volcano", new WorldArea(2820, 3150, 120, 100, 0)),
-            new NamedArea("Tai Bwo Wannai", new WorldArea(2760, 3050, 76, 74, 0)),
-            new NamedArea("Cairn Isle", new WorldArea(2760, 2960, 54, 58, 0)),
-            new NamedArea("Shilo Village", new WorldArea(2800, 2920, 84, 88, 0)),
-            new NamedArea("Kharazi Jungle", new WorldArea(2780, 2880, 170, 130, 0)),
-            new NamedArea("Crandor", new WorldArea(2820, 3230, 80, 72, 0)),
-            new NamedArea("Canifis", new WorldArea(3470, 3460, 54, 50, 0)),
-            new NamedArea("Port Phasmatys", new WorldArea(3650, 3470, 60, 56, 0)),
-            new NamedArea("Burgh de Rott", new WorldArea(3470, 3180, 72, 72, 0)),
-            new NamedArea("Mort'ton", new WorldArea(3430, 3270, 72, 72, 0)),
-            new NamedArea("Darkmeyer", new WorldArea(3580, 3320, 86, 78, 0)),
-            new NamedArea("Slepe", new WorldArea(3650, 3240, 74, 70, 0)),
-            new NamedArea("Barrows", new WorldArea(3540, 3270, 62, 54, 0)),
-            new NamedArea("Paterdomus", new WorldArea(3400, 3460, 54, 52, 0)),
-            new NamedArea("Digsite", new WorldArea(3320, 3380, 72, 72, 0)),
-            new NamedArea("Mort Myre Swamp", new WorldArea(3390, 3370, 170, 170, 0)),
-            new NamedArea("Fossil Island", new WorldArea(3648, 3712, 192, 200, 0)),
-            new NamedArea("Ape Atoll", new WorldArea(2680, 2680, 170, 130, 0)),
-            new NamedArea("Entrana", new WorldArea(2790, 3320, 90, 80, 0)),
-            new NamedArea("Tutorial Island", new WorldArea(3080, 3080, 120, 100, 0)),
-            new NamedArea("Rellekka", new WorldArea(2620, 3630, 96, 88, 0)),
-            new NamedArea("Fremennik Slayer Cave", new WorldArea(2780, 10020, 160, 150, 0)),
-            new NamedArea("Waterbirth Island", new WorldArea(2500, 3740, 160, 110, 0)),
-            new NamedArea("Miscellania", new WorldArea(2480, 3840, 110, 100, 0)),
-            new NamedArea("Etceteria", new WorldArea(2580, 3860, 120, 100, 0)),
-            new NamedArea("Lunar Isle", new WorldArea(2060, 3890, 190, 180, 0)),
-            new NamedArea("Neitiznot", new WorldArea(2290, 3790, 88, 84, 0)),
-            new NamedArea("Jatizso", new WorldArea(2380, 3790, 84, 84, 0)),
-            new NamedArea("Keldagrim", new WorldArea(2810, 10120, 180, 170, 0)),
-            new NamedArea("Motherlode Mine", new WorldArea(3710, 5630, 220, 190, 0)),
-            new NamedArea("Blast Mine", new WorldArea(1450, 3830, 100, 90, 0)),
-            new NamedArea("Hosidius", new WorldArea(1670, 3530, 160, 190, 0)),
-            new NamedArea("Shayzien", new WorldArea(1460, 3560, 170, 170, 0)),
-            new NamedArea("Arceuus", new WorldArea(1570, 3750, 180, 170, 0)),
-            new NamedArea("Lovakengj", new WorldArea(1410, 3690, 170, 170, 0)),
-            new NamedArea("Piscarilius", new WorldArea(1740, 3670, 190, 180, 0)),
-            new NamedArea("Mount Karuulm", new WorldArea(1240, 3770, 130, 130, 0)),
-            new NamedArea("Wintertodt Camp", new WorldArea(1610, 3930, 70, 70, 0)),
-            new NamedArea("Farming Guild", new WorldArea(1210, 3700, 100, 100, 0)),
-            new NamedArea("Woodcutting Guild", new WorldArea(1540, 3440, 130, 120, 0)),
-            new NamedArea("Kourend Woodland", new WorldArea(1480, 3440, 220, 210, 0)),
-            new NamedArea("Ferox Enclave", new WorldArea(3110, 3620, 48, 42, 0)),
-            new NamedArea("Wilderness Resource Area", new WorldArea(3160, 3920, 72, 56, 0)),
-            new NamedArea("Mage Arena", new WorldArea(3080, 3920, 74, 68, 0)),
-            new NamedArea("Chaos Temple", new WorldArea(2940, 3810, 72, 66, 0)),
-            new NamedArea("Lava Maze", new WorldArea(3010, 3830, 94, 80, 0)),
-            new NamedArea("Black Chinchompa Hunting Ground", new WorldArea(3100, 3770, 90, 80, 0)),
-            new NamedArea("Varlamore Hunter Guild", new WorldArea(1530, 3410, 80, 70, 0)),
-            new NamedArea("Civitas illa Fortis", new WorldArea(1600, 3000, 240, 270, 0)),
-            new NamedArea("Aldarin", new WorldArea(1350, 2880, 130, 140, 0)),
-            new NamedArea("Avium Savannah", new WorldArea(1470, 3000, 230, 450, 0)),
-            new NamedArea("Sunset Coast", new WorldArea(1200, 2900, 160, 320, 0)),
-            new NamedArea("Varlamore Mountain Range", new WorldArea(1400, 3100, 100, 150, 0)));
+    /** Route targets that aren't wiki location pages (bosses, minigames) or need a specific spot. */
+    private static final Map<String, WorldPoint> POI_COORDINATES = new HashMap<>();
 
-    /** Large province fallback bounding boxes for broad regional identification. */
-    private static final List<NamedArea> PROVINCE_FALLBACKS = Arrays.asList(
-            new NamedArea("Kebos Lowlands", new WorldArea(1100, 3500, 430, 420, 0)),
-            new NamedArea("Great Kourend", new WorldArea(1560, 3450, 360, 360, 0)),
-            new NamedArea("Wilderness", new WorldArea(2940, 3520, 360, 560, 0)),
-            new NamedArea("Karamja", new WorldArea(2760, 2860, 260, 380, 0)),
-            new NamedArea("Varlamore", new WorldArea(1200, 2700, 650, 780, 0)),
-            new NamedArea("Tirannwn", new WorldArea(2100, 3050, 260, 300, 0)),
-            new NamedArea("Kandarin", new WorldArea(2100, 2900, 760, 650, 0)),
-            new NamedArea("Asgarnia", new WorldArea(2860, 3100, 200, 420, 0)),
-            new NamedArea("Misthalin", new WorldArea(3060, 3140, 270, 380, 0)),
-            new NamedArea("Kharidian Desert", new WorldArea(3100, 2600, 350, 510, 0)),
-            new NamedArea("Morytania", new WorldArea(3380, 3140, 340, 460, 0)),
-            new NamedArea("Fremennik Province", new WorldArea(2580, 3550, 270, 300, 0)));
+    static {
+        // Banks and guild entrances where the wiki page centre is not where you'd walk to
+        POI_COORDINATES.put("edgeville bank", new WorldPoint(3096, 3494, 0));
+        POI_COORDINATES.put("lumbridge", new WorldPoint(3222, 3218, 0));
+        POI_COORDINATES.put("woodcutting guild", new WorldPoint(1658, 3505, 0));
+        POI_COORDINATES.put("mining guild", new WorldPoint(3019, 3339, 0));
+        POI_COORDINATES.put("fishing guild", new WorldPoint(2611, 3393, 0));
+        POI_COORDINATES.put("warriors guild", new WorldPoint(2843, 3543, 0));
+
+        // Minigames & activities
+        POI_COORDINATES.put("wintertodt", new WorldPoint(1630, 3965, 0));
+        POI_COORDINATES.put("barrows", new WorldPoint(3565, 3298, 0));
+        POI_COORDINATES.put("blast furnace", new WorldPoint(2716, 3713, 0)); // Keldagrim entrance
+        POI_COORDINATES.put("motherlode mine", new WorldPoint(3059, 9764, 0)); // Falador mine entrance
+        POI_COORDINATES.put("barbarian assault", new WorldPoint(2526, 3577, 0));
+        POI_COORDINATES.put("nightmare zone", new WorldPoint(2609, 3115, 0));
+        POI_COORDINATES.put("tithe farm", new WorldPoint(1798, 3596, 0));
+        POI_COORDINATES.put("giants foundry", new WorldPoint(3361, 3147, 0));
+        POI_COORDINATES.put("guardians of the rift", new WorldPoint(3109, 3169, 0)); // Wizard cellar entrance
+        POI_COORDINATES.put("pest control", new WorldPoint(2659, 2676, 0)); // Void Knights' Outpost
+        POI_COORDINATES.put("tempoross", new WorldPoint(3155, 2835, 0));
+        POI_COORDINATES.put("tears of guthix", new WorldPoint(3169, 3173, 0)); // Lumbridge swamp entrance
+        POI_COORDINATES.put("chaos altar", new WorldPoint(2948, 3821, 0));
+        POI_COORDINATES.put("fortis colosseum", new WorldPoint(1800, 3105, 0));
+        POI_COORDINATES.put("perilous moons", new WorldPoint(1450, 3120, 0));
+
+        // Raids & bosses (surface entrances)
+        POI_COORDINATES.put("chambers of xeric", new WorldPoint(1255, 3560, 0));
+        POI_COORDINATES.put("theatre of blood", new WorldPoint(3659, 3217, 0));
+        POI_COORDINATES.put("tombs of amascut", new WorldPoint(3356, 2698, 0));
+        POI_COORDINATES.put("chasm of fire", new WorldPoint(1435, 3671, 0));
+        POI_COORDINATES.put("vorkath", new WorldPoint(2640, 3693, 0)); // Rellekka boat
+        POI_COORDINATES.put("zulrah", new WorldPoint(2200, 3056, 0)); // Zul-Andra boat
+        POI_COORDINATES.put("muspah", new WorldPoint(2848, 3964, 0)); // Weiss
+        POI_COORDINATES.put("vardorvis", new WorldPoint(1220, 3420, 0));
+        POI_COORDINATES.put("duke sucellus", new WorldPoint(1560, 3780, 0));
+        POI_COORDINATES.put("tormented demons", new WorldPoint(2540, 3170, 0));
+        POI_COORDINATES.put("hueycoatl", new WorldPoint(1412, 3266, 0));
+        POI_COORDINATES.put("amoxliatl", new WorldPoint(1402, 3080, 0));
+        POI_COORDINATES.put("prifddinas", new WorldPoint(2240, 3260, 0)); // Gates; the city itself is elsewhere
+    }
 
     /**
-     * Resolves a human-readable location description for a player position.
+     * Short place name for a position, e.g. "Rimmington mine".
      *
      * @param worldPoint       the player's {@link WorldPoint}
      * @param inInstance       {@code true} if the player is in an instanced area
@@ -157,12 +89,13 @@ public final class LocationResolver {
      * @return display location string
      */
     public String describe(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
-        return resolveLocation(worldPoint, inInstance, instanceTemplate, false);
+        return resolve(worldPoint, inInstance, instanceTemplate, false);
     }
 
     /**
-     * Resolves an enriched location description formatted for AI system context
-     * (includes canonical aliases).
+     * Place name with its wider area and how certain the match is, for the AI's context, e.g.
+     * "Near Rimmington mine (part of Rimmington, Asgarnia)". The wider areas are the wiki's own
+     * "location" chain.
      *
      * @param worldPoint       the player's {@link WorldPoint}
      * @param inInstance       {@code true} if the player is in an instanced area
@@ -170,94 +103,54 @@ public final class LocationResolver {
      * @return AI prompt location string
      */
     public String describeForAi(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate) {
-        return resolveLocation(worldPoint, inInstance, instanceTemplate, true);
+        return resolve(worldPoint, inInstance, instanceTemplate, true);
     }
 
-    private String resolveLocation(WorldPoint worldPoint, boolean inInstance, InstanceTemplates instanceTemplate,
-            boolean forAi) {
-        if (worldPoint == null) {
+    private String resolve(WorldPoint wp, boolean inInstance, InstanceTemplates template, boolean forAi) {
+        if (wp == null) {
             return "Unknown";
         }
-
         if (inInstance) {
-            return instanceTemplate != null
-                    ? describeInstanceTemplate(instanceTemplate)
-                    : "Instanced area";
+            return template != null ? describeInstanceTemplate(template) : "Instanced area";
         }
 
-        RegionAlias alias = REGION_ALIASES.get(worldPoint.getRegionID());
-        if (alias != null) {
-            return forAi ? formatAlias(alias) : alias.displayName;
+        int x = wp.getX();
+        int y = wp.getY();
+        WikiLocation best = null;
+        for (WikiLocation loc : LOCATIONS) {
+            if (loc.contains(x, y) && (best == null || loc.moreSpecificThan(best, x, y))) {
+                best = loc;
+            }
+        }
+        if (best != null) {
+            if (!forAi) {
+                return best.name;
+            }
+            return (best.exact ? best.name : "Near " + best.name) + best.context();
         }
 
-        NamedArea directMatch = findArea(worldPoint);
-        if (directMatch != null) {
-            return directMatch.name;
+        WikiLocation nearest = null;
+        double nearestDist = Double.MAX_VALUE;
+        for (WikiLocation loc : LOCATIONS) {
+            double d = loc.distanceToCentre(x, y);
+            if (d < nearestDist && (nearest == null || !loc.water || nearest.water)) {
+                nearest = loc;
+                nearestDist = d;
+            }
         }
-
-        NamedArea regionFallback = findAreaByRegion(worldPoint.getRegionID(), worldPoint.getPlane());
-        if (regionFallback != null) {
-            return regionFallback.name;
+        if (nearest == null || nearestDist > NEAREST_SEARCH_TILES) {
+            return "Unknown area (region " + wp.getRegionID() + ")";
         }
-
-        String underground = resolveUnderground(worldPoint, forAi);
-        if (underground != null) {
-            return underground;
-        }
-
-        NamedArea provinceFallback = findProvinceFallback(worldPoint);
-        if (provinceFallback != null) {
-            return provinceFallback.name;
-        }
-
-        String provinceUnderground = resolveProvinceUnderground(worldPoint, forAi);
-        if (provinceUnderground != null) {
-            return provinceUnderground;
-        }
-
-        return "Unknown area (region " + worldPoint.getRegionID() + ")";
+        String direction = direction(x - nearest.centreX, y - nearest.centreY);
+        String text = "Unnamed area " + Math.round(nearestDist) + " tiles " + direction + " of " + nearest.name;
+        return forAi ? text + nearest.context().replace(" (part of ", " (which is part of ") : text;
     }
 
-    private NamedArea findArea(WorldPoint point) {
-        for (NamedArea area : KNOWN_AREAS) {
-            if (point.isInArea2D(area.worldArea)) {
-                return area;
-            }
-        }
-
-        return null;
-    }
-
-    private String resolveUnderground(WorldPoint worldPoint, boolean forAi) {
-        for (int offset : UNDERGROUND_Y_OFFSETS) {
-            if (worldPoint.getY() <= offset) {
-                continue;
-            }
-
-            WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset,
-                    worldPoint.getPlane());
-
-            if (normalized.getY() >= 5000 || normalized.getY() < 2000) {
-                continue;
-            }
-
-            RegionAlias alias = REGION_ALIASES.get(normalized.getRegionID());
-            if (alias != null) {
-                return (forAi ? formatAlias(alias) : alias.displayName) + " (underground)";
-            }
-
-            NamedArea area = findArea(normalized);
-            if (area != null) {
-                return area.name + " (underground)";
-            }
-
-            NamedArea regionFallback = findAreaByRegion(normalized.getRegionID(), normalized.getPlane());
-            if (regionFallback != null) {
-                return regionFallback.name + " (underground)";
-            }
-        }
-
-        return null;
+    private static String direction(double dx, double dy) {
+        String[] names = { "east", "north-east", "north", "north-west", "west", "south-west", "south", "south-east" };
+        double angle = Math.toDegrees(Math.atan2(dy, dx));
+        int index = (int) Math.round(((angle + 360) % 360) / 45.0) % 8;
+        return names[index];
     }
 
     private String describeInstanceTemplate(InstanceTemplates instanceTemplate) {
@@ -273,14 +166,9 @@ public final class LocationResolver {
         }
     }
 
-    private String humanize(String value) {
-        if (value == null || value.isEmpty()) {
-            return "";
-        }
-        String[] words = value.split("_");
+    private static String humanize(String value) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < words.length; i++) {
-            String word = words[i];
+        for (String word : value.split("_")) {
             if (word.isEmpty()) {
                 continue;
             }
@@ -288,226 +176,14 @@ public final class LocationResolver {
                 sb.append(' ');
             }
             sb.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) {
-                sb.append(word.substring(1).toLowerCase(Locale.ENGLISH));
-            }
+            sb.append(word.substring(1).toLowerCase(Locale.ENGLISH));
         }
         return sb.toString();
     }
 
     /**
-     * Returns a location string enriched with the canonical OSRS name when it
-     * differs from the display name. This is the preferred method for building AI
-     * prompt context so
-     * the model can reason about well-known area names even when the in-game
-     * display differs.
-     * e.g. "Kourend Underground (Catacombs of Kourend)"
-     *
-     * @param alias the {@link RegionAlias}
-     * @return formatted alias string
-     */
-    private static String formatAlias(RegionAlias alias) {
-        if (alias.canonicalName.equals(alias.displayName)) {
-            return alias.displayName;
-        }
-
-        return alias.displayName + " (also known as: " + alias.canonicalName + ")";
-    }
-
-    private static Map<Integer, RegionAlias> loadRegionAliases() {
-        Map<Integer, RegionAlias> aliases = new HashMap<>();
-        try (InputStream stream = LocationResolver.class.getResourceAsStream(REGION_ALIAS_RESOURCE)) {
-            if (stream == null) {
-                return Collections.emptyMap();
-            }
-
-            Properties properties = new Properties();
-            properties.load(new InputStreamReader(stream, StandardCharsets.UTF_8));
-            for (String key : properties.stringPropertyNames()) {
-                try {
-                    int regionId = Integer.parseInt(key.trim());
-                    RegionAlias alias = parseRegionAliasValue(properties.getProperty(key));
-                    if (alias != null) {
-                        aliases.put(regionId, alias);
-                    }
-                } catch (NumberFormatException ignored) {
-                    // Ignore malformed region ids so a single bad entry does not break all aliases.
-                }
-            }
-        } catch (IOException ignored) {
-            return Collections.emptyMap();
-        }
-
-        return Collections.unmodifiableMap(aliases);
-    }
-
-    private static RegionAlias parseRegionAliasValue(String value) {
-        if (value == null) {
-            return null;
-        }
-
-        String normalized = value.trim();
-        if (normalized.isEmpty()) {
-            return null;
-        }
-
-        String[] parts = normalized.split("\\|", 2);
-        String displayName = parts[0].trim();
-        String canonicalName = parts.length > 1 ? parts[1].trim() : displayName;
-
-        if (displayName.isEmpty()) {
-            displayName = canonicalName;
-        }
-
-        if (displayName.isEmpty()) {
-            return null;
-        }
-
-        if (canonicalName.isEmpty()) {
-            canonicalName = displayName;
-        }
-
-        return new RegionAlias(displayName, canonicalName);
-    }
-
-    private NamedArea findAreaByRegion(int regionId, int plane) {
-        int rx = regionId >> 8;
-        int ry = regionId & 0xFF;
-        int regionMinX = rx << 6;
-        int regionMinY = ry << 6;
-
-        List<NamedArea> overlapping = new ArrayList<>();
-        for (NamedArea area : KNOWN_AREAS) {
-            if (area.worldArea.getPlane() == plane) {
-                if (overlaps(regionMinX, regionMinY, 64, 64,
-                        area.worldArea.getX(), area.worldArea.getY(),
-                        area.worldArea.getWidth(), area.worldArea.getHeight())) {
-                    overlapping.add(area);
-                }
-            }
-        }
-
-        if (overlapping.isEmpty()) {
-            return null;
-        }
-
-        overlapping.sort((a, b) -> Integer.compare(
-                b.worldArea.getWidth() * b.worldArea.getHeight(),
-                a.worldArea.getWidth() * a.worldArea.getHeight()));
-
-        return overlapping.get(0);
-    }
-
-    private NamedArea findProvinceFallback(WorldPoint point) {
-        for (NamedArea area : PROVINCE_FALLBACKS) {
-            if (point.isInArea2D(area.worldArea)) {
-                return area;
-            }
-        }
-        return null;
-    }
-
-    private String resolveProvinceUnderground(WorldPoint worldPoint, boolean forAi) {
-        for (int offset : UNDERGROUND_Y_OFFSETS) {
-            if (worldPoint.getY() <= offset) {
-                continue;
-            }
-
-            WorldPoint normalized = new WorldPoint(worldPoint.getX(), worldPoint.getY() - offset,
-                    worldPoint.getPlane());
-
-            if (normalized.getY() >= 5000 || normalized.getY() < 2000) {
-                continue;
-            }
-
-            NamedArea area = findProvinceFallback(normalized);
-            if (area != null) {
-                return area.name + " (underground)";
-            }
-        }
-        return null;
-    }
-
-    private static boolean overlaps(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
-        return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
-    }
-
-    /** Well-known POI landmarks with surface coordinates. */
-    private static final Map<String, WorldPoint> POI_COORDINATES = new HashMap<>();
-
-    static {
-        // Cities & Banks
-        POI_COORDINATES.put("grand exchange", new WorldPoint(3164, 3487, 0));
-        POI_COORDINATES.put("varrock west bank", new WorldPoint(3183, 3441, 0));
-        POI_COORDINATES.put("varrock east bank", new WorldPoint(3253, 3420, 0));
-        POI_COORDINATES.put("edgeville bank", new WorldPoint(3096, 3494, 0));
-        POI_COORDINATES.put("lumbridge", new WorldPoint(3222, 3218, 0));
-        POI_COORDINATES.put("falador east bank", new WorldPoint(3012, 3355, 0));
-        POI_COORDINATES.put("falador west bank", new WorldPoint(2946, 3368, 0));
-        POI_COORDINATES.put("seers village bank", new WorldPoint(2725, 3492, 0));
-        POI_COORDINATES.put("catherby bank", new WorldPoint(2808, 3440, 0));
-        POI_COORDINATES.put("ardougne south bank", new WorldPoint(2658, 3283, 0));
-        POI_COORDINATES.put("ardougne north bank", new WorldPoint(2615, 3332, 0));
-        POI_COORDINATES.put("draynor bank", new WorldPoint(3092, 3244, 0));
-        POI_COORDINATES.put("al kharid bank", new WorldPoint(3270, 3166, 0));
-        POI_COORDINATES.put("hosidius bank", new WorldPoint(1676, 3617, 0));
-        POI_COORDINATES.put("shayzien bank", new WorldPoint(1488, 3592, 0));
-
-        // Guilds
-        POI_COORDINATES.put("farming guild", new WorldPoint(1248, 3726, 0));
-        POI_COORDINATES.put("woodcutting guild", new WorldPoint(1658, 3505, 0));
-        POI_COORDINATES.put("mining guild", new WorldPoint(3019, 3339, 0));
-        POI_COORDINATES.put("fishing guild", new WorldPoint(2611, 3393, 0));
-        POI_COORDINATES.put("crafting guild", new WorldPoint(2933, 3290, 0));
-        POI_COORDINATES.put("cooks guild", new WorldPoint(3143, 3442, 0));
-        POI_COORDINATES.put("hunter guild", new WorldPoint(1557, 3048, 0));
-        POI_COORDINATES.put("myths guild", new WorldPoint(2457, 2850, 0));
-        POI_COORDINATES.put("champions guild", new WorldPoint(3191, 3363, 0));
-        POI_COORDINATES.put("heroes guild", new WorldPoint(2902, 3510, 0));
-        POI_COORDINATES.put("legends guild", new WorldPoint(2728, 3377, 0));
-        POI_COORDINATES.put("wizards guild", new WorldPoint(2590, 3087, 0));
-        POI_COORDINATES.put("warriors guild", new WorldPoint(2843, 3543, 0));
-
-        // Minigames & Activities
-        POI_COORDINATES.put("wintertodt", new WorldPoint(1630, 3965, 0));
-        POI_COORDINATES.put("barrows", new WorldPoint(3565, 3298, 0));
-        POI_COORDINATES.put("ferox enclave", new WorldPoint(3135, 3628, 0));
-        POI_COORDINATES.put("blast furnace", new WorldPoint(2716, 3713, 0)); // Keldagrim entrance
-        POI_COORDINATES.put("motherlode mine", new WorldPoint(3059, 9764, 0)); // Falador mine entrance
-        POI_COORDINATES.put("barbarian assault", new WorldPoint(2526, 3577, 0));
-        POI_COORDINATES.put("nightmare zone", new WorldPoint(2609, 3115, 0));
-        POI_COORDINATES.put("tithe farm", new WorldPoint(1798, 3596, 0));
-        POI_COORDINATES.put("giants foundry", new WorldPoint(3361, 3147, 0));
-        POI_COORDINATES.put("guardians of the rift", new WorldPoint(3109, 3169, 0)); // Wizard cellar entrance
-        POI_COORDINATES.put("pest control", new WorldPoint(2659, 2676, 0));
-        POI_COORDINATES.put("tempoross", new WorldPoint(3155, 2835, 0));
-        POI_COORDINATES.put("tears of guthix", new WorldPoint(3169, 3173, 0)); // Lumbridge swamp entrance
-        POI_COORDINATES.put("mage arena", new WorldPoint(3095, 3957, 0));
-        POI_COORDINATES.put("chaos altar", new WorldPoint(2948, 3821, 0));
-        POI_COORDINATES.put("fortis colosseum", new WorldPoint(1800, 3105, 0));
-        POI_COORDINATES.put("perilous moons", new WorldPoint(1450, 3120, 0));
-
-        // Raids & Bosses (Surface Entrances)
-        POI_COORDINATES.put("chambers of xeric", new WorldPoint(1255, 3560, 0));
-        POI_COORDINATES.put("theatre of blood", new WorldPoint(3659, 3217, 0));
-        POI_COORDINATES.put("tombs of amascut", new WorldPoint(3356, 2698, 0));
-        POI_COORDINATES.put("chasm of fire", new WorldPoint(1435, 3671, 0));
-        POI_COORDINATES.put("vorkath", new WorldPoint(2640, 3693, 0)); // Rellekka boat
-        POI_COORDINATES.put("zulrah", new WorldPoint(2200, 3056, 0)); // Zul-Andra boat
-        POI_COORDINATES.put("muspah", new WorldPoint(2848, 3964, 0)); // Weiss
-        POI_COORDINATES.put("vardorvis", new WorldPoint(1220, 3420, 0));
-        POI_COORDINATES.put("duke sucellus", new WorldPoint(1560, 3780, 0));
-        POI_COORDINATES.put("the leviathan", new WorldPoint(2070, 6380, 0));
-        POI_COORDINATES.put("the whisperer", new WorldPoint(3000, 5800, 0));
-        POI_COORDINATES.put("tormented demons", new WorldPoint(2540, 3170, 0));
-        POI_COORDINATES.put("hueycoatl", new WorldPoint(1412, 3266, 0));
-        POI_COORDINATES.put("amoxliatl", new WorldPoint(1402, 3080, 0));
-        POI_COORDINATES.put("darkmeyer", new WorldPoint(3610, 3360, 0));
-        POI_COORDINATES.put("prifddinas", new WorldPoint(2240, 3260, 0));
-    }
-
-    /**
-     * Resolves a named POI query into a {@link WorldPoint} destination.
+     * Resolves a place name into a route target: hand-picked targets first (bosses, minigames,
+     * entrances), then wiki locations by name. For dungeons, the surface entrance is preferred.
      *
      * @param query POI or landmark name
      * @return matching {@link WorldPoint} or {@code null} if not found
@@ -516,58 +192,216 @@ public final class LocationResolver {
         if (query == null || query.trim().isEmpty()) {
             return null;
         }
-
-        String cleaned = query.trim().toLowerCase().replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
-
-        // Exact match on POI database
-        if (POI_COORDINATES.containsKey(cleaned)) {
-            return POI_COORDINATES.get(cleaned);
+        String cleaned = normalize(query);
+        if (cleaned.isEmpty()) {
+            return null;
         }
 
-        // Substring / partial match on POI database
+        WorldPoint poi = POI_COORDINATES.get(cleaned);
+        if (poi != null) {
+            return poi;
+        }
+
+        WikiLocation loc = pick(BY_NAME.get(cleaned + " entrance"));
+        if (loc == null) {
+            loc = pick(BY_NAME.get(cleaned));
+        }
+        if (loc != null) {
+            return new WorldPoint(loc.centreX, loc.centreY, loc.plane);
+        }
+
         for (Map.Entry<String, WorldPoint> entry : POI_COORDINATES.entrySet()) {
             if (cleaned.contains(entry.getKey()) || entry.getKey().contains(cleaned)) {
                 return entry.getValue();
             }
         }
+        // Partial name match: the shortest wiki name containing the query (e.g. "ardougne" ->
+        // "East Ardougne" rather than a building in it), or a name the query contains.
+        String bestKey = null;
+        for (String key : BY_NAME.keySet()) {
+            if ((key.contains(cleaned) || cleaned.contains(key))
+                    && (bestKey == null || key.length() < bestKey.length())) {
+                bestKey = key;
+            }
+        }
+        loc = bestKey != null ? pick(BY_NAME.get(bestKey)) : null;
+        return loc != null ? new WorldPoint(loc.centreX, loc.centreY, loc.plane) : null;
+    }
 
-        // Fallback: Check KNOWN_AREAS center point
-        for (NamedArea area : KNOWN_AREAS) {
-            String areaName = area.name.toLowerCase();
-            if (cleaned.contains(areaName) || areaName.contains(cleaned)) {
-                WorldArea wa = area.worldArea;
-                return new WorldPoint(wa.getX() + wa.getWidth() / 2, wa.getY() + wa.getHeight() / 2, wa.getPlane());
+    /** The largest shape of a location, as the most representative target. */
+    private static WikiLocation pick(List<WikiLocation> shapes) {
+        if (shapes == null || shapes.isEmpty()) {
+            return null;
+        }
+        WikiLocation best = shapes.get(0);
+        for (WikiLocation loc : shapes) {
+            if (loc.area > best.area) {
+                best = loc;
+            }
+        }
+        return best;
+    }
+
+    private static String normalize(String s) {
+        return s.toLowerCase(Locale.ENGLISH).replaceAll("[^a-z0-9\\s]", "").replaceAll("\\s+", " ").trim();
+    }
+
+    private static List<WikiLocation> load() {
+        List<WikiLocation> out = new ArrayList<>();
+        try (InputStream stream = LocationResolver.class.getResourceAsStream(DATA_RESOURCE)) {
+            if (stream == null) {
+                return Collections.emptyList();
+            }
+            BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                WikiLocation loc = WikiLocation.parse(line);
+                if (loc != null) {
+                    out.add(loc);
+                }
+            }
+        } catch (IOException ignored) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    private static Map<String, List<WikiLocation>> indexByName(List<WikiLocation> locations) {
+        Map<String, List<WikiLocation>> map = new HashMap<>();
+        for (WikiLocation loc : locations) {
+            map.computeIfAbsent(normalize(loc.name), k -> new ArrayList<>()).add(loc);
+        }
+        return map;
+    }
+
+    /** One shape of a wiki location: a polygon outline or a circle around the map centre. */
+    private static final class WikiLocation {
+        final String name;
+        final String[] parents;
+        final String region;
+        final boolean water;
+        final int plane;
+        /** Polygon outline (otherwise a circle). */
+        final boolean polygon;
+        /** Outline drawn on the wiki map, as opposed to a circle or an estimate from monster spawns. */
+        final boolean exact;
+        final int[] xs;
+        final int[] ys;
+        final int radius;
+        final int centreX;
+        final int centreY;
+        final double area;
+
+        private WikiLocation(String name, String[] parents, String region, boolean water, int plane,
+                int[] xs, int[] ys, int radius, boolean estimated) {
+            this.name = name;
+            this.parents = parents;
+            this.region = region;
+            this.water = water;
+            this.plane = plane;
+            this.xs = xs;
+            this.ys = ys;
+            this.radius = radius;
+            this.polygon = radius < 0;
+            this.exact = polygon && !estimated;
+            if (polygon) {
+                long sx = 0;
+                long sy = 0;
+                double twiceArea = 0;
+                for (int i = 0, j = xs.length - 1; i < xs.length; j = i++) {
+                    sx += xs[i];
+                    sy += ys[i];
+                    twiceArea += (double) xs[j] * ys[i] - (double) xs[i] * ys[j];
+                }
+                this.centreX = (int) (sx / xs.length);
+                this.centreY = (int) (sy / xs.length);
+                this.area = Math.max(1, Math.abs(twiceArea) / 2);
+            } else {
+                this.centreX = xs[0];
+                this.centreY = ys[0];
+                this.area = Math.PI * radius * radius;
             }
         }
 
-        return null;
-    }
-
-    /**
-     * Struct representing a named OSRS area paired with its {@link WorldArea}
-     * bounding box.
-     */
-    private static final class NamedArea {
-        private final String name;
-        private final WorldArea worldArea;
-
-        private NamedArea(String name, WorldArea worldArea) {
-            this.name = name;
-            this.worldArea = worldArea;
+        static WikiLocation parse(String line) {
+            String[] f = line.split("\t", -1);
+            if (f.length < 9) {
+                return null;
+            }
+            try {
+                String[] parents = f[4].isEmpty() ? new String[0] : f[4].split("\\|");
+                boolean water = f[3].startsWith("water");
+                boolean estimated = f[3].endsWith("~");
+                int plane = Integer.parseInt(f[6]);
+                if ("C".equals(f[7])) {
+                    String[] c = f[8].split(",");
+                    return new WikiLocation(f[0], parents, f[5], water, plane,
+                            new int[] { Integer.parseInt(c[0]) }, new int[] { Integer.parseInt(c[1]) },
+                            Integer.parseInt(c[2]), estimated);
+                }
+                String[] pts = f[8].split(";");
+                if (pts.length < 3) {
+                    return null;
+                }
+                int[] xs = new int[pts.length];
+                int[] ys = new int[pts.length];
+                for (int i = 0; i < pts.length; i++) {
+                    String[] p = pts[i].split(",");
+                    xs[i] = Integer.parseInt(p[0]);
+                    ys[i] = Integer.parseInt(p[1]);
+                }
+                return new WikiLocation(f[0], parents, f[5], water, plane, xs, ys, -1, estimated);
+            } catch (RuntimeException e) {
+                return null;
+            }
         }
-    }
 
-    /**
-     * Struct representing a region ID alias containing a display name and canonical
-     * name.
-     */
-    private static final class RegionAlias {
-        private final String displayName;
-        private final String canonicalName;
+        boolean contains(int x, int y) {
+            if (!polygon) {
+                return distanceToCentre(x, y) <= radius;
+            }
+            // Ray casting on the tile's centre.
+            double px = x + 0.5;
+            double py = y + 0.5;
+            boolean inside = false;
+            for (int i = 0, j = xs.length - 1; i < xs.length; j = i++) {
+                if ((ys[i] > py) != (ys[j] > py)
+                        && px < (double) (xs[j] - xs[i]) * (py - ys[i]) / (ys[j] - ys[i]) + xs[i]) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
 
-        private RegionAlias(String displayName, String canonicalName) {
-            this.displayName = displayName;
-            this.canonicalName = canonicalName;
+        double distanceToCentre(int x, int y) {
+            double dx = x - centreX;
+            double dy = y - centreY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        /** Land beats water; then the smaller area; ties go to the closer centre. */
+        boolean moreSpecificThan(WikiLocation other, int x, int y) {
+            if (water != other.water) {
+                return !water;
+            }
+            if (Math.abs(area - other.area) > 1e-6) {
+                return area < other.area;
+            }
+            return distanceToCentre(x, y) < other.distanceToCentre(x, y);
+        }
+
+        /** " (part of Rimmington, Asgarnia)", or "" when nothing is known. */
+        String context() {
+            List<String> parts = new ArrayList<>();
+            for (String p : parents) {
+                if (!p.isEmpty() && !p.equalsIgnoreCase(name) && !parts.contains(p)) {
+                    parts.add(p);
+                }
+            }
+            return parts.isEmpty() ? "" : " (part of " + String.join(", ", parts) + ")";
         }
     }
 }

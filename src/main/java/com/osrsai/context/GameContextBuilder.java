@@ -128,6 +128,9 @@ public class GameContextBuilder {
                         .append(wp.getPlane()).append("\n");
                 sb.append("Region ID: ").append(wp.getRegionID()).append("\n");
                 sb.append("Instanced Area: ").append(inInstance ? "Yes" : "No").append("\n");
+                if (client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1) {
+                    sb.append("In the Wilderness: Yes (PvP risk; call get_player_location_details for the level)\n");
+                }
             }
         }
         sb.append("\n");

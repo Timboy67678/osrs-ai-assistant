@@ -51,3 +51,6 @@ build/
 *.ipr
 bin/
 .vscode/
+
+# Python (scripts/)
+__pycache__/
